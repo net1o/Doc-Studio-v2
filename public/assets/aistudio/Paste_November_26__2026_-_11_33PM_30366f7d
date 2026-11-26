@@ -1,0 +1,1612 @@
+// ========================================================================
+// TRADEMARK JOURNAL MONITORING SYSTEM — v2.1 (Bug Fixed)
+// ------------------------------------------------------------------------
+// Fixes vs v2:
+//  - FIX 1: setupSystem() ab JournalCheck sheet auto-create karta hai
+//            agar exist na kare — pehle sirf warn karta tha aur band
+//            ho jaata tha
+//  - FIX 2: applyDashboardTemplate_() function restore kiya — v2 mein
+//            ye function delete ho gaya tha jis se Dashboard blank rahta
+//            tha first run pe
+//  - FIX 3: setupSystem() ab refreshDashboardLabels_ ki jagah
+//            applyDashboardTemplate_() call karta hai first-time setup ke
+//            liye — Safe Refresh mein refreshDashboardLabels_() hi rehta
+//            hai (labels only, data safe)
+//  - Baaki sab v2 ka code exactly as-is
+// ========================================================================
+
+
+// ========================================
+// MENU
+// ========================================
+
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu("🔰 Journal Monitor")
+    .addItem("⚙️ Setup System", "setupSystem")
+    .addItem("🔍 Run Scan", "runScan")
+    .addSeparator()
+    .addItem("📄 Generate Documents", "generateDocsAndPdfs")
+    .addItem("📜 Convert to PDF", "convertGeneratedDocsToPdfs")
+    .addSeparator()
+    .addItem("📊 Generate Report", "generateReport")
+    .addSeparator()
+    .addSubMenu(
+      ui.createMenu("More Tools")
+        .addItem("📦 Backup Data (CSV/JSON)", "backupAndExport")
+        .addItem("🕠 Re-normalize Dates", "normalizeJournalCheckFilingDates")
+        .addItem("🔎 Test Case Lookup", "testCaseLookup")
+    )
+    .addToUi();
+}
+
+
+// ========================================
+// CONFIG
+// ========================================
+
+const CFG = {
+  SHEET_DASHBOARD: "Dashboard",
+  SHEET_JOURNAL:   "JournalCheck",   // VBA se data yahan paste hota hai
+  SHEET_REVIEW:    "Review",
+  SHEET_RECORDS:   "Records",
+  SHEET_REPORT:    "Report",
+
+  DASH_JOURNAL_NO_A1:       "B2",
+  DASH_JOURNAL_DATE_A1:     "B3",
+  DASH_KEYWORDS_RANGE_A1:   "A7:A",
+  DASH_TM_RANGE_A1:         "B7:B",
+
+  MAIN_FOLDER_ID: "1v9Fesbb_dT7PqljlQQ4fP87fcesEv0mx",
+  TEMPLATE_ID:    "1eHJGw4Lly5T8PRFqkcyVBdVZVwYgNUdZHRsjd8cwWUM",
+
+  EXTERNAL_SHEET_ID:   "1yu27k_3Z6cCJmcnQI52z1dIC52Zi9ZxaKlo9wJiNFiQ",
+  EXTERNAL_SHEET_NAME: "DATABASE",
+  EXTERNAL_KEY_COL:    8,         // Column H = TM/CPR NUMBER
+  EXTERNAL_VALUE_COLS: [3, 4],    // Column C = CASE NUMBER, D = CLIENT NAME
+
+  KEYWORD_MATCH_MODE: "word",     // "contains" | "word"
+
+  SERIAL_PREFIX: "PB-",
+  SERIAL_PAD:    3,
+
+  STATUS_REVIEW: "REVIEW",
+  STATUS_OK:     "MAILMERGE",
+  STATUS_DONE:   "GENERATED",
+
+  DECISION_PENDING: "PENDING REVIEW",
+  DECISION_ISSUE:   "ISSUE - OPPOSE",
+  DECISION_CLEAR:   "NO ISSUE - CLEAR",
+};
+
+// -----------------------------------------------------------------------
+// JournalCheck headers — VBA ConvertJournal2() output se exactly match
+// Page No column last mein hai — aap manually fill karte hain
+// -----------------------------------------------------------------------
+const JOURNAL_HEADERS = [
+  "Application No",
+  "Title",
+  "Class",
+  "Applicant Name and Address",
+  "Agent Name and Address",
+  "Date of Filing",
+  "Page No",   // manually fill kiya jata hai
+];
+
+// -----------------------------------------------------------------------
+// Review aur Records ke headers — v2 se unchanged
+// -----------------------------------------------------------------------
+const REVIEW_HEADERS = [
+  "Journal No", "Journal Date", "Application No", "Case No", "Title", "Class",
+  "Applicant Name and Address", "Agent Name and Address", "Date of Filing",
+  "Matched Term", "Match Type", "Decision", "Status",
+  "Generated Doc", "Generated PDF", "Generated At", "Page No",
+];
+
+const RECORDS_HEADERS = [
+  "Journal No", "Journal Date", "TM No", "Case No", "Class",
+  "Applicant Name and Address", "Trading/Title", "Agent Name and Address",
+  "Application No", "Date of Filing", "Matched Term", "Match Type",
+  "Decision", "Remarks", "Doc URL", "PDF URL", "Created At", "Page No",
+];
+
+const UI_CFG = {
+  FONT_FAMILY:      "Ysabeau SC",
+  HEADER_BG:        "#c46300",
+  HEADER_FG:        "#000000",
+  ALT_ROW_BG:       "#fff2e5",
+  DATE_FORMAT:      "dd-MMM-yy",
+  DEFAULT_H_ALIGN:  "left",
+  DEFAULT_V_ALIGN:  "middle",
+  WRAP_STRATEGY:    SpreadsheetApp.WrapStrategy.CLIP,
+
+  FREEZE_DEFAULT:   1,
+  FREEZE_DASHBOARD: 6,
+
+  SHEETS: {
+    Records: {
+      widths: [80, 90, 80, 90, 50, 250, 250, 300, 100, 100, 140, 100, 160, 200, 100, 100, 80, 70],
+      aligns: ["C","C","C","C","C","L","L","L","C","C","C","C","C","L","L","L","C","C"],
+    },
+    Review: {
+      widths: [50, 90, 90, 98, 300, 50, 320, 160, 80, 90, 150, 160, 150, 60, 60, 90, 70],
+      aligns: ["C","C","C","C","L","C","L","L","C","C","C","C","C","L","L","C","C"],
+    },
+    Dashboard: {
+      widths: [500, 400],
+      aligns: ["L", "C"],
+    },
+    JournalCheck: {
+      // Application No | Title | Class | Applicant | Agent | Date | Page No
+      widths: [100, 200, 60, 320, 200, 100, 70],
+      aligns: ["C", "L", "C", "L", "L", "C", "C"],
+    },
+  },
+};
+
+
+// ========================================
+// SETUP
+// ========================================
+
+function setupSystem() {
+  const ss = SpreadsheetApp.getActive();
+  const ui = SpreadsheetApp.getUi();
+
+  const dashboardExisting = ss.getSheetByName(CFG.SHEET_DASHBOARD);
+  const reviewExisting    = ss.getSheetByName(CFG.SHEET_REVIEW);
+  const recordsExisting   = ss.getSheetByName(CFG.SHEET_RECORDS);
+
+  // -----------------------------------------------------------------------
+  // Check karo kya existing sheets mein data hai
+  // Agar hai to user se poochho — Full Reset ya Safe Refresh?
+  // -----------------------------------------------------------------------
+  const hasExistingData =
+    dashboardHasData_(dashboardExisting) ||
+    sheetHasData_(reviewExisting)        ||
+    sheetHasData_(recordsExisting);
+
+  let wipeMode = false;
+
+  if (hasExistingData) {
+    const resp = ui.alert(
+      "⚠️ Confirm Setup",
+      "Dashboard, Review aur/ya Records mein pehle se data hai.\n\n" +
+        "• YES   = Full Reset — sab kuch erase ho jaye ga aur fresh start hoga.\n" +
+        "• NO    = Safe Refresh — data safe rahe ga, sirf missing columns add honge.\n" +
+        "• CANCEL = kuch nahi hoga.",
+      ui.ButtonSet.YES_NO_CANCEL
+    );
+    if (resp === ui.Button.CANCEL || resp === ui.Button.CLOSE) {
+      notify_("Setup cancel kiya. Koi change nahi hua.");
+      return;
+    }
+    wipeMode = resp === ui.Button.YES;
+  }
+
+  // -----------------------------------------------------------------------
+  // Sheets ensure karo (create if missing)
+  // -----------------------------------------------------------------------
+  const dashboard = ensureSheet_(ss, CFG.SHEET_DASHBOARD);
+  const review    = ensureSheet_(ss, CFG.SHEET_REVIEW);
+  const records   = ensureSheet_(ss, CFG.SHEET_RECORDS);
+
+  // -----------------------------------------------------------------------
+  // FIX 1: JournalCheck sheet auto-create
+  // Pehle v2 mein ye sirf check karta tha aur warn karta tha
+  // Ab auto-create hoti hai headers ke saath
+  // Affect: Pehli baar Setup run karne pe JournalCheck sheet
+  //         automatically banti hai — aap iske andar VBA data paste
+  //         karte hain
+  // -----------------------------------------------------------------------
+  let journal = ss.getSheetByName(CFG.SHEET_JOURNAL);
+  let journalWasCreated = false;
+
+  if (!journal) {
+    journal = ss.insertSheet(CFG.SHEET_JOURNAL);
+    // Headers set karo — VBA ConvertJournal2() output se exactly match
+    journal.getRange(1, 1, 1, JOURNAL_HEADERS.length).setValues([JOURNAL_HEADERS]);
+    journalWasCreated = true;
+  }
+
+  // -----------------------------------------------------------------------
+  // Wipe mode ya Safe Refresh based on user choice
+  // -----------------------------------------------------------------------
+  if (wipeMode) {
+    // Full Reset — sab clear, fresh headers
+    dashboard.clear();
+    review.clear();
+    records.clear();
+    review.getRange(1, 1, 1, REVIEW_HEADERS.length).setValues([REVIEW_HEADERS]);
+    records.getRange(1, 1, 1, RECORDS_HEADERS.length).setValues([RECORDS_HEADERS]);
+
+    // FIX 2: applyDashboardTemplate_() — Full Reset mein full template
+    // Affect: Dashboard ko pehli baar properly setup karta hai —
+    //         B2 (Journal No), B3 (Journal Date), A7:A (Keywords),
+    //         B7:B (TM Numbers), aur Protection Summary block
+    applyDashboardTemplate_(dashboard);
+
+  } else {
+    // Safe Refresh — data safe, sirf missing columns add honge
+    migrateSheetToHeaders_(review, REVIEW_HEADERS, {
+      "Decision": CFG.DECISION_PENDING,
+      "Status":   CFG.STATUS_REVIEW,
+      "Page No":  "",
+    });
+    migrateSheetToHeaders_(records, RECORDS_HEADERS, {
+      "Decision": "",
+      "Page No":  "",
+    });
+
+    // Safe Refresh mein sirf labels refresh — data touch nahi hoga
+    refreshDashboardLabels_(dashboard);
+  }
+
+  // -----------------------------------------------------------------------
+  // Dropdowns, formatting, stats
+  // -----------------------------------------------------------------------
+  backfillDecisionDefaults_(review);
+  setupReviewValidation_(review);
+
+  applyUniversalFormatting_(dashboard);
+  applyUniversalFormatting_(journal);
+  applyUniversalFormatting_(review);
+  applyUniversalFormatting_(records);
+  applyAlternatingRows_(review);
+  applyAlternatingRows_(records);
+
+  updateDashboardStats_();
+
+  // -----------------------------------------------------------------------
+  // Final message
+  // -----------------------------------------------------------------------
+  const mode = wipeMode ? "Full Reset" : "Safe Refresh";
+  const journalNote = journalWasCreated
+    ? `\n\n✅ JournalCheck sheet nayi banayi gayi hai.\nVBA se data convert karke isme paste karein.`
+    : `\n\nℹ️ JournalCheck sheet pehle se exist karti thi — touch nahi ki.`;
+
+  notify_(
+    `Setup Complete ✅ (${mode})\n\n` +
+      `Sheets ready:\n- ${CFG.SHEET_DASHBOARD}\n- ${CFG.SHEET_JOURNAL}\n- ${CFG.SHEET_REVIEW}\n- ${CFG.SHEET_RECORDS}` +
+      journalNote +
+      `\n\nAgle steps:\n` +
+      `1) Journal No → Dashboard!${CFG.DASH_JOURNAL_NO_A1}\n` +
+      `2) Journal Date → Dashboard!${CFG.DASH_JOURNAL_DATE_A1}\n` +
+      `3) Keywords → column A row 7 se\n` +
+      `4) TM Numbers (6-digit) → column B row 7 se\n` +
+      `5) Run Scan`
+  );
+}
+
+
+// ========================================
+// FIX 2: applyDashboardTemplate_() — RESTORED
+// -----------------------------------------------------------------------
+// Yeh function v2 mein accidentally delete ho gaya tha.
+// Ab wapas restore kiya gaya hai.
+// Affect: Full Reset mein Dashboard properly setup hota hai —
+//         Title, Journal No/Date fields, Keywords/TM headers,
+//         Protection Summary block — sab kuch fresh banta hai.
+// ========================================
+
+function applyDashboardTemplate_(sheet) {
+  // Puri sheet clear karo pehle
+  sheet.clear();
+
+  // -----------------------------------------------------------------------
+  // Row 1: Title
+  // -----------------------------------------------------------------------
+  sheet.getRange("A1").setValue("TRADEMARK JOURNAL MONITOR");
+  sheet.getRange("A1:B1").merge();
+  sheet.getRange("A1:B1")
+    .setFontWeight("bold")
+    .setFontSize(14)
+    .setBackground(UI_CFG.HEADER_BG)
+    .setFontColor(UI_CFG.HEADER_FG)
+    .setHorizontalAlignment("center");
+
+  // -----------------------------------------------------------------------
+  // Rows 2-3: Journal No aur Date input fields
+  // -----------------------------------------------------------------------
+  sheet.getRange("A2").setValue("Journal No");
+  sheet.getRange("A3").setValue("Journal Date");
+  sheet.getRange("B2").setNumberFormat("@");                // text format — number auto-convert na ho
+  sheet.getRange("B3").setNumberFormat("dd-mmm-yyyy");      // date display format
+  sheet.getRange("A2:A3")
+    .setBackground("#f3f4f6")
+    .setFontWeight("bold");
+  sheet.getRange("A2:B3")
+    .setBorder(true, true, true, true, true, true);
+
+  // -----------------------------------------------------------------------
+  // Row 4-5: blank spacer
+  // -----------------------------------------------------------------------
+  sheet.getRange("A4").setValue("");
+  sheet.getRange("A5").setValue("");
+
+  // -----------------------------------------------------------------------
+  // Row 6: Keywords aur TM Numbers column headers
+  // -----------------------------------------------------------------------
+  sheet.getRange("A6").setValue("Keywords");
+  sheet.getRange("B6").setValue("TM Numbers (6-digit)");
+  sheet.getRange("A6:B6")
+    .setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG)
+    .setFontColor(UI_CFG.HEADER_FG);
+
+  // -----------------------------------------------------------------------
+  // Freeze rows — row 6 tak freeze (keywords list scroll ho sake)
+  // -----------------------------------------------------------------------
+  sheet.setFrozenRows(UI_CFG.FREEZE_DASHBOARD);
+
+  // -----------------------------------------------------------------------
+  // Column widths
+  // -----------------------------------------------------------------------
+  sheet.setColumnWidth(1, 500);
+  sheet.setColumnWidth(2, 400);
+
+  // -----------------------------------------------------------------------
+  // Protection Summary block (cols D-E) — stats yahan update hote hain
+  // -----------------------------------------------------------------------
+  buildProtectionSummaryLabels_(sheet);
+}
+
+
+// ========================================
+// DASHBOARD HELPERS (v2 se unchanged)
+// ========================================
+
+function refreshDashboardLabels_(sheet) {
+  // Safe Refresh mein sirf yahi call hota hai
+  // B2/B3 ka data touch nahi hota — sirf labels aur structure refresh
+  sheet.getRange("A1").setValue("TRADEMARK JOURNAL MONITOR");
+  sheet.getRange("A1:B1").merge();
+
+  sheet.getRange("A2").setValue("Journal No");
+  sheet.getRange("A3").setValue("Journal Date");
+  sheet.getRange("B2").setNumberFormat("@");
+  sheet.getRange("B3").setNumberFormat("dd-mmm-yyyy");
+
+  sheet.getRange("A6").setValue("Keywords");
+  sheet.getRange("B6").setValue("TM Numbers (6-digit)");
+
+  sheet.setFrozenRows(UI_CFG.FREEZE_DASHBOARD);
+  styleDashboardStatic_(sheet);
+  buildProtectionSummaryLabels_(sheet);
+}
+
+function styleDashboardStatic_(sheet) {
+  sheet.setColumnWidth(1, 500);
+  sheet.setColumnWidth(2, 400);
+  sheet.setColumnWidths(4, 2, 220);
+
+  sheet.getRange("A1:B1")
+    .setFontWeight("bold").setFontSize(14)
+    .setBackground(UI_CFG.HEADER_BG).setFontColor(UI_CFG.HEADER_FG);
+  sheet.getRange("A2:A3")
+    .setBackground("#f3f4f6").setFontWeight("bold");
+  sheet.getRange("A6:B6")
+    .setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG).setFontColor(UI_CFG.HEADER_FG);
+  sheet.getRange("A2:B3")
+    .setBorder(true, true, true, true, true, true);
+}
+
+function buildProtectionSummaryLabels_(sheet) {
+  sheet.getRange("D2:E2")
+    .merge()
+    .setValue("📊 Protection Summary")
+    .setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG)
+    .setFontColor(UI_CFG.HEADER_FG);
+
+  const rows = [
+    ["TM Matches",             ""],
+    ["Keyword Matches",        ""],
+    ["Pending / Issue / Clear",""],
+    ["Docs / PDFs Generated",  ""],
+  ];
+  sheet.getRange(3, 4, rows.length, 2).setValues(rows);
+  sheet.getRange(3, 4, rows.length, 1)
+    .setFontWeight("bold")
+    .setBackground("#f3f4f6");
+  sheet.getRange(3, 4, rows.length, 2)
+    .setBorder(true, true, true, true, true, true);
+}
+
+function updateDashboardStats_() {
+  const ss        = SpreadsheetApp.getActive();
+  const dashboard = ss.getSheetByName(CFG.SHEET_DASHBOARD);
+  const review    = ss.getSheetByName(CFG.SHEET_REVIEW);
+  if (!dashboard || !review) return;
+
+  const stats = computeReviewStats_(review);
+  dashboard.getRange("E3").setValue(stats.tmMatches);
+  dashboard.getRange("E4").setValue(stats.keywordMatches);
+  dashboard.getRange("E5").setValue(`${stats.pending} / ${stats.issue} / ${stats.clear}`);
+  dashboard.getRange("E6").setValue(`${stats.docsGenerated} / ${stats.pdfsGenerated}`);
+}
+
+
+// ========================================
+// SETUP HELPERS (v2 se unchanged)
+// ========================================
+
+function sheetHasData_(sheet) {
+  if (!sheet) return false;
+  return sheet.getLastRow() > 1;
+}
+
+function dashboardHasData_(sheet) {
+  if (!sheet) return false;
+  const jn = String(sheet.getRange(CFG.DASH_JOURNAL_NO_A1).getValue() || "").trim();
+  const kw = sheet
+    .getRange(CFG.DASH_KEYWORDS_RANGE_A1)
+    .getValues()
+    .some(row => String(row[0] || "").trim());
+  return !!jn || kw;
+}
+
+function migrateSheetToHeaders_(sheet, newHeaders, defaults) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+
+  if (lastRow < 1 || lastCol < 1) {
+    sheet.getRange(1, 1, 1, newHeaders.length).setValues([newHeaders]);
+    return { migrated: false, rowCount: 0 };
+  }
+
+  const oldHeaders = sheet
+    .getRange(1, 1, 1, lastCol)
+    .getValues()[0]
+    .map(h => String(h || "").trim());
+
+  const sameShape =
+    oldHeaders.length === newHeaders.length &&
+    oldHeaders.every((h, i) => h === newHeaders[i]);
+  if (sameShape) return { migrated: false, rowCount: Math.max(0, lastRow - 1) };
+
+  const oldIdx = {};
+  oldHeaders.forEach((h, i) => { if (h) oldIdx[h] = i; });
+
+  const oldData = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues()
+    : [];
+
+  const newData = oldData.map(oldRow =>
+    newHeaders.map(h => {
+      if (h in oldIdx) return oldRow[oldIdx[h]];
+      return defaults && h in defaults ? defaults[h] : "";
+    })
+  );
+
+  sheet.clear();
+  sheet.getRange(1, 1, 1, newHeaders.length).setValues([newHeaders]);
+  if (newData.length > 0) {
+    sheet.getRange(2, 1, newData.length, newHeaders.length).setValues(newData);
+  }
+
+  return { migrated: true, rowCount: newData.length };
+}
+
+function backfillDecisionDefaults_(review) {
+  const lastRow = review.getLastRow();
+  if (lastRow < 2) return;
+
+  const headers = review.getRange(1, 1, 1, review.getLastColumn()).getValues()[0];
+  const idx = makeIndex_(headers);
+  if (!("Decision" in idx)) return;
+
+  const range  = review.getRange(2, idx["Decision"] + 1, lastRow - 1, 1);
+  const values = range.getValues();
+  let changed  = false;
+
+  for (let i = 0; i < values.length; i++) {
+    if (!String(values[i][0] || "").trim()) {
+      values[i][0] = CFG.DECISION_PENDING;
+      changed = true;
+    }
+  }
+  if (changed) range.setValues(values);
+}
+
+function setupReviewValidation_(sheet) {
+  const idx     = makeIndex_(REVIEW_HEADERS);
+  const maxRows = 2000;
+
+  const decisionRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList([CFG.DECISION_PENDING, CFG.DECISION_ISSUE, CFG.DECISION_CLEAR], true)
+    .setAllowInvalid(true)
+    .build();
+  sheet.getRange(2, idx["Decision"] + 1, maxRows, 1).setDataValidation(decisionRule);
+
+  const statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList([CFG.STATUS_REVIEW, CFG.STATUS_OK, CFG.STATUS_DONE], true)
+    .setAllowInvalid(true)
+    .build();
+  sheet.getRange(2, idx["Status"] + 1, maxRows, 1).setDataValidation(statusRule);
+}
+
+function ensureSheet_(ss, name) {
+  return ss.getSheetByName(name) || ss.insertSheet(name);
+}
+
+function ensureReviewHeaders_(sheet) {
+  if (sheet.getLastRow() < 1 || !sheet.getRange(1, 1).getValue()) {
+    sheet.getRange(1, 1, 1, REVIEW_HEADERS.length).setValues([REVIEW_HEADERS]);
+  }
+}
+
+function ensureRecordsHeaders_(sheet) {
+  if (sheet.getLastRow() < 1 || !sheet.getRange(1, 1).getValue()) {
+    sheet.getRange(1, 1, 1, RECORDS_HEADERS.length).setValues([RECORDS_HEADERS]);
+  }
+}
+
+function formatReviewSheet_(sheet) {
+  sheet.getRange(1, 1, 1, REVIEW_HEADERS.length)
+    .setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG)
+    .setFontColor(UI_CFG.HEADER_FG);
+  sheet.setFrozenRows(1);
+}
+
+function formatRecordsSheet_(sheet) {
+  sheet.getRange(1, 1, 1, RECORDS_HEADERS.length)
+    .setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG)
+    .setFontColor(UI_CFG.HEADER_FG);
+  sheet.setFrozenRows(1);
+}
+
+
+// ========================================
+// SCAN (v2 se unchanged)
+// ========================================
+
+function runScan() {
+  const ss = SpreadsheetApp.getActive();
+
+  const dashboard = ss.getSheetByName(CFG.SHEET_DASHBOARD);
+  const journal   = ss.getSheetByName(CFG.SHEET_JOURNAL);
+  const review    = ensureSheet_(ss, CFG.SHEET_REVIEW);
+
+  if (!dashboard) {
+    notify_(`Sheet '${CFG.SHEET_DASHBOARD}' not found. Run Setup first.`);
+    return;
+  }
+  if (!journal) {
+    notify_(`Sheet '${CFG.SHEET_JOURNAL}' not found. Setup chalao — sheet auto-ban jayegi.`);
+    return;
+  }
+
+  const journalNo   = String(dashboard.getRange(CFG.DASH_JOURNAL_NO_A1).getValue() || "").trim();
+  const journalDate = dashboard.getRange(CFG.DASH_JOURNAL_DATE_A1).getValue();
+
+  if (!journalNo) {
+    notify_(`Dashboard!${CFG.DASH_JOURNAL_NO_A1} khali hai. Journal No daalo (e.g. 898).`);
+    return;
+  }
+
+  const keywords = readNonBlankStrings_(
+    dashboard.getRange(CFG.DASH_KEYWORDS_RANGE_A1).getValues()
+  ).map(s => s.trim()).filter(Boolean);
+
+  const tmNumbers = readNonBlankStrings_(
+    dashboard.getRange(CFG.DASH_TM_RANGE_A1).getValues()
+  ).map(s => s.trim()).filter(s => /^\d{6}$/.test(s));
+
+  if (keywords.length === 0 && tmNumbers.length === 0) {
+    notify_(
+      `Dashboard mein koi keyword ya 6-digit TM number nahi mila:\n` +
+      `- ${CFG.DASH_KEYWORDS_RANGE_A1}\n- ${CFG.DASH_TM_RANGE_A1}`
+    );
+    return;
+  }
+
+  const headerMap = getHeaderMap_(journal);
+  const requiredHeaders = [
+    "Application No", "Title", "Class",
+    "Applicant Name and Address",
+    "Agent Name and Address",
+    "Date of Filing",
+  ];
+  for (const h of requiredHeaders) {
+    if (!(h in headerMap)) {
+      notify_(`JournalCheck sheet mein column missing: ${h}`);
+      return;
+    }
+  }
+  const pageNoColIdx = "Page No" in headerMap ? headerMap["Page No"] : -1;
+
+  const lastRow = journal.getLastRow();
+  if (lastRow < 2) {
+    notify_("JournalCheck sheet mein koi data nahi. VBA se convert karke paste karo.");
+    return;
+  }
+
+  const rows = journal
+    .getRange(2, 1, lastRow - 1, journal.getLastColumn())
+    .getValues();
+
+  const tmSet              = new Set(tmNumbers);
+  const normalizedKeywords = keywords.map(k => normalizeKeyword_(k));
+  const caseMap            = buildCaseNumberMap_();
+
+  ensureReviewHeaders_(review);
+  const existingKeys = getExistingReviewKeys_(review);
+
+  const outRows = [];
+  let matchedCount     = 0;
+  let skippedDuplicate = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+
+    const applicationNo = String(r[headerMap["Application No"]] || "").trim();
+    const title         = String(r[headerMap["Title"]]           || "").trim();
+    const classNo       = String(r[headerMap["Class"]]           || "").trim();
+    const applicant     = String(r[headerMap["Applicant Name and Address"]] || "").trim();
+    const agent         = String(r[headerMap["Agent Name and Address"]]     || "").trim();
+    const filingDateRaw = r[headerMap["Date of Filing"]] || "";
+    const filingDate    = parseLooseDate_(filingDateRaw) || filingDateRaw;
+    const pageNo        = pageNoColIdx >= 0 ? String(r[pageNoColIdx] || "").trim() : "";
+
+    if (!applicationNo && !title && !applicant && !agent) continue;
+
+    let matchType   = "";
+    let matchedTerm = "";
+
+    if (tmSet.has(applicationNo)) {
+      matchType   = "TM";
+      matchedTerm = applicationNo;
+    } else {
+      const hit = findKeywordHit_(normalizedKeywords, r);
+      if (hit) {
+        matchType   = "KEYWORD";
+        matchedTerm = hit;
+      }
+    }
+
+    if (!matchType) continue;
+
+    const caseNo   = caseMap[applicationNo] || "NOT FOUND";
+    const uniqueKey = `${journalNo}|${applicationNo}|${matchType}|${matchedTerm}`;
+
+    if (existingKeys.has(uniqueKey)) {
+      skippedDuplicate++;
+      continue;
+    }
+    existingKeys.add(uniqueKey);
+
+    outRows.push([
+      journalNo,
+      journalDate || "",
+      applicationNo,
+      caseNo,
+      title,
+      classNo,
+      applicant,
+      agent,
+      filingDate,
+      matchedTerm,
+      matchType,
+      CFG.DECISION_PENDING,
+      CFG.STATUS_REVIEW,
+      "",   // Generated Doc
+      "",   // Generated PDF
+      "",   // Generated At
+      pageNo,
+    ]);
+
+    matchedCount++;
+  }
+
+  if (outRows.length > 0) {
+    appendRows_(review, outRows);
+    setupReviewValidation_(review);
+    applyUniversalFormatting_(review);
+    applyAlternatingRows_(review);
+  }
+
+  updateDashboardStats_();
+
+  notify_(
+    `Scan Complete ✅\n\nJournal: ${journalNo}\n` +
+    `Total Rows: ${rows.length}\n` +
+    `New Matches: ${matchedCount}\n` +
+    `Skipped (duplicate): ${skippedDuplicate}`
+  );
+}
+
+
+// ========================================
+// DOC GENERATION + PDF CONVERSION (v2 se unchanged)
+// ========================================
+
+function generateDocsAndPdfs() {
+  const ss = SpreadsheetApp.getActive();
+
+  const dashboard = ss.getSheetByName(CFG.SHEET_DASHBOARD);
+  const review    = ss.getSheetByName(CFG.SHEET_REVIEW);
+  const records   = ensureSheet_(ss, CFG.SHEET_RECORDS);
+
+  if (!dashboard || !review) {
+    notify_("Dashboard ya Review sheet nahi mili. Setup chalao pehle.");
+    return;
+  }
+
+  const journalNo   = String(dashboard.getRange(CFG.DASH_JOURNAL_NO_A1).getValue() || "").trim();
+  const journalDate = dashboard.getRange(CFG.DASH_JOURNAL_DATE_A1).getValue();
+  if (!journalNo) {
+    notify_(`Dashboard!${CFG.DASH_JOURNAL_NO_A1} khali hai.`);
+    return;
+  }
+
+  const reviewData = review.getDataRange().getValues();
+  if (reviewData.length < 2) {
+    notify_("Review khali hai. Pehle Scan chalao.");
+    return;
+  }
+
+  const headers = reviewData[0];
+  const idx     = makeIndex_(headers);
+
+  for (const h of REVIEW_HEADERS) {
+    if (!(h in idx)) {
+      notify_(`Review sheet mein column missing: ${h}. Setup dobara chalao.`);
+      return;
+    }
+  }
+
+  const rootFolder   = DriveApp.getFolderById(CFG.MAIN_FOLDER_ID);
+  const journalFolder = getOrCreateFolder_(rootFolder, `Journal_${journalNo}`);
+  const docsFolder   = getOrCreateFolder_(journalFolder, "Docs");
+
+  let processed   = 0;
+  const now       = new Date();
+  let serialStart = getNextSerial_(review, idx["Generated Doc"]);
+
+  const recordRows = [];
+
+  for (let r = 1; r < reviewData.length; r++) {
+    const row = reviewData[r];
+
+    const status      = String(row[idx["Status"]]        || "").trim();
+    const existingDoc = String(row[idx["Generated Doc"]] || "").trim();
+
+    if (status.toLowerCase() !== CFG.STATUS_OK.toLowerCase()) continue;
+    if (existingDoc) continue;
+
+    const applicationNo = String(row[idx["Application No"]] || "").trim();
+    const caseNo        = String(row[idx["Case No"]]         || "").trim();
+    const title         = String(row[idx["Title"]]           || "").trim();
+    const classNo       = String(row[idx["Class"]]           || "").trim();
+    const pageNo        = String(row[idx["Page No"]]         || "").trim();
+
+    const serialNo = CFG.SERIAL_PREFIX + String(serialStart).padStart(CFG.SERIAL_PAD, "0");
+    serialStart++;
+
+    // File name: CaseNo_Title_AppNo_JournalNo
+    const safeCaseNo  = (caseNo  || "NOCASE").replace(/[^a-zA-Z0-9]+/g, "_");
+    const safeTitle   = title    ? title.replace(/[^a-zA-Z0-9]+/g, "_").slice(0, 40) : "TITLE";
+    const safeAppNo   = (applicationNo || "NOAPP").replace(/[^a-zA-Z0-9]+/g, "_");
+    const safeJournal = String(journalNo || "NOJRN").replace(/[^a-zA-Z0-9]+/g, "_");
+    const docName     = `${safeCaseNo}_${safeTitle}_${safeAppNo}_${safeJournal}`;
+
+    const mergeTags = {
+      "{{S_NO}}":           serialNo,
+      "{{JOURNAL_NO}}":     String(journalNo),
+      "{{CASE_NO}}":        caseNo || "NOT FOUND",
+      "{{APPLICATION_NO}}": applicationNo,
+      "{{CLASS}}":          classNo,
+      "{{TITLE}}":          title,
+      "{{PAGE_NO}}":        pageNo,
+      "{image}":            "",
+    };
+
+    try {
+      const docId  = generateDocumentFromTemplate_(CFG.TEMPLATE_ID, docsFolder, docName, mergeTags);
+      const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
+
+      review.getRange(r + 1, idx["Generated Doc"] + 1).setValue(docUrl);
+      review.getRange(r + 1, idx["Generated PDF"] + 1).setValue("");
+      review.getRange(r + 1, idx["Generated At"]  + 1).setValue(now);
+      review.getRange(r + 1, idx["Status"]         + 1).setValue(CFG.STATUS_DONE);
+
+      recordRows.push([
+        journalNo,
+        journalDate || "",
+        applicationNo,
+        caseNo || "NOT FOUND",
+        classNo,
+        row[idx["Applicant Name and Address"]] || "",
+        title,
+        row[idx["Agent Name and Address"]]     || "",
+        applicationNo,
+        row[idx["Date of Filing"]]             || "",
+        row[idx["Matched Term"]]               || "",
+        row[idx["Match Type"]]                 || "",
+        row[idx["Decision"]]                   || "",
+        "",        // Remarks
+        docUrl,
+        "",        // PDF URL
+        now,
+        pageNo,
+      ]);
+
+      processed++;
+    } catch (e) {
+      review.getRange(r + 1, idx["Status"] + 1).setValue(
+        "ERROR: " + (e && e.message ? e.message : String(e))
+      );
+    }
+  }
+
+  ensureRecordsHeaders_(records);
+  if (recordRows.length > 0) {
+    appendRows_(records, recordRows);
+    applyUniversalFormatting_(records);
+    applyAlternatingRows_(records);
+  }
+
+  applyUniversalFormatting_(review);
+  applyUniversalFormatting_(records);
+  updateDashboardStats_();
+
+  notify_(
+    processed > 0
+      ? `Docs Generated ✅\n\n${processed} DOC(s) bane\nFolder: Journal_${journalNo}/Docs\n\n` +
+          `Ab Doc mein images add karo, phir "Convert to PDF" chalao.`
+      : `Status = '${CFG.STATUS_OK}' wali koi row nahi mili (ya already generated hai).`
+  );
+}
+
+function convertGeneratedDocsToPdfs() {
+  const ss = SpreadsheetApp.getActive();
+
+  const dashboard = ss.getSheetByName(CFG.SHEET_DASHBOARD);
+  const review    = ss.getSheetByName(CFG.SHEET_REVIEW);
+
+  if (!dashboard || !review) {
+    notify_("Dashboard ya Review sheet nahi mili. Setup chalao pehle.");
+    return;
+  }
+
+  const journalNo = String(
+    dashboard.getRange(CFG.DASH_JOURNAL_NO_A1).getValue() || ""
+  ).trim();
+  if (!journalNo) {
+    notify_(`Dashboard!${CFG.DASH_JOURNAL_NO_A1} khali hai.`);
+    return;
+  }
+
+  const reviewData = review.getDataRange().getValues();
+  if (reviewData.length < 2) {
+    notify_("Review sheet khali hai.");
+    return;
+  }
+
+  const headers = reviewData[0];
+  const idx     = makeIndex_(headers);
+
+  const required = [
+    "Status", "Generated Doc", "Generated PDF",
+    "Application No", "Case No", "Title", "Journal No",
+  ];
+  for (const h of required) {
+    if (!(h in idx)) {
+      notify_(`Review sheet mein column missing: ${h}`);
+      return;
+    }
+  }
+
+  const rootFolder    = DriveApp.getFolderById(CFG.MAIN_FOLDER_ID);
+  const journalFolder = getOrCreateFolder_(rootFolder, `Journal_${journalNo}`);
+  const pdfsFolder    = getOrCreateFolder_(journalFolder, "PDFs");
+
+  let processed = 0;
+  let skipped   = 0;
+  let errors    = 0;
+
+  for (let r = 1; r < reviewData.length; r++) {
+    const row = reviewData[r];
+
+    const status      = String(row[idx["Status"]]           || "").trim();
+    const docUrl      = String(row[idx["Generated Doc"]]    || "").trim();
+    const existingPdf = String(row[idx["Generated PDF"]]    || "").trim();
+
+    // Sirf woh rows jinka Doc ban chuka hai lekin PDF abhi nahi
+    if (status.toUpperCase() !== CFG.STATUS_DONE.toUpperCase()) { skipped++; continue; }
+    if (!docUrl || existingPdf)                                  { skipped++; continue; }
+
+    const docIdMatch = docUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!docIdMatch) {
+      review.getRange(r + 1, idx["Status"] + 1).setValue("ERROR: Invalid Doc URL");
+      errors++;
+      continue;
+    }
+    const docId = docIdMatch[1];
+
+    const safeCaseNo  = String(row[idx["Case No"]]         || "NOCASE").trim().replace(/[^a-zA-Z0-9]+/g, "_");
+    const safeTitle   = String(row[idx["Title"]]           || "TITLE").trim().replace(/[^a-zA-Z0-9]+/g, "_").slice(0, 40);
+    const safeAppNo   = String(row[idx["Application No"]]  || "NOAPP").trim().replace(/[^a-zA-Z0-9]+/g, "_");
+    const safeJournal = String(row[idx["Journal No"]]      || journalNo || "NOJRN").trim().replace(/[^a-zA-Z0-9]+/g, "_");
+    const baseName    = `${safeCaseNo}_${safeTitle}_${safeAppNo}_${safeJournal}`;
+
+    try {
+      const pdfUrl = exportDocToPdf_(docId, pdfsFolder, baseName);
+      review.getRange(r + 1, idx["Generated PDF"] + 1).setValue(pdfUrl);
+      if ("Generated At" in idx) {
+        review.getRange(r + 1, idx["Generated At"] + 1).setValue(new Date());
+      }
+      processed++;
+    } catch (e) {
+      review.getRange(r + 1, idx["Status"] + 1).setValue(
+        "ERROR PDF: " + (e && e.message ? e.message : String(e))
+      );
+      errors++;
+    }
+  }
+
+  applyUniversalFormatting_(review);
+  applyAlternatingRows_(review);
+  updateDashboardStats_();
+
+  notify_(
+    `PDF Conversion Complete ✅\n\n` +
+    `Processed: ${processed}\nSkipped: ${skipped}\nErrors: ${errors}\n\n` +
+    `Folder: Journal_${journalNo}/PDFs`
+  );
+}
+
+
+// ========================================
+// DOC / PDF HELPERS (v2 se unchanged)
+// ========================================
+
+function getOrCreateFolder_(parent, name) {
+  const it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+function generateDocumentFromTemplate_(templateId, folder, docName, mergeTags) {
+  const templateFile = DriveApp.getFileById(templateId);
+  const newFile      = templateFile.makeCopy(docName, folder);
+  const docId        = newFile.getId();
+
+  const doc  = DocumentApp.openById(docId);
+  const body = doc.getBody();
+
+  Object.keys(mergeTags).forEach(tag => {
+    const value   = String(mergeTags[tag] || "");
+    const escaped = escapeRegExp_(tag);
+    try {
+      body.replaceText(escaped, value);
+    } catch (e) {
+      Logger.log("replaceText failed: " + tag + " -> " + e);
+    }
+  });
+
+  doc.saveAndClose();
+  return docId;
+}
+
+function exportDocToPdf_(docId, pdfFolder, baseName) {
+  try {
+    const url    = `https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=application/pdf`;
+    const params = {
+      method:  "get",
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true,
+    };
+    const resp = UrlFetchApp.fetch(url, params);
+    if (resp.getResponseCode() >= 200 && resp.getResponseCode() < 300) {
+      const blob    = resp.getBlob().setName(baseName + ".pdf");
+      const pdfFile = pdfFolder.createFile(blob);
+      return pdfFile.getUrl();
+    }
+  } catch (e) {
+    Logger.log("Drive export failed, fallback: " + e);
+  }
+
+  const file    = DriveApp.getFileById(docId);
+  const blob    = file.getBlob().getAs(MimeType.PDF);
+  const pdfFile = pdfFolder.createFile(blob).setName(baseName + ".pdf");
+  return pdfFile.getUrl();
+}
+
+function getNextSerial_(reviewSheet, generatedDocIdx0) {
+  const lastRow = reviewSheet.getLastRow();
+  if (lastRow < 2) return 1;
+
+  const col  = generatedDocIdx0 + 1;
+  const vals = reviewSheet.getRange(2, col, lastRow - 1, 1).getValues();
+  let count  = 0;
+  for (let i = 0; i < vals.length; i++) {
+    if (String(vals[i][0] || "").trim()) count++;
+  }
+  return count + 1;
+}
+
+
+// ========================================
+// REPORT (v2 se unchanged)
+// ========================================
+
+function generateReport() {
+  const ss        = SpreadsheetApp.getActive();
+  const dashboard = ss.getSheetByName(CFG.SHEET_DASHBOARD);
+  const review    = ss.getSheetByName(CFG.SHEET_REVIEW);
+
+  if (!review) {
+    notify_("Review sheet nahi mili. Setup aur Scan chalao pehle.");
+    return;
+  }
+
+  const journalNo    = dashboard
+    ? String(dashboard.getRange(CFG.DASH_JOURNAL_NO_A1).getValue() || "").trim()
+    : "";
+  const allStats     = computeReviewStats_(review);
+  const currentStats = journalNo ? computeReviewStats_(review, journalNo) : null;
+
+  const props       = PropertiesService.getDocumentProperties();
+  const reportCount = (Number(props.getProperty("REPORT_COUNT")) || 0) + 1;
+  props.setProperty("REPORT_COUNT", String(reportCount));
+
+  const report = ensureSheet_(ss, CFG.SHEET_REPORT);
+  report.getCharts().forEach(c => report.removeChart(c));
+  report.clear();
+
+  report.getRange("A1").setValue("📊 Trademark Journal Monitoring Report").setFontWeight("bold").setFontSize(14);
+  report.getRange("A2").setValue(
+    "Generated: " + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd-MMM-yyyy HH:mm") +
+      `   |   Report #${reportCount}`
+  );
+
+  let row = 4;
+  if (currentStats) {
+    row = writeStatsBlock_(report, row, `Current Journal (No. ${journalNo})`, currentStats);
+    row += 1;
+  }
+  row = writeStatsBlock_(report, row, "All-Time (All Journals)", allStats);
+  row += 2;
+
+  report.getRange(row, 1).setValue("Breakdown by Journal").setFontWeight("bold");
+  row++;
+  const tableHeaderRow = row;
+  report.getRange(row, 1, 1, 4).setValues([
+    ["Journal No", "Total Matches", "Issue / Oppose", "Docs Generated"],
+  ]);
+  row++;
+
+  Object.keys(allStats.byJournal).sort().forEach(jn => {
+    const j = allStats.byJournal[jn];
+    report.getRange(row, 1, 1, 4).setValues([[jn, j.total, j.issue, j.docs]]);
+    row++;
+  });
+  report.getRange(tableHeaderRow, 1, 1, 4)
+    .setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG)
+    .setFontColor(UI_CFG.HEADER_FG);
+
+  const chartDataRow1 = row + 2;
+  report.getRange(chartDataRow1, 1, 4, 2).setValues([
+    ["Decision", "Count"],
+    ["Pending",          allStats.pending],
+    ["Issue / Oppose",   allStats.issue],
+    ["No Issue / Clear", allStats.clear],
+  ]);
+
+  const chartDataRow2 = chartDataRow1 + 6;
+  report.getRange(chartDataRow2, 1, 3, 2).setValues([
+    ["Match Type", "Count"],
+    ["TM",      allStats.tmMatches],
+    ["Keyword", allStats.keywordMatches],
+  ]);
+
+  applyUniversalFormatting_(report);
+  report.autoResizeColumns(1, 4);
+
+  const decisionChart = report.newChart()
+    .setChartType(Charts.ChartType.PIE)
+    .addRange(report.getRange(chartDataRow1, 1, 4, 2))
+    .setPosition(chartDataRow1, 4, 0, 0)
+    .setOption("title", "Decision Breakdown (All-Time)")
+    .build();
+  report.insertChart(decisionChart);
+
+  const matchTypeChart = report.newChart()
+    .setChartType(Charts.ChartType.PIE)
+    .addRange(report.getRange(chartDataRow2, 1, 3, 2))
+    .setPosition(chartDataRow2, 4, 0, 0)
+    .setOption("title", "Match Type Breakdown (All-Time)")
+    .build();
+  report.insertChart(matchTypeChart);
+
+  updateDashboardStats_();
+  notify_(
+    `Report Generated ✅ (#${reportCount})\n\n'${CFG.SHEET_REPORT}' sheet mein dekhein.`
+  );
+}
+
+function computeReviewStats_(reviewSheet, filterJournalNo) {
+  const stats = {
+    total: 0, tmMatches: 0, keywordMatches: 0,
+    pending: 0, issue: 0, clear: 0,
+    docsGenerated: 0, pdfsGenerated: 0,
+    byJournal: {},
+  };
+
+  const lastRow = reviewSheet.getLastRow();
+  if (lastRow < 2) return stats;
+
+  const headers = reviewSheet.getRange(1, 1, 1, reviewSheet.getLastColumn()).getValues()[0];
+  const idx     = makeIndex_(headers);
+  const data    = reviewSheet.getRange(2, 1, lastRow - 1, reviewSheet.getLastColumn()).getValues();
+
+  data.forEach(row => {
+    const journalNo   = String(row[idx["Journal No"]] || "").trim();
+    const decisionRaw = String(row[idx["Decision"]]   || "").trim().toUpperCase();
+    const isIssue     = decisionRaw === CFG.DECISION_ISSUE.toUpperCase();
+    const hasDoc      = !!String(row[idx["Generated Doc"]] || "").trim();
+
+    if (!stats.byJournal[journalNo]) {
+      stats.byJournal[journalNo] = { total: 0, issue: 0, docs: 0 };
+    }
+    stats.byJournal[journalNo].total++;
+    if (isIssue) stats.byJournal[journalNo].issue++;
+    if (hasDoc)  stats.byJournal[journalNo].docs++;
+
+    if (filterJournalNo && journalNo !== String(filterJournalNo)) return;
+
+    stats.total++;
+    const matchType = String(row[idx["Match Type"]] || "").trim().toUpperCase();
+    if (matchType === "TM")      stats.tmMatches++;
+    else if (matchType === "KEYWORD") stats.keywordMatches++;
+
+    if (decisionRaw === CFG.DECISION_ISSUE.toUpperCase()) stats.issue++;
+    else if (decisionRaw === CFG.DECISION_CLEAR.toUpperCase()) stats.clear++;
+    else stats.pending++;
+
+    if (hasDoc) stats.docsGenerated++;
+    if (String(row[idx["Generated PDF"]] || "").trim()) stats.pdfsGenerated++;
+  });
+
+  return stats;
+}
+
+function writeStatsBlock_(sheet, startRow, title, stats) {
+  let row = startRow;
+  sheet.getRange(row, 1).setValue(title).setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG).setFontColor(UI_CFG.HEADER_FG);
+  sheet.getRange(row, 1, 1, 2).merge();
+  row++;
+
+  const lines = [
+    ["Total Matches",                   stats.total],
+    ["TM Matches",                      stats.tmMatches],
+    ["Keyword Matches",                 stats.keywordMatches],
+    ["Pending Review",                  stats.pending],
+    ["Issue / Oppose",                  stats.issue],
+    ["No Issue / Clear",                stats.clear],
+    ["Actionable (Pending + Issue)",    stats.pending + stats.issue],
+    ["Docs Generated",                  stats.docsGenerated],
+    ["PDFs Generated",                  stats.pdfsGenerated],
+  ];
+
+  lines.forEach(([label, value]) => {
+    sheet.getRange(row, 1).setValue(label);
+    sheet.getRange(row, 2).setValue(value);
+    row++;
+  });
+
+  return row;
+}
+
+
+// ========================================
+// BACKUP + EXPORT (v2 se unchanged)
+// ========================================
+
+function backupAndExport() {
+  const ss = SpreadsheetApp.getActive();
+
+  const dashboard = ss.getSheetByName(CFG.SHEET_DASHBOARD);
+  const journal   = ss.getSheetByName(CFG.SHEET_JOURNAL);
+  const review    = ss.getSheetByName(CFG.SHEET_REVIEW);
+  const records   = ss.getSheetByName(CFG.SHEET_RECORDS);
+
+  if (!dashboard) { notify_("Dashboard nahi mila. Setup chalao."); return; }
+  if (!journal)   { notify_(`JournalCheck sheet nahi mili.`);       return; }
+
+  const journalNo = String(
+    dashboard.getRange(CFG.DASH_JOURNAL_NO_A1).getValue() || ""
+  ).trim();
+  if (!journalNo) { notify_(`Dashboard!${CFG.DASH_JOURNAL_NO_A1} khali hai.`); return; }
+
+  const rootFolder    = DriveApp.getFolderById(CFG.MAIN_FOLDER_ID);
+  const journalFolder = getOrCreateFolder_(rootFolder, `Journal_${journalNo}`);
+
+  const backupFolder  = getOrCreateFolder_(journalFolder, "Backup");
+  const resultsFolder = getOrCreateFolder_(journalFolder, "Results");
+  const recordFolder  = getOrCreateFolder_(journalFolder, "Record");
+
+  exportSheetToFiles_(journal, backupFolder, `JournalCheck_Journal_${journalNo}_FULL`);
+  applyUniversalFormatting_(journal);
+
+  const backupSheetName =
+    `JournalCheck_${journalNo}_Backup_` +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmm");
+  journal.copyTo(ss).setName(backupSheetName);
+
+  if (review)  {
+    exportSheetToFiles_(review,  resultsFolder, `Review_Journal_${journalNo}`);
+    applyUniversalFormatting_(review);
+    applyAlternatingRows_(review);
+  }
+  if (records) {
+    exportSheetToFiles_(records, recordFolder,  `Records_Journal_${journalNo}`);
+    applyUniversalFormatting_(records);
+    applyAlternatingRows_(records);
+  }
+
+  notify_(
+    `Backup + Export Done ✅\n\n` +
+    `Drive folder: Journal_${journalNo}\n` +
+    `Sheet backup: ${backupSheetName}`
+  );
+}
+
+function exportSheetToFiles_(sheet, folder, baseName) {
+  const values = sheet.getDataRange().getValues();
+  const csv    = toCsv_(values);
+  const json   = JSON.stringify(toObjects_(values), null, 2);
+  const txt    =
+    `Rows: ${Math.max(0, values.length - 1)}\n` +
+    `Cols: ${values[0] ? values[0].length : 0}\n` +
+    `Generated: ${new Date().toISOString()}\n`;
+
+  folder.createFile(baseName + ".csv",  csv,  MimeType.CSV);
+  folder.createFile(baseName + ".json", json, MimeType.PLAIN_TEXT);
+  folder.createFile(baseName + ".txt",  txt,  MimeType.PLAIN_TEXT);
+}
+
+function toCsv_(values) {
+  return values
+    .map(row =>
+      row.map(v => {
+        const s       = v === null || v === undefined ? "" : String(v);
+        const escaped = s.replace(/"/g, '""');
+        return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+      }).join(",")
+    ).join("\n");
+}
+
+function toObjects_(values) {
+  if (!values || values.length === 0) return [];
+  const headers = values[0].map(h => String(h || "").trim());
+  const out     = [];
+  for (let r = 1; r < values.length; r++) {
+    const obj = {};
+    for (let c = 0; c < headers.length; c++) {
+      if (!headers[c]) continue;
+      obj[headers[c]] = values[r][c];
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
+
+// ========================================
+// DATE NORMALIZATION (v2 se unchanged)
+// ========================================
+
+function normalizeJournalCheckFilingDates() {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(CFG.SHEET_JOURNAL);
+  if (!sh) {
+    notify_(`Sheet '${CFG.SHEET_JOURNAL}' nahi mili.`);
+    return;
+  }
+
+  const headerMap = getHeaderMap_(sh);
+  if (!("Date of Filing" in headerMap)) {
+    notify_(`'Date of Filing' column ${CFG.SHEET_JOURNAL} mein nahi mila.`);
+    return;
+  }
+  const colF    = headerMap["Date of Filing"] + 1;
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) { notify_("JournalCheck mein koi data nahi."); return; }
+
+  const range = sh.getRange(2, colF, lastRow - 1, 1);
+  const vals  = range.getValues();
+  const tz    = Session.getScriptTimeZone();
+  let changed = 0;
+  let failed  = 0;
+
+  for (let i = 0; i < vals.length; i++) {
+    const d = parseLooseDate_(vals[i][0]);
+    if (!d) { failed++; continue; }
+    vals[i][0] = Utilities.formatDate(d, tz, UI_CFG.DATE_FORMAT);
+    changed++;
+  }
+
+  range.setValues(vals);
+  range.setNumberFormat(UI_CFG.DATE_FORMAT);
+  notify_(`Date normalize done ✅  Changed: ${changed} | Failed: ${failed}`);
+}
+
+function parseLooseDate_(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  if (
+    Object.prototype.toString.call(value) === "[object Date]" &&
+    !isNaN(value.getTime())
+  ) return value;
+
+  const s      = String(value).trim();
+  if (!s)      return null;
+
+  const native = new Date(s);
+  if (!isNaN(native.getTime())) return native;
+
+  const m = s.match(
+    /^\s*(\d{1,2})[\-\/]([A-Za-z]{3}|\d{1,2})[\-\/](\d{2}|\d{4})\s*$/
+  );
+  if (!m) return null;
+
+  const dd    = parseInt(m[1], 10);
+  const mid   = m[2];
+  const yyRaw = m[3];
+
+  let mm = /^\d+$/.test(mid) ? parseInt(mid, 10) : monthAbbrevToNumber_(mid);
+  if (!mm || mm < 1 || mm > 12) return null;
+
+  let yyyy;
+  if (yyRaw.length === 4) {
+    yyyy = parseInt(yyRaw, 10);
+  } else {
+    const yy = parseInt(yyRaw, 10);
+    yyyy = yy <= 49 ? 2000 + yy : 1900 + yy;
+  }
+
+  const d = new Date(yyyy, mm - 1, dd);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function monthAbbrevToNumber_(mon) {
+  const map = {
+    jan:1, feb:2, mar:3, apr:4, may:5,  jun:6,
+    jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+  };
+  return map[String(mon || "").trim().toLowerCase()] || null;
+}
+
+
+// ========================================
+// SHARED HELPERS (v2 se unchanged)
+// ========================================
+
+function getHeaderMap_(sheet) {
+  const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const map       = {};
+  for (let c = 0; c < headerRow.length; c++) {
+    const name = String(headerRow[c] || "").trim();
+    if (name) map[name] = c;
+  }
+  return map;
+}
+
+function readNonBlankStrings_(values2d) {
+  const out = [];
+  for (let i = 0; i < values2d.length; i++) {
+    const s = String(values2d[i] && values2d[i][0] || "").trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+function normalizeKeyword_(k) {
+  return String(k || "").trim();
+}
+
+function findKeywordHit_(keywords, haystacks) {
+  const hs = Array.isArray(haystacks) ? haystacks : [haystacks];
+  for (let i = 0; i < keywords.length; i++) {
+    const kw = keywords[i];
+    if (!kw) continue;
+    const kwLower = kw.toLowerCase();
+    const re      =
+      CFG.KEYWORD_MATCH_MODE === "word"
+        ? buildWordBoundaryRegex_(kwLower)
+        : null;
+
+    for (let h = 0; h < hs.length; h++) {
+      const t = String(hs[h] || "").toLowerCase();
+      if (!t) continue;
+      if (CFG.KEYWORD_MATCH_MODE === "contains") {
+        if (t.includes(kwLower)) return kw;
+      } else if (re && re.test(t)) {
+        return kw;
+      }
+    }
+  }
+  return "";
+}
+
+function escapeRegExp_(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildWordBoundaryRegex_(keywordLower) {
+  const escaped = escapeRegExp_(keywordLower);
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+}
+
+function buildCaseNumberMap_() {
+  try {
+    const extSS = SpreadsheetApp.openById(CFG.EXTERNAL_SHEET_ID);
+    const sh    = extSS.getSheetByName(CFG.EXTERNAL_SHEET_NAME);
+    if (!sh) return {};
+
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) return {};
+
+    const maxCol   = Math.max(CFG.EXTERNAL_KEY_COL, ...(CFG.EXTERNAL_VALUE_COLS || [2]));
+    const data     = sh.getRange(2, 1, lastRow, maxCol).getValues();
+    const map      = {};
+    const keyIdx   = CFG.EXTERNAL_KEY_COL - 1;
+    const valueIdxs = (CFG.EXTERNAL_VALUE_COLS || [2]).map(c => c - 1);
+
+    for (let i = 0; i < data.length; i++) {
+      const key = String(data[i][keyIdx] || "").trim();
+      if (!key) continue;
+      const values = valueIdxs
+        .map(idx => String(data[i][idx] || "").trim())
+        .filter(v => v !== "");
+      if (!map[key]) map[key] = values.join("-") || "NOT FOUND";
+    }
+    return map;
+  } catch (e) {
+    Logger.log("Case lookup error: " + e);
+    return {};
+  }
+}
+
+function getExistingReviewKeys_(reviewSheet) {
+  const keys    = new Set();
+  const lastRow = reviewSheet.getLastRow();
+  if (lastRow < 2) return keys;
+
+  const lastCol = reviewSheet.getLastColumn();
+  const headers = reviewSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const idx     = makeIndex_(headers);
+  const data    = reviewSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+  for (let i = 0; i < data.length; i++) {
+    const journalNo   = String(data[i][idx["Journal No"]]   || "").trim();
+    const appNo       = String(data[i][idx["Application No"]] || "").trim();
+    const matchedTerm = String(data[i][idx["Matched Term"]] || "").trim();
+    const matchType   = String(data[i][idx["Match Type"]]   || "").trim();
+    if (!journalNo || !appNo || !matchType) continue;
+    keys.add(`${journalNo}|${appNo}|${matchType}|${matchedTerm}`);
+  }
+  return keys;
+}
+
+function appendRows_(sheet, rows) {
+  const startRow = sheet.getLastRow() + 1;
+  sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+function makeIndex_(headers) {
+  const idx = {};
+  for (let i = 0; i < headers.length; i++) {
+    const h = String(headers[i] || "").trim();
+    if (h) idx[h] = i;
+  }
+  return idx;
+}
+
+
+// ========================================
+// FORMATTING (v2 se unchanged — single system)
+// ========================================
+
+function applyUniversalFormatting_(sheet) {
+  if (!sheet) return;
+
+  const name    = sheet.getName();
+  const lastRow = Math.max(1, sheet.getLastRow());
+  const lastCol = Math.max(1, sheet.getLastColumn());
+
+  const range = sheet.getRange(1, 1, lastRow, lastCol);
+  range.setFontFamily(UI_CFG.FONT_FAMILY);
+  range.setHorizontalAlignment(UI_CFG.DEFAULT_H_ALIGN);
+  range.setVerticalAlignment(UI_CFG.DEFAULT_V_ALIGN);
+  range.setWrapStrategy(UI_CFG.WRAP_STRATEGY);
+
+  sheet.setFrozenRows(
+    name === CFG.SHEET_DASHBOARD ? UI_CFG.FREEZE_DASHBOARD : UI_CFG.FREEZE_DEFAULT
+  );
+
+  const header = sheet.getRange(1, 1, 1, lastCol);
+  header
+    .setFontFamily(UI_CFG.FONT_FAMILY)
+    .setFontWeight("bold")
+    .setBackground(UI_CFG.HEADER_BG)
+    .setFontColor(UI_CFG.HEADER_FG)
+    .setVerticalAlignment(UI_CFG.DEFAULT_V_ALIGN)
+    .setWrapStrategy(UI_CFG.WRAP_STRATEGY);
+
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(v => String(v || "").trim());
+  for (let c = 0; c < headers.length; c++) {
+    if (headers[c].toLowerCase().includes("date") && lastRow > 1) {
+      sheet.getRange(2, c + 1, lastRow - 1, 1).setNumberFormat(UI_CFG.DATE_FORMAT);
+    }
+  }
+
+  applySheetLayout_(sheet);
+}
+
+function applySheetLayout_(sheet) {
+  const cfg = UI_CFG.SHEETS[sheet.getName()];
+  if (!cfg) return;
+
+  if (cfg.widths) {
+    for (let i = 0; i < cfg.widths.length; i++) {
+      sheet.setColumnWidth(i + 1, cfg.widths[i]);
+    }
+  }
+  if (cfg.aligns) {
+    const lastRow = Math.max(1, sheet.getLastRow());
+    for (let i = 0; i < cfg.aligns.length; i++) {
+      const align = cfg.aligns[i] === "C" ? "center"
+                  : cfg.aligns[i] === "R" ? "right"
+                  : "left";
+      sheet.getRange(1, i + 1, lastRow, 1).setHorizontalAlignment(align);
+    }
+  }
+}
+
+function applyAlternatingRows_(sheet) {
+  if (!sheet) return;
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow <= 2 || lastCol < 1) return;
+
+  const range = sheet.getRange(2, 1, lastRow - 1, lastCol);
+  const bgs   = range.getBackgrounds();
+  for (let r = 0; r < bgs.length; r++) {
+    if (r % 2 === 1) {
+      for (let c = 0; c < lastCol; c++) bgs[r][c] = UI_CFG.ALT_ROW_BG;
+    }
+  }
+  range.setBackgrounds(bgs);
+}
+
+
+// ========================================
+// DIAGNOSTICS (v2 se unchanged)
+// ========================================
+
+function notify_(message, title) {
+  SpreadsheetApp.getActive().toast(
+    String(message || ""), title || "Journal Monitor", 12
+  );
+}
+
+function testCaseLookup() {
+  const map  = buildCaseNumberMap_();
+  const keys = Object.keys(map);
+  Logger.log("Total keys found: " + keys.length);
+  Logger.log("First 10: " + keys.slice(0, 10).join(", "));
+  SpreadsheetApp.getUi().alert(
+    "Keys found: " + keys.length +
+    "\n\nFirst 5:\n" + keys.slice(0, 5).join("\n") +
+    "\n\nView → Logs mein full details dekhein."
+  );
+}

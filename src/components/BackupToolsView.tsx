@@ -1,0 +1,237 @@
+import { useState } from 'react';
+import { Download, RotateCcw, Search } from 'lucide-react';
+import { JournalCheckRow, JournalConfig, RecordRow, ReviewRow } from '../types/journal';
+import { buildCaseMap, exportRowsToCsv, triggerFileDownload } from '../lib/journal/engine';
+
+interface BackupToolsViewProps {
+  config: JournalConfig;
+  journalRows: JournalCheckRow[];
+  reviewRows: ReviewRow[];
+  records: RecordRow[];
+  onResetSampleData: () => void;
+}
+
+export function BackupToolsView({
+  config,
+  journalRows,
+  reviewRows,
+  records,
+  onResetSampleData,
+}: BackupToolsViewProps) {
+  const [lookupInput, setLookupInput] = useState('');
+  const caseMap = buildCaseMap(config.caseEntries);
+  const lookupKeys = Object.keys(caseMap);
+  const lookupResult = lookupInput.trim() ? caseMap[lookupInput.trim()] || 'NOT FOUND' : null;
+
+  const exportDataset = (
+    name: string,
+    headers: string[],
+    matrix: (string | number | boolean)[][],
+    jsonPayload: unknown,
+    format: 'csv' | 'json'
+  ) => {
+    const jn = config.journalNo || '909';
+    if (format === 'csv') {
+      const csv = exportRowsToCsv(headers, matrix);
+      triggerFileDownload(csv, `${name}_Journal_${jn}.csv`, 'text/csv;charset=utf-8');
+    } else {
+      triggerFileDownload(
+        JSON.stringify(jsonPayload, null, 2),
+        `${name}_Journal_${jn}.json`,
+        'application/json;charset=utf-8'
+      );
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-[#0c0c0e] border border-[#2a2a30] p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-white">Backup, Export &amp; Diagnostics</h2>
+          <p className="text-xs text-[#9c9ca6] mt-1">
+            Export JournalCheck, Review, and Records datasets as CSV or JSON, or verify Case Lookup keys.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onResetSampleData}
+          className="h-[38px] px-4 border border-[#3a3a42] bg-[#16161a] hover:border-[#ffee00] hover:text-[#ffee00] text-xs font-semibold text-white inline-flex items-center gap-2 self-start sm:self-auto"
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-[#ffee00]" aria-hidden="true" />
+          <span>Reset Sample Journal 909 Data</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* JournalCheck Export */}
+        <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 space-y-4">
+          <div>
+            <h3 className="text-base font-bold text-white">JournalCheck</h3>
+            <p className="text-xs text-[#9c9ca6] mt-1 tabular-nums">
+              {journalRows.length} rows ready for backup
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                exportDataset(
+                  'JournalCheck',
+                  ['Application No', 'Title', 'Class', 'Applicant Name and Address', 'Agent Name and Address', 'Date of Filing', 'Page No'],
+                  journalRows.map((r) => [
+                    r.applicationNo,
+                    r.title,
+                    r.classNo,
+                    r.applicant,
+                    r.agent,
+                    r.dateOfFiling,
+                    r.pageNo,
+                  ]),
+                  journalRows,
+                  'csv'
+                )
+              }
+              className="flex-1 py-2 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600] inline-flex items-center justify-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>CSV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                exportDataset('JournalCheck', [], [], journalRows, 'json')
+              }
+              className="flex-1 py-2 border border-[#3a3a42] text-white text-xs font-semibold hover:border-[#ffee00]"
+            >
+              JSON
+            </button>
+          </div>
+        </div>
+
+        {/* Review Export */}
+        <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 space-y-4">
+          <div>
+            <h3 className="text-base font-bold text-white">Review Queue</h3>
+            <p className="text-xs text-[#9c9ca6] mt-1 tabular-nums">
+              {reviewRows.length} matched rows ready for backup
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                exportDataset(
+                  'Review',
+                  ['Journal No', 'Journal Date', 'Application No', 'Case No', 'Title', 'Class', 'Matched Term', 'Match Type', 'Decision', 'Status', 'Page No'],
+                  reviewRows.map((r) => [
+                    r.journalNo,
+                    r.journalDate,
+                    r.applicationNo,
+                    r.caseNo,
+                    r.title,
+                    r.classNo,
+                    r.matchedTerm,
+                    r.matchType,
+                    r.decision,
+                    r.status,
+                    r.pageNo,
+                  ]),
+                  reviewRows,
+                  'csv'
+                )
+              }
+              className="flex-1 py-2 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600] inline-flex items-center justify-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>CSV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => exportDataset('Review', [], [], reviewRows, 'json')}
+              className="flex-1 py-2 border border-[#3a3a42] text-white text-xs font-semibold hover:border-[#ffee00]"
+            >
+              JSON
+            </button>
+          </div>
+        </div>
+
+        {/* Records Export */}
+        <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 space-y-4">
+          <div>
+            <h3 className="text-base font-bold text-white">Records Ledger</h3>
+            <p className="text-xs text-[#9c9ca6] mt-1 tabular-nums">
+              {records.length} generated records ready for backup
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                exportDataset(
+                  'Records',
+                  ['Journal No', 'Journal Date', 'TM No', 'Case No', 'Class', 'Title', 'Decision', 'PDF Ready', 'Page No'],
+                  records.map((r) => [
+                    r.journalNo,
+                    r.journalDate,
+                    r.tmNo,
+                    r.caseNo,
+                    r.classNo,
+                    r.title,
+                    r.decision,
+                    r.pdfReady,
+                    r.pageNo,
+                  ]),
+                  records,
+                  'csv'
+                )
+              }
+              className="flex-1 py-2 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600] inline-flex items-center justify-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>CSV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => exportDataset('Records', [], [], records, 'json')}
+              className="flex-1 py-2 border border-[#3a3a42] text-white text-xs font-semibold hover:border-[#ffee00]"
+            >
+              JSON
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Test Case Lookup Tool */}
+      <div className="bg-[#0c0c0e] border border-[#2a2a30] p-6 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base font-bold text-white">Test Case Lookup</h3>
+          <span className="text-xs text-[#ffee00] font-bold tabular-nums">
+            {lookupKeys.length} indexed keys
+          </span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search
+              className="w-4 h-4 text-[#85858f] absolute left-3 top-1/2 -translate-y-1/2"
+              aria-hidden="true"
+            />
+            <input
+              type="text"
+              value={lookupInput}
+              onChange={(e) => setLookupInput(e.target.value)}
+              placeholder="Enter 6-digit TM number (e.g. 548291)"
+              className="w-full bg-[#16161a] border border-[#2f2f36] pl-9 pr-3 py-2 text-xs text-white font-mono focus:border-[#ffee00]"
+            />
+          </div>
+          {lookupResult && (
+            <div className="px-3.5 py-2 bg-[#16161a] border border-[#2f2f36] text-xs">
+              <span className="text-[#9c9ca6]">Result: </span>
+              <span className="font-bold text-[#ffee00]">{lookupResult}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

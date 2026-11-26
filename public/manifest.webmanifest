@@ -1,16 +1,16 @@
 {
-  "name": "Document Studio",
-  "short_name": "Doc Studio",
-  "description": "Standalone workspace for creating, organizing, versioning, previewing, and exporting business documents.",
+  "name": "Journal Monitor & Doc Generator",
+  "short_name": "Journal Monitor",
+  "description": "Trademark journal analyzer, watchlist scanner, review queue, and Legal 8.5x14 Journal 909 document generator.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fbfafc",
-  "theme_color": "#7463e8",
+  "background_color": "#000000",
+  "theme_color": "#ffee00",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237463e8'/%3E%3Cpath d='M20 16h16l10 10v22a2 2 0 0 1-2 2H20a2 2 0 0 1-2-2V18a2 2 0 0 1 2-2z' fill='%23ffffff'/%3E%3Cpath d='M36 16v10h10' fill='%23e2ddf9'/%3E%3Crect x='24' y='32' width='16' height='2.5' rx='1' fill='%237463e8'/%3E%3Crect x='24' y='38' width='12' height='2.5' rx='1' fill='%237463e8'/%3E%3C/svg%3E",
+      "src": "/favicon.ico",
       "sizes": "64x64",
-      "type": "image/svg+xml"
+      "type": "image/x-icon"
     }
   ]
 }
