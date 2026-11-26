@@ -1,0 +1,22 @@
+{
+  // Local Supabase CLI configuration baseline for Document Studio (isolated project)
+  "project_id": "document-studio-local",
+  "api": {
+    "enabled": true,
+    "port": 54321,
+    "schemas": ["public"],
+    "max_rows": 1000
+  },
+  "db": {
+    "port": 54322,
+    "major_version": 15
+  },
+  "storage": {
+    "enabled": true,
+    "file_size_limit": "25MiB"
+  },
+  "auth": {
+    "enabled": true,
+    "site_url": "http://localhost:3000"
+  }
+}

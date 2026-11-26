@@ -1,0 +1,8 @@
+{
+  "name": "Document Studio",
+  "description": "Standalone web application for creating, importing, editing, organizing, previewing, and exporting business documents with immutable version history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
