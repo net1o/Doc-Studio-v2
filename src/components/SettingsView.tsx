@@ -165,7 +165,13 @@ export function SettingsView({
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white border border-[#e2e4ea] p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-3">
+          <BrandexLogo
+            variant="logo17Icon"
+            size="sm"
+            primaryColor={universal.docPrimaryColor}
+            accentColor={universal.docAccentColor}
+          />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Workspace &amp; Universal Settings
           </h2>
@@ -192,19 +198,30 @@ export function SettingsView({
           </div>
 
           {/* Live Brandex Theme Swatch Preview */}
-          <div className="flex items-center gap-3 px-3 py-1.5 bg-[#f8f9fb] border border-[#e2e4ea]">
-            <BrandexLogo
-              variant="logo01"
-              size="sm"
-              primaryColor={universal.docPrimaryColor}
-              accentColor={universal.docAccentColor}
-            />
-            <BrandexLogo
-              variant="logo06"
-              size="sm"
-              primaryColor={universal.docPrimaryColor}
-              accentColor={universal.docAccentColor}
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 px-3 py-1.5 bg-[#f8f9fb] border border-[#e2e4ea]">
+              <BrandexLogo
+                variant="logoFinal"
+                size="sm"
+                primaryColor={universal.docPrimaryColor}
+                accentColor={universal.docAccentColor}
+              />
+              <BrandexLogo
+                variant="logo17"
+                size="sm"
+                primaryColor={universal.docPrimaryColor}
+                accentColor={universal.docAccentColor}
+              />
+            </div>
+            <div className="px-3 py-1.5 bg-[#111111] border border-[#111111]">
+              <BrandexLogo
+                variant="logoFinal"
+                size="sm"
+                primaryColor={universal.docPrimaryColor}
+                accentColor={universal.docAccentColor}
+                onDark
+              />
+            </div>
           </div>
         </div>
 

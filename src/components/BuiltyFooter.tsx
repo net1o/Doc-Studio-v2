@@ -15,12 +15,12 @@ export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: Builty
 
   return (
     <footer className="no-print mt-12">
-      {/* Consultation Strip with Logo 01 */}
+      {/* Consultation Strip with Logo-Final */}
       <div className="bg-white border-t border-b border-[#e2e4ea]">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <BrandexLogo
-              variant="logo01"
+              variant="logoFinal"
               size="sm"
               primaryColor={logoPrimary}
               accentColor={logoAccent}
@@ -44,15 +44,15 @@ export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: Builty
         </div>
       </div>
 
-      {/* Main Corporate Footer with Logo 20 Horizontal Lockup */}
+      {/* Main Corporate Footer with Logo-Final on Dark */}
       <div className="bg-[#111111] text-white">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-9 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-3">
             <BrandexLogo
-              variant="logo20"
+              variant="logoFinal"
               size="md"
-              primaryColor="#ffffff"
-              accentColor={uiAccent}
+              primaryColor={logoPrimary}
+              accentColor={logoAccent || uiAccent}
               onDark
             />
             <p className="text-xs text-[#9c9ca6] leading-relaxed max-w-sm">
@@ -105,7 +105,16 @@ export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: Builty
 
         <div className="border-t border-[#1d1d22]">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4 text-xs text-[#8e8e98]">
-            <span>Brandex Law Associate</span>
+            <span className="inline-flex items-center gap-2">
+              <BrandexLogo
+                variant="logo17Icon"
+                size="xs"
+                primaryColor={logoPrimary}
+                accentColor={logoAccent}
+                onDark
+              />
+              <span>Brandex Law Associate</span>
+            </span>
             <button
               type="button"
               onClick={onScrollTop}

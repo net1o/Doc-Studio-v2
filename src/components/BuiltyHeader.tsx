@@ -53,14 +53,14 @@ export function BuiltyHeader({
   return (
     <header className="no-print sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e2e4ea]">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-3 xl:gap-5">
-        {/* Zone 1: Brandex Logo 01 Primary Branding */}
+        {/* Zone 1: Brandex Logo-Final Primary Branding */}
         <button
           type="button"
           onClick={() => onSelectTab('analyzer')}
           className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
         >
           <BrandexLogo
-            variant="logo01"
+            variant="logoFinal"
             size="md"
             primaryColor={logoPrimary}
             accentColor={logoAccent}

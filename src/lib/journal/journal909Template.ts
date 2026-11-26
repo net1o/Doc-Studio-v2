@@ -4,6 +4,10 @@ import {
   PaperSizePreset,
   UniversalSettings,
 } from '../../types/journal';
+import {
+  buildLogo17IconSvgString,
+  buildLogoFinalSvgString,
+} from '../../components/BrandexLogo';
 
 function esc(value: string): string {
   return String(value || '')
@@ -242,7 +246,8 @@ export function buildJournal909Html(
     .image-header { margin-top: ${dims.compactLayout ? '0.18in' : '0.28in'}; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .image-line { flex: 1; max-width: 1.8in; height: 2px; background: var(--theme); }
     .image-title { margin: 0; padding: 0 12px; font-family: var(--font-display); font-size: 15.5pt; font-weight: 800; letter-spacing: 2px; color: var(--heading); text-transform: uppercase; }
-    .image-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0.16in 0; min-height: 1.4in; }
+    .image-area { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 0.16in 0; min-height: 1.4in; }
+    .image-stamp { position: absolute; right: 8px; bottom: 8px; width: 64px; height: 64px; opacity: 0.9; pointer-events: none; }
     .footer { margin-top: auto; }
     .note-bar { background: var(--theme); color: #ffffff; text-align: center; font-family: var(--font-tech); font-size: 9pt; font-weight: 600; letter-spacing: 0.8px; padding: 6px 10px; text-transform: uppercase; }
     .brandex-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0.12in 0 0.1in 0; }
@@ -355,18 +360,12 @@ export function buildJournal909Html(
         </div>
         <div class="image-line"></div>
       </div>
-      <div class="image-area" contenteditable="true">${imageHtml}</div>
+      <div class="image-area" contenteditable="true">${imageHtml}<div class="image-stamp">${buildLogo17IconSvgString(themePrimary, themeAccent, '#ffffff')}</div></div>
       <div class="footer">
         <div class="note-bar">${safeNote}</div>
         <div class="brandex-row">
           <div class="brandex-line"></div>
-          <svg height="46" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <text x="110" y="16" text-anchor="middle" fill="${themePrimary}" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" letter-spacing="4.5">GET LEGAL</text>
-            <text x="14" y="59" fill="${themePrimary}" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="500">b</text>
-            <circle cx="60" cy="46" r="17.5" fill="${themeAccent}" />
-            <text x="60" y="54" text-anchor="middle" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-size="23" font-weight="600">R</text>
-            <text x="81" y="59" fill="${themePrimary}" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="500" letter-spacing="-1">ndex</text>
-          </svg>
+          ${buildLogoFinalSvgString(themePrimary, themeAccent, themePrimary, 46)}
           <div class="brandex-line"></div>
         </div>
         <div class="contact-row">

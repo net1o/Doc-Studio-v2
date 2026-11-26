@@ -52,7 +52,7 @@ export function BuiltyHeroBanner({
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <BrandexLogo
-              variant="logo03"
+              variant="logo17Icon"
               size="lg"
               primaryColor={logoPrimary}
               accentColor={logoAccent}

@@ -451,13 +451,13 @@ export function AnalyzerView({
 
   return (
     <div className="space-y-8">
-      {/* Watchlist Status Badge with Brandex Circular Seal (Logo 06) */}
+      {/* Watchlist Status Badge with Brandex Icon 17 */}
       <section aria-label="Watchlist active status">
         <div className="bg-white border border-[#111111] p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-start sm:items-center gap-3.5">
             <BrandexLogo
-              variant="logo06"
-              size="lg"
+              variant="logo17"
+              size="md"
               primaryColor={logoPrimary}
               accentColor={logoAccent}
               className="shrink-0"

@@ -184,6 +184,13 @@ export function Journal909GeneratorView({
   if (!activeDoc) {
     return (
       <div className="bg-white border border-[#e2e4ea] p-10 text-center space-y-4">
+        <BrandexLogo
+          variant="logo17"
+          size="lg"
+          primaryColor={themePrimary}
+          accentColor={themeAccent}
+          className="mx-auto"
+        />
         <h2 className="text-xl font-extrabold text-[#111111]">No Documents Yet</h2>
         <button
           type="button"
@@ -225,11 +232,20 @@ export function Journal909GeneratorView({
       {/* Left Control Rail */}
       <aside className="no-print xl:col-span-4 bg-white border border-[#e2e4ea] p-5 space-y-5">
         <div className="flex items-center justify-between gap-2 border-b border-[#eceef2] pb-3">
-          <div>
-            <h2 className="text-base font-extrabold text-[#111111]">
-              Journal {activeDoc.journalNo || '909'} ({resolvedDims.label})
-            </h2>
-            <p className="text-[11.5px] text-[#555a66]">Document Controls</p>
+          <div className="flex items-center gap-2.5">
+            <BrandexLogo
+              variant="logo17Icon"
+              size="sm"
+              primaryColor={themePrimary}
+              accentColor={themeAccent}
+              className="shrink-0"
+            />
+            <div>
+              <h2 className="text-base font-extrabold text-[#111111]">
+                Journal {activeDoc.journalNo || '909'} ({resolvedDims.label})
+              </h2>
+              <p className="text-[11.5px] text-[#555a66]">Document Controls</p>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -1159,11 +1175,11 @@ export function Journal909GeneratorView({
                     </button>
                   )}
 
-                  {/* Brandex Circular Badge (Logo 06) Official Stamp */}
+                  {/* Brandex Icon 17 Official Stamp */}
                   <div className="absolute right-2 bottom-2 opacity-90 pointer-events-none">
                     <BrandexLogo
-                      variant="logo06"
-                      size="lg"
+                      variant="logo17"
+                      size="md"
                       primaryColor={themePrimary}
                       accentColor={themeAccent}
                     />
@@ -1196,11 +1212,11 @@ export function Journal909GeneratorView({
                     </div>
                   )}
 
-                  {/* Brandex Logo 01 (Original Refined) Footer Branding */}
+                  {/* Brandex Logo-Final Footer Branding */}
                   <div className="j909-brandex-row">
                     <div className="j909-brandex-line" />
                     <BrandexLogo
-                      variant="logo01"
+                      variant="logoFinal"
                       size="md"
                       primaryColor={themePrimary}
                       accentColor={themeAccent}

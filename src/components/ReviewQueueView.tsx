@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CheckSquare, CopyCheck, FilePlus2, FileText } from 'lucide-react';
-import { ReviewDecision, ReviewRow, ReviewStatus } from '../types/journal';
+import { ReviewDecision, ReviewRow, ReviewStatus, UniversalSettings } from '../types/journal';
+import { BrandexLogo } from './BrandexLogo';
 import {
   DeleteAllConfirmModal,
   TableControlsBar,
@@ -11,6 +12,7 @@ interface ReviewQueueViewProps {
   rows: ReviewRow[];
   pageSize?: number;
   defaultEditMode?: boolean;
+  themeSettings?: UniversalSettings;
   onUpdateRow: (id: string, patch: Partial<ReviewRow>) => void;
   onBulkApplyStatusByAppNo: (
     applicationNo: string,
@@ -38,6 +40,7 @@ export function ReviewQueueView({
   rows,
   pageSize = 50,
   defaultEditMode = false,
+  themeSettings,
   onUpdateRow,
   onBulkApplyStatusByAppNo,
   onMarkIssuesMailmerge,
@@ -167,6 +170,12 @@ export function ReviewQueueView({
     <div className="space-y-5">
       <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
+          <BrandexLogo
+            variant="logo17Icon"
+            size="sm"
+            primaryColor={themeSettings?.docPrimaryColor}
+            accentColor={themeSettings?.docAccentColor}
+          />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">Review Queue</h2>
           <span className="bg-[#ffee00] text-[#111111] px-2.5 py-0.5 text-xs font-extrabold tabular-nums">
             {rows.length} Matches

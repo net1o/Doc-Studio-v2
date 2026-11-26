@@ -44,6 +44,7 @@ import { RecordsReportView } from './components/RecordsReportView';
 import { SettingsView } from './components/SettingsView';
 import { BackupToolsView } from './components/BackupToolsView';
 import { BuiltyFooter } from './components/BuiltyFooter';
+import { buildLogo17IconSvgString } from './components/BrandexLogo';
 
 function formatSerial(prefix: string, pad: number, indexOneBased: number): string {
   const num = String(indexOneBased).padStart(Math.max(1, pad), '0');
@@ -146,6 +147,23 @@ export default function App() {
   useEffect(() => {
     saveJournalState(state);
   }, [state]);
+
+  useEffect(() => {
+    const svg = buildLogo17IconSvgString(
+      universalSettings.docPrimaryColor || '#290076',
+      universalSettings.docAccentColor || '#f4580b',
+      '#ffffff'
+    );
+    const dataUrl = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.type = 'image/svg+xml';
+    link.href = dataUrl;
+  }, [universalSettings.docPrimaryColor, universalSettings.docAccentColor]);
 
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent) => {
@@ -684,6 +702,7 @@ export default function App() {
             rows={state.journalRows}
             pageSize={universalSettings.tablePageSize}
             defaultEditMode={universalSettings.enableInlineEdit}
+            themeSettings={universalSettings}
             onChangeRows={handleUpdateJournalRows}
             onNormalizeDates={handleNormalizeDates}
             onRunScan={handleRunScan}
@@ -697,6 +716,7 @@ export default function App() {
             rows={state.reviewRows}
             pageSize={universalSettings.tablePageSize}
             defaultEditMode={universalSettings.enableInlineEdit}
+            themeSettings={universalSettings}
             onUpdateRow={handleUpdateReviewRow}
             onBulkApplyStatusByAppNo={handleBulkApplyStatusByAppNo}
             onMarkIssuesMailmerge={handleMarkIssuesMailmerge}
@@ -732,6 +752,7 @@ export default function App() {
             config={state.config}
             pageSize={universalSettings.tablePageSize}
             defaultEditMode={universalSettings.enableInlineEdit}
+            themeSettings={universalSettings}
             onUpdateConfig={handleUpdateConfig}
             onRefreshReviewCases={(entries: CaseEntry[]) => {
               const { rows, updatedCount } = refreshReviewCaseNumbers(state.reviewRows, entries);
@@ -754,6 +775,7 @@ export default function App() {
             allTimeStats={allTimeStats}
             pageSize={universalSettings.tablePageSize}
             defaultEditMode={universalSettings.enableInlineEdit}
+            themeSettings={universalSettings}
             onOpenGeneratedDoc={handleOpenGeneratedDocById}
             onUpdateRecord={handleUpdateRecord}
             onDeleteAllRecords={handleDeleteAllRecords}
@@ -776,6 +798,7 @@ export default function App() {
             journalRows={state.journalRows}
             reviewRows={state.reviewRows}
             records={state.records}
+            themeSettings={universalSettings}
             onResetSampleData={handleResetSampleData}
           />
         )}

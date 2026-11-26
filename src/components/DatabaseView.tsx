@@ -16,7 +16,8 @@ import {
   ShieldPlus,
   Trash2,
 } from 'lucide-react';
-import { CaseEntry, CaseSheetConfig, JournalConfig } from '../types/journal';
+import { CaseEntry, CaseSheetConfig, JournalConfig, UniversalSettings } from '../types/journal';
+import { BrandexLogo } from './BrandexLogo';
 import {
   analyzeCaseEntries,
   checkDuplicate,
@@ -45,6 +46,7 @@ interface DatabaseViewProps {
   config: JournalConfig;
   pageSize?: number;
   defaultEditMode?: boolean;
+  themeSettings?: UniversalSettings;
   onUpdateConfig: (next: JournalConfig) => void;
   onRefreshReviewCases: (entries: CaseEntry[]) => void;
   onNotify: (message: string) => void;
@@ -82,6 +84,7 @@ export function DatabaseView({
   config,
   pageSize = 50,
   defaultEditMode = false,
+  themeSettings,
   onUpdateConfig,
   onRefreshReviewCases,
   onNotify,
@@ -692,6 +695,12 @@ export function DatabaseView({
       {/* Header Toolbar */}
       <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
+          <BrandexLogo
+            variant="logo17Icon"
+            size="sm"
+            primaryColor={themeSettings?.docPrimaryColor}
+            accentColor={themeSettings?.docAccentColor}
+          />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Cases Database
           </h2>

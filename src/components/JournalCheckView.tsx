@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CalendarClock, FileUp, Play, Plus, Trash2 } from 'lucide-react';
-import { JournalCheckRow } from '../types/journal';
+import { JournalCheckRow, UniversalSettings } from '../types/journal';
+import { BrandexLogo } from './BrandexLogo';
 import { deduplicateJournalCheckRows } from '../lib/journal/engine';
 import { JournalImportWizard } from './JournalImportWizard';
 import {
@@ -13,6 +14,7 @@ interface JournalCheckViewProps {
   rows: JournalCheckRow[];
   pageSize?: number;
   defaultEditMode?: boolean;
+  themeSettings?: UniversalSettings;
   onChangeRows: (rows: JournalCheckRow[]) => void;
   onNormalizeDates: () => void;
   onRunScan: () => void;
@@ -33,6 +35,7 @@ export function JournalCheckView({
   rows,
   pageSize = 50,
   defaultEditMode = false,
+  themeSettings,
   onChangeRows,
   onNormalizeDates,
   onRunScan,
@@ -193,6 +196,12 @@ export function JournalCheckView({
     <div className="space-y-5">
       <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
+          <BrandexLogo
+            variant="logo17Icon"
+            size="sm"
+            primaryColor={themeSettings?.docPrimaryColor}
+            accentColor={themeSettings?.docAccentColor}
+          />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             JournalCheck Table
           </h2>

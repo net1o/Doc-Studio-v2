@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Download, RotateCcw, Search } from 'lucide-react';
-import { JournalCheckRow, JournalConfig, RecordRow, ReviewRow } from '../types/journal';
+import { JournalCheckRow, JournalConfig, RecordRow, ReviewRow, UniversalSettings } from '../types/journal';
 import { buildCaseMap, exportRowsToCsv, triggerFileDownload } from '../lib/journal/engine';
+import { BrandexLogo } from './BrandexLogo';
 
 interface BackupToolsViewProps {
   config: JournalConfig;
   journalRows: JournalCheckRow[];
   reviewRows: ReviewRow[];
   records: RecordRow[];
+  themeSettings?: UniversalSettings;
   onResetSampleData: () => void;
 }
 
@@ -16,6 +18,7 @@ export function BackupToolsView({
   journalRows,
   reviewRows,
   records,
+  themeSettings,
   onResetSampleData,
 }: BackupToolsViewProps) {
   const [lookupInput, setLookupInput] = useState('');
@@ -46,9 +49,17 @@ export function BackupToolsView({
   return (
     <div className="space-y-6">
       <div className="bg-white border border-[#e2e4ea] p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
-          Backup &amp; Export
-        </h2>
+        <div className="flex items-center gap-3">
+          <BrandexLogo
+            variant="logo17Icon"
+            size="sm"
+            primaryColor={themeSettings?.docPrimaryColor}
+            accentColor={themeSettings?.docAccentColor}
+          />
+          <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
+            Backup &amp; Export
+          </h2>
+        </div>
         <button
           type="button"
           onClick={onResetSampleData}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FileText } from 'lucide-react';
-import { JournalStats, RecordRow } from '../types/journal';
+import { JournalStats, RecordRow, UniversalSettings } from '../types/journal';
+import { BrandexLogo } from './BrandexLogo';
 import {
   DeleteAllConfirmModal,
   TableControlsBar,
@@ -14,6 +15,7 @@ interface RecordsReportViewProps {
   allTimeStats: JournalStats;
   pageSize?: number;
   defaultEditMode?: boolean;
+  themeSettings?: UniversalSettings;
   onOpenGeneratedDoc: (docId: string) => void;
   onUpdateRecord?: (id: string, patch: Partial<RecordRow>) => void;
   onDeleteAllRecords?: () => void;
@@ -36,6 +38,7 @@ export function RecordsReportView({
   allTimeStats,
   pageSize = 50,
   defaultEditMode = false,
+  themeSettings,
   onOpenGeneratedDoc,
   onUpdateRecord,
   onDeleteAllRecords,
@@ -183,6 +186,12 @@ export function RecordsReportView({
       {/* Summary Section */}
       <section className="space-y-4" aria-label="Monitoring report">
         <div className="flex flex-wrap items-center gap-2.5">
+          <BrandexLogo
+            variant="logo17Icon"
+            size="sm"
+            primaryColor={themeSettings?.docPrimaryColor}
+            accentColor={themeSettings?.docAccentColor}
+          />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Monitoring Report
           </h2>
