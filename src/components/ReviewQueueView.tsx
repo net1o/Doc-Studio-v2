@@ -1,10 +1,15 @@
-import { useState } from 'react';
-import { CheckSquare, FilePlus2, FileText } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CheckSquare, CopyCheck, FilePlus2, FileText } from 'lucide-react';
 import { ReviewDecision, ReviewRow, ReviewStatus } from '../types/journal';
 
 interface ReviewQueueViewProps {
   rows: ReviewRow[];
   onUpdateRow: (id: string, patch: Partial<ReviewRow>) => void;
+  onBulkApplyStatusByAppNo: (
+    applicationNo: string,
+    status: ReviewStatus,
+    visibleRowIds: string[]
+  ) => void;
   onMarkIssuesMailmerge: () => void;
   onGenerateDocsFromMailmerge: () => void;
   onOpenDocInGenerator: (row: ReviewRow) => void;
@@ -13,6 +18,7 @@ interface ReviewQueueViewProps {
 export function ReviewQueueView({
   rows,
   onUpdateRow,
+  onBulkApplyStatusByAppNo,
   onMarkIssuesMailmerge,
   onGenerateDocsFromMailmerge,
   onOpenDocInGenerator,
@@ -20,24 +26,40 @@ export function ReviewQueueView({
   const [search, setSearch] = useState('');
   const [matchFilter, setMatchFilter] = useState<'ALL' | 'TM' | 'KEYWORD'>('ALL');
   const [decisionFilter, setDecisionFilter] = useState<'ALL' | ReviewDecision>('ALL');
+  const [openMenuRowId, setOpenMenuRowId] = useState<string | null>(null);
 
   const mailmergeReadyCount = rows.filter(
     (r) => r.status === 'MAILMERGE' && !r.generatedDocId
   ).length;
 
-  const filtered = rows.filter((r) => {
-    if (matchFilter !== 'ALL' && r.matchType !== matchFilter) return false;
-    if (decisionFilter !== 'ALL' && r.decision !== decisionFilter) return false;
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      r.applicationNo.toLowerCase().includes(q) ||
-      r.caseNo.toLowerCase().includes(q) ||
-      r.title.toLowerCase().includes(q) ||
-      r.matchedTerm.toLowerCase().includes(q) ||
-      r.applicant.toLowerCase().includes(q)
-    );
-  });
+  const filtered = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (matchFilter !== 'ALL' && r.matchType !== matchFilter) return false;
+        if (decisionFilter !== 'ALL' && r.decision !== decisionFilter) return false;
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return (
+          r.applicationNo.toLowerCase().includes(q) ||
+          r.caseNo.toLowerCase().includes(q) ||
+          r.title.toLowerCase().includes(q) ||
+          r.matchedTerm.toLowerCase().includes(q) ||
+          r.applicant.toLowerCase().includes(q)
+        );
+      }),
+    [rows, matchFilter, decisionFilter, search]
+  );
+
+  const visibleRowIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
+
+  const appNoCountsInView = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of filtered) {
+      const key = r.applicationNo.trim();
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }, [filtered]);
 
   return (
     <div className="space-y-5">
@@ -189,24 +211,79 @@ export function ReviewQueueView({
                     </select>
                   </td>
                   <td className="py-2.5 px-3">
-                    <select
-                      aria-label={`Status for ${row.applicationNo}`}
-                      value={row.status}
-                      onChange={(e) =>
-                        onUpdateRow(row.id, { status: e.target.value as ReviewStatus })
-                      }
-                      className={`border px-2 py-1.5 text-[11.5px] font-bold focus:border-[#111111] ${
-                        row.status === 'GENERATED'
-                          ? 'bg-emerald-50 border-emerald-400 text-emerald-900'
-                          : row.status === 'MAILMERGE'
-                          ? 'bg-[#fffbeb] border-[#d97706] text-[#92400e]'
-                          : 'bg-[#f8f9fb] border-[#cbd0da] text-[#111111]'
-                      }`}
-                    >
-                      <option value="REVIEW">REVIEW</option>
-                      <option value="MAILMERGE">MAILMERGE</option>
-                      <option value="GENERATED">GENERATED</option>
-                    </select>
+                    {(() => {
+                      const appKey = row.applicationNo.trim();
+                      const matchCount = appKey ? appNoCountsInView[appKey] || 0 : 0;
+                      const menuOpen = openMenuRowId === row.id;
+                      return (
+                        <div className="relative flex items-center gap-1.5">
+                          <select
+                            aria-label={`Status for ${row.applicationNo}`}
+                            value={row.status}
+                            onChange={(e) =>
+                              onUpdateRow(row.id, { status: e.target.value as ReviewStatus })
+                            }
+                            className={`border px-2 py-1.5 text-[11.5px] font-bold focus:border-[#111111] ${
+                              row.status === 'GENERATED'
+                                ? 'bg-emerald-50 border-emerald-400 text-emerald-900'
+                                : row.status === 'MAILMERGE'
+                                ? 'bg-[#fffbeb] border-[#d97706] text-[#92400e]'
+                                : 'bg-[#f8f9fb] border-[#cbd0da] text-[#111111]'
+                            }`}
+                          >
+                            <option value="REVIEW">REVIEW</option>
+                            <option value="MAILMERGE">MAILMERGE</option>
+                            <option value="GENERATED">GENERATED</option>
+                          </select>
+
+                          <button
+                            type="button"
+                            data-sfx="filter"
+                            disabled={!appKey}
+                            title={`Apply ${row.status} to all rows in view matching App No ${appKey || '—'} (${matchCount})`}
+                            aria-label={`Bulk apply status for Application ${row.applicationNo}`}
+                            onClick={() => setOpenMenuRowId(menuOpen ? null : row.id)}
+                            className={`px-1.5 py-1.5 border text-[10.5px] font-bold inline-flex items-center gap-1 whitespace-nowrap ${
+                              matchCount > 1
+                                ? 'border-[#111111] bg-[#fffef0] text-[#111111] hover:bg-[#ffee00]'
+                                : 'border-[#cbd0da] bg-[#f8f9fb] text-[#555a66] hover:border-[#111111] hover:text-[#111111]'
+                            } disabled:opacity-40`}
+                          >
+                            <CopyCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                            {matchCount > 1 && <span className="tabular-nums">{matchCount}</span>}
+                          </button>
+
+                          {menuOpen && appKey && (
+                            <div
+                              role="menu"
+                              className="absolute right-0 top-full mt-1 z-30 w-56 bg-white border border-[#111111] shadow-lg p-2 space-y-1.5"
+                            >
+                              <div className="text-[10.5px] font-extrabold text-[#111111] border-b border-[#eceef2] pb-1">
+                                App No {appKey} ({matchCount} in view)
+                              </div>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  onBulkApplyStatusByAppNo(appKey, row.status, visibleRowIds);
+                                  setOpenMenuRowId(null);
+                                }}
+                                className="w-full text-left px-2 py-1.5 bg-[#ffee00] hover:bg-[#f2e000] text-[#111111] text-[11px] font-extrabold"
+                              >
+                                Apply &quot;{row.status}&quot; to all {matchCount} matching row(s)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOpenMenuRowId(null)}
+                                className="w-full text-left px-2 py-1 text-[10.5px] font-semibold text-[#555a66] hover:text-[#111111]"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="py-2.5 px-3 text-right whitespace-nowrap">
                     <button

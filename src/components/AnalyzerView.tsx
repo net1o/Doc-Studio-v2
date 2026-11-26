@@ -24,6 +24,7 @@ import {
   JournalStats,
 } from '../types/journal';
 import {
+  checkDuplicate,
   mergeDatabaseEntries,
   mergeUniqueKeywords,
   mergeUniqueTmNumbers,
@@ -116,9 +117,16 @@ export function AnalyzerView({
       return;
     }
     setTmError(null);
+    const dupCheck = checkDuplicate(parts, config.tmNumbers);
+    if (dupCheck.unique.length === 0) {
+      setTmError(`Duplicate protected: all entered TM number(s) already exist in Watchlist.`);
+      onNotify(`Duplicate protected: ${dupCheck.duplicates.length} TM number(s) already watched.`);
+      return;
+    }
+
     const { merged, added, skippedDuplicates } = mergeUniqueTmNumbers(
       config.tmNumbers,
-      parts,
+      dupCheck.unique,
       true
     );
     onUpdateConfig({
@@ -126,9 +134,10 @@ export function AnalyzerView({
       tmNumbers: merged,
     });
     setNewTm('');
-    if (skippedDuplicates > 0) {
+    const totalSkipped = dupCheck.duplicates.length + skippedDuplicates;
+    if (totalSkipped > 0) {
       onNotify(
-        `TM Numbers updated: ${added} added, ${skippedDuplicates} duplicate(s) skipped.`
+        `TM Numbers updated: ${added} added, ${totalSkipped} duplicate(s) skipped.`
       );
     }
   };
@@ -146,9 +155,13 @@ export function AnalyzerView({
     const cNo = caseNo.trim();
     if (!tm || !cNo) return;
 
-    const dup = config.caseEntries.find((c) => c.tmNumber.trim() === tm);
-    if (dup) {
-      setCaseError(`Duplicate protected: TM ${tm} already maps to ${dup.caseNo}.`);
+    const dupCheck = checkDuplicate(
+      tm,
+      config.caseEntries.map((c) => c.tmNumber)
+    );
+    if (dupCheck.isDuplicate) {
+      const dup = config.caseEntries.find((c) => c.tmNumber.trim() === tm);
+      setCaseError(`Duplicate protected: TM ${tm} already maps to ${dup?.caseNo || 'existing'}.`);
       return;
     }
     setCaseError(null);

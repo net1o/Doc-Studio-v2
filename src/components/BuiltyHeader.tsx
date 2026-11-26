@@ -6,9 +6,13 @@ interface BuiltyHeaderProps {
   activeTab: AppTab;
   onSelectTab: (tab: AppTab) => void;
   onRunScan: () => void;
+  activeContextCount: number;
+  watchlistCount: number;
+  journalRowsCount: number;
   reviewCount: number;
   docsCount: number;
   databaseCount: number;
+  recordsCount: number;
   sfxEnabled: boolean;
   onToggleSfx: () => void;
 }
@@ -17,37 +21,41 @@ export function BuiltyHeader({
   activeTab,
   onSelectTab,
   onRunScan,
+  activeContextCount,
+  watchlistCount,
+  journalRowsCount,
   reviewCount,
   docsCount,
   databaseCount,
+  recordsCount,
   sfxEnabled,
   onToggleSfx,
 }: BuiltyHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navItems: { id: AppTab; label: string }[] = [
-    { id: 'analyzer', label: 'Analyzer' },
-    { id: 'journalcheck', label: 'JournalCheck' },
-    { id: 'review', label: `Review (${reviewCount})` },
-    { id: 'generator', label: `Doc Generator (${docsCount})` },
-    { id: 'database', label: `Database (${databaseCount})` },
-    { id: 'records', label: 'Records' },
-    { id: 'settings', label: 'Settings' },
-    { id: 'backup', label: 'Backup' },
+  const navItems: { id: AppTab; label: string; shortcut: string; count: number | null }[] = [
+    { id: 'analyzer', label: 'Analyzer', shortcut: 'Ctrl+1', count: watchlistCount },
+    { id: 'journalcheck', label: 'JournalCheck', shortcut: 'Ctrl+2', count: journalRowsCount },
+    { id: 'review', label: 'Review', shortcut: 'Ctrl+3', count: reviewCount },
+    { id: 'generator', label: 'Doc Gen', shortcut: 'Ctrl+4', count: docsCount },
+    { id: 'database', label: 'Database', shortcut: 'Ctrl+5', count: databaseCount },
+    { id: 'records', label: 'Records', shortcut: 'Ctrl+6', count: recordsCount },
+    { id: 'settings', label: 'Settings', shortcut: 'Ctrl+7', count: null },
+    { id: 'backup', label: 'Backup', shortcut: 'Ctrl+8', count: activeContextCount },
   ];
 
   return (
     <header className="no-print sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e2e4ea]">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-4 xl:gap-6">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-3 xl:gap-5">
         {/* Zone 1: Brand Mark */}
         <button
           type="button"
           onClick={() => onSelectTab('analyzer')}
-          className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
+          className="flex items-center gap-2 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
         >
           <svg
-            width="32"
-            height="32"
+            width="30"
+            height="30"
             viewBox="0 0 36 36"
             fill="none"
             aria-hidden="true"
@@ -57,7 +65,7 @@ export function BuiltyHeader({
             <polygon points="11,30 18,16 25,30" fill="#111111" />
             <rect x="16" y="22" width="4" height="8" fill="#ffee00" />
           </svg>
-          <span className="text-[18px] font-extrabold tracking-tight text-[#111111]">
+          <span className="text-[17px] font-extrabold tracking-tight text-[#111111]">
             Journal Monitor
           </span>
         </button>
@@ -65,22 +73,46 @@ export function BuiltyHeader({
         {/* Zone 2: Single-Line Navigation Links */}
         <nav
           aria-label="Primary navigation"
-          className="hidden lg:flex items-center lg:gap-3.5 xl:gap-5 text-[12.5px] xl:text-[13px] font-bold"
+          className="hidden lg:flex items-center lg:gap-1.5 xl:gap-2.5 text-[11.5px] xl:text-[12.5px] font-bold"
         >
           {navItems.map((item) => {
             const active = activeTab === item.id;
+            const displayCount = active ? activeContextCount : item.count;
             return (
               <button
                 key={item.id}
                 type="button"
                 data-sfx="filter"
                 data-active={active}
+                title={`${item.label} (${item.shortcut})`}
                 onClick={() => onSelectTab(item.id)}
-                className={`builty-filter-btn relative py-2 px-1 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111] ${
-                  active ? 'text-[#111111]' : 'text-[#555a66] hover:text-[#111111]'
+                className={`builty-nav-tab relative py-2 px-2 xl:px-2.5 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111] ${
+                  active
+                    ? 'text-[#111111] bg-[#fffef0]'
+                    : 'text-[#555a66] hover:text-[#111111]'
                 }`}
               >
-                <span className="tabular-nums">{item.label}</span>
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
+                  <span>{item.label}</span>
+                  {displayCount !== null && (
+                    <span
+                      title={
+                        item.id === 'backup'
+                          ? `Active view items: ${displayCount}`
+                          : `${item.label} items: ${displayCount}`
+                      }
+                      className={`px-1.5 py-0.5 text-[10px] font-extrabold leading-none transition-colors ${
+                        active
+                          ? 'bg-[#111111] text-[#ffee00]'
+                          : item.id === 'backup'
+                          ? 'bg-[#ffee00] text-[#111111] border border-[#111111]/20'
+                          : 'bg-[#f1f2f5] text-[#111111]'
+                      }`}
+                    >
+                      {displayCount}
+                    </span>
+                  )}
+                </span>
                 <span
                   aria-hidden="true"
                   className={`absolute left-0 right-0 bottom-0 h-[3px] bg-[#ffee00] transition-transform duration-200 origin-left ${
@@ -93,7 +125,7 @@ export function BuiltyHeader({
         </nav>
 
         {/* Zone 3: Sound Toggle + Primary Slanted Builty CTA + Mobile Trigger */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={onToggleSfx}
@@ -115,10 +147,10 @@ export function BuiltyHeader({
           <button
             type="button"
             onClick={onRunScan}
-            className="builty-btn h-[42px] pl-4 pr-2 gap-3 text-[13px] tracking-wide whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
+            className="builty-btn h-[40px] pl-3.5 pr-2 gap-2.5 text-[12.5px] tracking-wide whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
           >
             <span>Run Scan</span>
-            <span className="builty-btn-icon-tab w-8 h-7">
+            <span className="builty-btn-icon-tab w-7 h-6">
               <Play className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
             </span>
           </button>
@@ -136,24 +168,37 @@ export function BuiltyHeader({
 
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-[#e2e4ea] bg-white px-4 py-3 space-y-1">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-sfx="filter"
-              onClick={() => {
-                onSelectTab(item.id);
-                setMobileMenuOpen(false);
-              }}
-              className={`w-full text-left px-3 py-2.5 text-sm font-bold border-b border-[#eceef2] last:border-b-0 ${
-                activeTab === item.id
-                  ? 'bg-[#fffef0] text-[#111111]'
-                  : 'text-[#555a66] hover:text-[#111111]'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const active = activeTab === item.id;
+            const displayCount = active ? activeContextCount : item.count;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                data-sfx="filter"
+                data-active={active}
+                onClick={() => {
+                  onSelectTab(item.id);
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-bold border-b border-[#eceef2] last:border-b-0 ${
+                  active
+                    ? 'bg-[#fffef0] text-[#111111] border-l-4 border-l-[#ffee00]'
+                    : 'text-[#555a66] hover:text-[#111111]'
+                }`}
+              >
+                <span>{item.label}</span>
+                <span className="inline-flex items-center gap-2 text-xs tabular-nums">
+                  {displayCount !== null && (
+                    <span className="px-1.5 py-0.5 bg-[#111111] text-[#ffee00] font-extrabold text-[11px]">
+                      {displayCount}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono text-[#6b7280]">{item.shortcut}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </header>

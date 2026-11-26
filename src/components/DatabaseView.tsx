@@ -1,5 +1,9 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CheckCircle2,
   Database,
   Download,
@@ -13,10 +17,12 @@ import {
 import { CaseEntry, CaseSheetConfig, JournalConfig } from '../types/journal';
 import {
   buildGoogleSheetCsvUrl,
+  checkDuplicate,
   exportRowsToCsv,
   formatCompositeCaseNo,
   mergeDatabaseEntries,
   parseCaseLookupInput,
+  parseLooseDate,
   triggerFileDownload,
 } from '../lib/journal/engine';
 import {
@@ -50,6 +56,21 @@ export function DatabaseView({
 
   const [showImporter, setShowImporter] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [codeCaseFilter, setCodeCaseFilter] = useState('');
+  const [sortBy, setSortBy] = useState<
+    | 'none'
+    | 'tmNumber'
+    | 'caseNo'
+    | 'clientCode'
+    | 'applicationName'
+    | 'clientName'
+    | 'classNo'
+    | 'status'
+    | 'date'
+  >('none');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [selectedTms, setSelectedTms] = useState<Set<string>>(() => new Set());
+  const [confirmDialog, setConfirmDialog] = useState<null | 'delete_all' | 'delete_selected'>(null);
 
   // Quick Add Row
   const [newTm, setNewTm] = useState('');
@@ -86,6 +107,15 @@ export function DatabaseView({
   const [refreshReviewOnImport, setRefreshReviewOnImport] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!confirmDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmDialog(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmDialog]);
+
   const parsedImport = useMemo(
     () =>
       parseCaseLookupInput(rawImport, {
@@ -101,6 +131,15 @@ export function DatabaseView({
     [rawImport, mappingMode, keyCol, prefixCol, clientCodeCol, caseCol, clientCol, appNameCol, separator]
   );
 
+  const importDuplicateCheck = useMemo(
+    () =>
+      checkDuplicate(
+        parsedImport.entries.map((entry) => entry.tmNumber),
+        config.caseEntries.map((c) => c.tmNumber)
+      ),
+    [parsedImport.entries, config.caseEntries]
+  );
+
   const importMergePreview = useMemo(
     () => mergeDatabaseEntries(config.caseEntries, parsedImport.entries, duplicatePolicy),
     [config.caseEntries, parsedImport.entries, duplicatePolicy]
@@ -108,16 +147,123 @@ export function DatabaseView({
 
   const filteredEntries = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return config.caseEntries;
-    return config.caseEntries.filter(
-      (c) =>
+    const ccQ = codeCaseFilter.trim().toLowerCase();
+    return config.caseEntries.filter((c) => {
+      if (ccQ) {
+        const matchesClientCodeOrCase =
+          (c.clientCode || '').toLowerCase().includes(ccQ) ||
+          (c.rawCaseNo || '').toLowerCase().includes(ccQ) ||
+          c.caseNo.toLowerCase().includes(ccQ) ||
+          (c.prefix || '').toLowerCase().includes(ccQ);
+        if (!matchesClientCodeOrCase) return false;
+      }
+      if (!q) return true;
+      return (
         c.tmNumber.toLowerCase().includes(q) ||
         c.caseNo.toLowerCase().includes(q) ||
+        (c.clientCode || '').toLowerCase().includes(q) ||
         (c.applicationName || '').toLowerCase().includes(q) ||
         c.clientName.toLowerCase().includes(q) ||
         (c.status || '').toLowerCase().includes(q)
-    );
-  }, [config.caseEntries, searchQuery]);
+      );
+    });
+  }, [config.caseEntries, searchQuery, codeCaseFilter]);
+
+  const sortedEntries = useMemo(() => {
+    if (sortBy === 'none') return filteredEntries;
+    const copy = [...filteredEntries];
+    const dir = sortDir === 'asc' ? 1 : -1;
+
+    copy.sort((a, b) => {
+      if (sortBy === 'date') {
+        const da = parseLooseDate(a.date || '')?.getTime() ?? 0;
+        const db = parseLooseDate(b.date || '')?.getTime() ?? 0;
+        if (da !== db) return (da - db) * dir;
+        return (a.date || '').localeCompare(b.date || '', undefined, { numeric: true }) * dir;
+      }
+      if (sortBy === 'classNo' || sortBy === 'tmNumber') {
+        const va = String(a[sortBy] || '').trim();
+        const vb = String(b[sortBy] || '').trim();
+        const na = Number(va);
+        const nb = Number(vb);
+        if (!Number.isNaN(na) && !Number.isNaN(nb) && va !== '' && vb !== '') {
+          return (na - nb) * dir;
+        }
+        return va.localeCompare(vb, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+      }
+      if (sortBy === 'clientCode') {
+        const va = `${a.prefix || ''}-${a.clientCode || ''}-${a.rawCaseNo || ''}`;
+        const vb = `${b.prefix || ''}-${b.clientCode || ''}-${b.rawCaseNo || ''}`;
+        return va.localeCompare(vb, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+      }
+      const va = String(
+        sortBy === 'status' ? `${a.status || ''} ${a.subStatus || ''}` : a[sortBy] || ''
+      ).trim();
+      const vb = String(
+        sortBy === 'status' ? `${b.status || ''} ${b.subStatus || ''}` : b[sortBy] || ''
+      ).trim();
+      return va.localeCompare(vb, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+    return copy;
+  }, [filteredEntries, sortBy, sortDir]);
+
+  const visibleEntries = useMemo(() => sortedEntries.slice(0, MAX_VISIBLE), [sortedEntries]);
+
+  const allVisibleSelected =
+    visibleEntries.length > 0 && visibleEntries.every((c) => selectedTms.has(c.tmNumber));
+
+  const handleToggleSort = (col: typeof sortBy) => {
+    if (sortBy === col) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(col);
+      setSortDir('asc');
+    }
+  };
+
+  const handleToggleSelectRow = (tmNumber: string) => {
+    setSelectedTms((prev) => {
+      const next = new Set(prev);
+      if (next.has(tmNumber)) next.delete(tmNumber);
+      else next.add(tmNumber);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAllVisible = () => {
+    setSelectedTms((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleEntries.forEach((c) => next.delete(c.tmNumber));
+      } else {
+        visibleEntries.forEach((c) => next.add(c.tmNumber));
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedTms.size === 0) return;
+    const removedCount = selectedTms.size;
+    onUpdateConfig({
+      ...config,
+      caseEntries: config.caseEntries.filter((c) => !selectedTms.has(c.tmNumber)),
+    });
+    setSelectedTms(new Set());
+    setConfirmDialog(null);
+    onNotify(`Deleted ${removedCount} selected record(s) from Database.`);
+  };
+
+  const handleDeleteAllRecords = () => {
+    const total = config.caseEntries.length;
+    onUpdateConfig({
+      ...config,
+      caseEntries: [],
+    });
+    setSelectedTms(new Set());
+    setConfirmDialog(null);
+    onNotify(`Deleted all ${total} record(s) from Database.`);
+  };
 
   const handleAddSingleRecord = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,10 +271,14 @@ export function DatabaseView({
     const composite = formatCompositeCaseNo(newPrefix, newClientCode, newRawCaseNo, separator);
     if (!tm || !composite) return;
 
-    const duplicate = config.caseEntries.find((c) => c.tmNumber.trim() === tm);
-    if (duplicate) {
+    const dupCheck = checkDuplicate(
+      tm,
+      config.caseEntries.map((c) => c.tmNumber)
+    );
+    if (dupCheck.isDuplicate) {
+      const duplicate = config.caseEntries.find((c) => c.tmNumber.trim() === tm);
       setSingleAddError(
-        `Duplicate protected: TM ${tm} is already in Database (Case ${duplicate.caseNo}).`
+        `Duplicate protected: TM ${tm} is already in Database (Case ${duplicate?.caseNo || 'existing'}).`
       );
       return;
     }
@@ -161,6 +311,12 @@ export function DatabaseView({
     onUpdateConfig({
       ...config,
       caseEntries: config.caseEntries.filter((c) => c.tmNumber !== tmNumber),
+    });
+    setSelectedTms((prev) => {
+      if (!prev.has(tmNumber)) return prev;
+      const next = new Set(prev);
+      next.delete(tmNumber);
+      return next;
     });
   };
 
@@ -334,6 +490,27 @@ export function DatabaseView({
           >
             <Download className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Export CSV</span>
+          </button>
+
+          {selectedTms.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirmDialog('delete_selected')}
+              className="h-[38px] px-3.5 border border-red-600 bg-red-600 hover:bg-red-700 text-xs font-bold text-white inline-flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Delete Selected ({selectedTms.size})</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            disabled={config.caseEntries.length === 0}
+            onClick={() => setConfirmDialog('delete_all')}
+            className="h-[38px] px-3.5 border border-red-300 bg-red-50 hover:border-red-600 hover:bg-red-600 hover:text-white text-xs font-bold text-red-700 inline-flex items-center gap-1.5 whitespace-nowrap disabled:opacity-40"
+          >
+            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Delete All Records</span>
           </button>
         </div>
       </div>
@@ -566,10 +743,10 @@ export function DatabaseView({
                   <div className="flex flex-wrap items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
                     <span className="font-bold">
-                      {parsedImport.entries.length} unique records ({importMergePreview.added} new ·{' '}
+                      {parsedImport.entries.length} unique records ({importDuplicateCheck.unique.length} new ·{' '}
                       {duplicatePolicy === 'skip'
                         ? `${importMergePreview.skippedDuplicates} duplicate skipped`
-                        : `${importMergePreview.updated} update existing`}
+                        : `${importDuplicateCheck.duplicates.length} update existing`}
                       )
                     </span>
                     <span aria-hidden="true" className="text-[#9ca3af]">·</span>
@@ -756,84 +933,163 @@ export function DatabaseView({
 
       {/* Search & Main Database Table */}
       <div className="bg-white border border-[#e2e4ea] overflow-hidden">
-        <div className="p-4 border-b border-[#e2e4ea] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search
-              className="w-4 h-4 text-[#6b7280] absolute left-3 top-1/2 -translate-y-1/2"
-              aria-hidden="true"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search TM/CPR No, Case No (e.g. A-32-4), App Name, Client, Status…"
-              className="w-full bg-[#f8f9fb] border border-[#cbd0da] pl-9 pr-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
-            />
+        <div className="p-4 border-b border-[#e2e4ea] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search
+                className="w-4 h-4 text-[#6b7280] absolute left-3 top-1/2 -translate-y-1/2"
+                aria-hidden="true"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search TM/CPR No, App Name, Client, Status…"
+                aria-label="Search database records"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] pl-9 pr-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+              />
+            </div>
+
+            <div className="relative flex-1 max-w-xs">
+              <Search
+                className="w-3.5 h-3.5 text-[#6b7280] absolute left-3 top-1/2 -translate-y-1/2"
+                aria-hidden="true"
+              />
+              <input
+                type="text"
+                value={codeCaseFilter}
+                onChange={(e) => setCodeCaseFilter(e.target.value)}
+                placeholder="Filter Client Code or Case No (e.g. 32 or A-32-4)…"
+                aria-label="Filter by Client Code or Case Number"
+                className="w-full bg-[#fffef0] border border-[#cbd0da] pl-8 pr-3 py-2 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+              />
+            </div>
           </div>
-          <span className="text-xs text-[#555a66] tabular-nums">
-            Showing {Math.min(MAX_VISIBLE, filteredEntries.length)} of {filteredEntries.length} records
-          </span>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {selectedTms.size > 0 && (
+              <span className="text-xs font-bold text-[#111111] bg-[#ffee00] px-2 py-0.5 tabular-nums">
+                {selectedTms.size} selected
+              </span>
+            )}
+            <span className="text-xs text-[#555a66] tabular-nums">
+              Showing {visibleEntries.length} of {sortedEntries.length} records
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[960px] text-xs">
+          <table className="w-full text-left border-collapse min-w-[1040px] text-xs">
             <thead className="bg-[#111111] text-white text-[11px] uppercase tracking-wider">
               <tr>
-                <th className="py-3 px-4">TM/CPR No (Col 8)</th>
-                <th className="py-3 px-4">Case No (3-4-5)</th>
-                <th className="py-3 px-4">Prefix · Code · #</th>
-                <th className="py-3 px-4">Application Name</th>
-                <th className="py-3 px-4">Client Name</th>
-                <th className="py-3 px-4 text-center">Class</th>
-                <th className="py-3 px-4">Status / Sub Status</th>
-                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={handleToggleSelectAllVisible}
+                    aria-label="Select all visible database records"
+                    className="w-4 h-4 accent-[#ffee00] cursor-pointer"
+                  />
+                </th>
+                {(
+                  [
+                    { key: 'tmNumber', label: 'TM/CPR No (Col 8)', align: 'left' },
+                    { key: 'caseNo', label: 'Case No (3-4-5)', align: 'left' },
+                    { key: 'clientCode', label: 'Prefix · Code · #', align: 'left' },
+                    { key: 'applicationName', label: 'Application Name', align: 'left' },
+                    { key: 'clientName', label: 'Client Name', align: 'left' },
+                    { key: 'classNo', label: 'Class', align: 'center' },
+                    { key: 'status', label: 'Status / Sub Status', align: 'left' },
+                    { key: 'date', label: 'Date', align: 'left' },
+                  ] as const
+                ).map((col) => {
+                  const activeSort = sortBy === col.key;
+                  const SortIcon = !activeSort
+                    ? ArrowUpDown
+                    : sortDir === 'asc'
+                    ? ArrowUp
+                    : ArrowDown;
+                  return (
+                    <th
+                      key={col.key}
+                      className={`py-3 px-4 ${col.align === 'center' ? 'text-center' : ''}`}
+                    >
+                      <button
+                        type="button"
+                        data-sfx="filter"
+                        onClick={() => handleToggleSort(col.key)}
+                        className={`inline-flex items-center gap-1 uppercase font-extrabold tracking-wider hover:text-[#ffee00] ${
+                          activeSort ? 'text-[#ffee00]' : 'text-white'
+                        }`}
+                      >
+                        <span>{col.label}</span>
+                        <SortIcon className="w-3 h-3 shrink-0" aria-hidden="true" />
+                      </button>
+                    </th>
+                  );
+                })}
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#eceef2] bg-white">
-              {filteredEntries.slice(0, MAX_VISIBLE).map((c) => (
-                <tr key={c.tmNumber} className="hover:bg-[#f7f8fa]">
-                  <td className="py-2.5 px-4 font-mono font-bold text-[#111111] tabular-nums whitespace-nowrap">
-                    {c.tmNumber}
-                  </td>
-                  <td className="py-2.5 px-4 whitespace-nowrap">
-                    <span className="px-2 py-0.5 bg-[#fffef0] border border-[#111111] font-mono font-extrabold text-[#111111]">
-                      {c.caseNo}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-4 font-mono text-[#555a66] tabular-nums whitespace-nowrap">
-                    {c.prefix || c.clientCode || c.rawCaseNo
-                      ? `${c.prefix || '—'} · ${c.clientCode || '—'} · ${c.rawCaseNo || '—'}`
-                      : '—'}
-                  </td>
-                  <td className="py-2.5 px-4 font-semibold text-[#111111]">
-                    {c.applicationName || '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-[#4b505c]">{c.clientName || '—'}</td>
-                  <td className="py-2.5 px-4 text-center font-mono tabular-nums">
-                    {c.classNo || '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-[#4b505c]">
-                    {[c.status, c.subStatus].filter(Boolean).join(' · ') || '—'}
-                  </td>
-                  <td className="py-2.5 px-4 font-mono text-[#555a66] whitespace-nowrap">
-                    {c.date || '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveEntry(c.tmNumber)}
-                      aria-label={`Delete TM ${c.tmNumber}`}
-                      className="p-1.5 text-[#6b7280] hover:text-red-600"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredEntries.length === 0 && (
+              {visibleEntries.map((c) => {
+                const isSelected = selectedTms.has(c.tmNumber);
+                return (
+                  <tr
+                    key={c.tmNumber}
+                    className={isSelected ? 'bg-[#fffef0]' : 'hover:bg-[#f7f8fa]'}
+                  >
+                    <td className="py-2.5 px-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelectRow(c.tmNumber)}
+                        aria-label={`Select TM ${c.tmNumber}`}
+                        className="w-4 h-4 accent-[#111111] cursor-pointer"
+                      />
+                    </td>
+                    <td className="py-2.5 px-4 font-mono font-bold text-[#111111] tabular-nums whitespace-nowrap">
+                      {c.tmNumber}
+                    </td>
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <span className="px-2 py-0.5 bg-[#fffef0] border border-[#111111] font-mono font-extrabold text-[#111111]">
+                        {c.caseNo}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 font-mono text-[#555a66] tabular-nums whitespace-nowrap">
+                      {c.prefix || c.clientCode || c.rawCaseNo
+                        ? `${c.prefix || '—'} · ${c.clientCode || '—'} · ${c.rawCaseNo || '—'}`
+                        : '—'}
+                    </td>
+                    <td className="py-2.5 px-4 font-semibold text-[#111111]">
+                      {c.applicationName || '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-[#4b505c]">{c.clientName || '—'}</td>
+                    <td className="py-2.5 px-4 text-center font-mono tabular-nums">
+                      {c.classNo || '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-[#4b505c]">
+                      {[c.status, c.subStatus].filter(Boolean).join(' · ') || '—'}
+                    </td>
+                    <td className="py-2.5 px-4 font-mono text-[#555a66] whitespace-nowrap">
+                      {c.date || '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEntry(c.tmNumber)}
+                        aria-label={`Delete TM ${c.tmNumber}`}
+                        className="p-1.5 text-[#6b7280] hover:text-red-600"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {visibleEntries.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-xs text-[#555a66]">
+                  <td colSpan={10} className="py-10 text-center text-xs text-[#555a66]">
                     No Database records match your filter. Click &quot;Import / Sync Database&quot; above to load your sheet.
                   </td>
                 </tr>
@@ -842,6 +1098,58 @@ export function DatabaseView({
           </table>
         </div>
       </div>
+
+      {/* Confirmation Dialog for Delete All / Bulk Delete */}
+      {confirmDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setConfirmDialog(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="db-confirm-dialog-title"
+            className="w-full max-w-md bg-white border border-[#111111] shadow-xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 id="db-confirm-dialog-title" className="text-base font-extrabold text-[#111111]">
+                  {confirmDialog === 'delete_all'
+                    ? 'Delete All Database Records?'
+                    : `Delete ${selectedTms.size} Selected Record(s)?`}
+                </h3>
+                <p className="text-xs text-[#555a66] mt-1">
+                  {confirmDialog === 'delete_all'
+                    ? `This will permanently remove all ${config.caseEntries.length} records from the Database batch. Export a CSV backup first if needed.`
+                    : `This will remove the ${selectedTms.size} checked TM record(s) from the Database.`}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="h-[36px] px-4 border border-[#cbd0da] bg-white text-xs font-bold text-[#111111]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={
+                  confirmDialog === 'delete_all' ? handleDeleteAllRecords : handleDeleteSelected
+                }
+                className="h-[36px] px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold"
+              >
+                {confirmDialog === 'delete_all' ? 'Confirm Delete All' : 'Confirm Bulk Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

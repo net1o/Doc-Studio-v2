@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, FileSpreadsheet, Layers, X } from 'lucide-react';
-import { parseWatchlistImport } from '../lib/journal/engine';
+import { checkDuplicate, parseWatchlistImport } from '../lib/journal/engine';
 
 interface WatchlistBulkModalProps {
   existingKeywords: string[];
@@ -46,13 +46,12 @@ export function WatchlistBulkModal({
 
   const mergeStats = useMemo(() => {
     const existingKwSet = new Set(existingKeywords.map((k) => k.trim().toLowerCase()));
-    const existingTmSet = new Set(existingTmNumbers.map((t) => t.trim()));
-
     const newKeywords = parsed.keywords.filter((k) => !existingKwSet.has(k.trim().toLowerCase()));
     const dupKeywords = parsed.keywords.length - newKeywords.length;
 
-    const newTms = parsed.tmNumbers.filter((t) => !existingTmSet.has(t.trim()));
-    const dupTms = parsed.tmNumbers.length - newTms.length;
+    const tmDupResult = checkDuplicate(parsed.tmNumbers, existingTmNumbers);
+    const newTms = tmDupResult.unique;
+    const dupTms = tmDupResult.duplicates.length;
 
     return {
       newKeywords,
@@ -111,8 +110,8 @@ export function WatchlistBulkModal({
             onClick={() => setInputMode('split')}
             className={`builty-filter-btn px-4 py-2 text-xs font-extrabold border-b-2 ${
               inputMode === 'split'
-                ? 'border-[#111111] text-[#111111] bg-[#fffef0]'
-                : 'border-transparent text-[#555a66] hover:text-[#111111]'
+                ? 'border-[#111111] text-[#111111] bg-[#ffee00]'
+                : 'border-transparent text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
             }`}
           >
             Comma / Line Lists (Keywords &amp; TM Numbers)
@@ -124,8 +123,8 @@ export function WatchlistBulkModal({
             onClick={() => setInputMode('csv')}
             className={`builty-filter-btn px-4 py-2 text-xs font-extrabold border-b-2 ${
               inputMode === 'csv'
-                ? 'border-[#111111] text-[#111111] bg-[#fffef0]'
-                : 'border-transparent text-[#555a66] hover:text-[#111111]'
+                ? 'border-[#111111] text-[#111111] bg-[#ffee00]'
+                : 'border-transparent text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
             }`}
           >
             Combined CSV / Excel Paste

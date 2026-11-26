@@ -1,4 +1,5 @@
-import { Database, RotateCcw, Settings2, ShieldCheck } from 'lucide-react';
+import { useRef } from 'react';
+import { Database, RotateCcw, Settings2, ShieldCheck, X } from 'lucide-react';
 import { CaseSheetConfig, JournalConfig, KeywordMatchMode } from '../types/journal';
 import {
   DEFAULT_APPS_SCRIPT_CASE_SHEET_ID,
@@ -23,6 +24,7 @@ export function SettingsView({
   onNotify,
   onOpenDatabase,
 }: SettingsViewProps) {
+  const journalNoInputRef = useRef<HTMLInputElement>(null);
   const sheetCfg: CaseSheetConfig = config.caseSheetConfig || {
     sheetUrlOrId: DEFAULT_APPS_SCRIPT_CASE_SHEET_ID,
     sheetName: DEFAULT_APPS_SCRIPT_CASE_SHEET_NAME,
@@ -110,13 +112,29 @@ export function SettingsView({
               <label htmlFor="settings-journal-no" className="block text-xs font-bold text-[#374151] mb-1.5">
                 Journal No (Dashboard B2)
               </label>
-              <input
-                id="settings-journal-no"
-                type="text"
-                value={config.journalNo}
-                onChange={(e) => onUpdateConfig({ ...config, journalNo: e.target.value })}
-                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2.5 text-sm text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
-              />
+              <div className="relative">
+                <input
+                  id="settings-journal-no"
+                  ref={journalNoInputRef}
+                  type="text"
+                  value={config.journalNo}
+                  onChange={(e) => onUpdateConfig({ ...config, journalNo: e.target.value })}
+                  className="w-full bg-[#f8f9fb] border border-[#cbd0da] pl-3 pr-8 py-2.5 text-sm text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+                />
+                {config.journalNo && (
+                  <button
+                    type="button"
+                    aria-label="Clear Journal No"
+                    onClick={() => {
+                      onUpdateConfig({ ...config, journalNo: '' });
+                      journalNoInputRef.current?.focus();
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#6b7280] hover:text-[#111111]"
+                  >
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div>

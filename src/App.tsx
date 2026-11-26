@@ -8,12 +8,15 @@ import {
   PaperSizeConfig,
   RecordRow,
   ReviewRow,
+  ReviewStatus,
 } from './types/journal';
 import {
   computeReviewStats,
+  exportRowsToCsv,
   normalizeJournalCheckDates,
   refreshReviewCaseNumbers,
   runJournalScan,
+  triggerFileDownload,
 } from './lib/journal/engine';
 import {
   JournalMonitorState,
@@ -152,6 +155,31 @@ export default function App() {
     return () => document.removeEventListener('click', handleDocumentClick, true);
   }, []);
 
+  useEffect(() => {
+    const shortcutMap: Record<string, AppTab> = {
+      '1': 'analyzer',
+      '2': 'journalcheck',
+      '3': 'review',
+      '4': 'generator',
+      '5': 'database',
+      '6': 'records',
+      '7': 'settings',
+      '8': 'backup',
+    };
+
+    const handleGlobalShortcut = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const targetTab = shortcutMap[e.key];
+      if (!targetTab) return;
+      e.preventDefault();
+      setActiveTab(targetTab);
+      playFilterSfx();
+    };
+
+    window.addEventListener('keydown', handleGlobalShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalShortcut);
+  }, []);
+
   const handleToggleSfx = () => {
     const next = !sfxEnabled;
     setSfxEnabled(next);
@@ -220,6 +248,32 @@ export default function App() {
       ...prev,
       reviewRows: prev.reviewRows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
     }));
+  };
+
+  const handleBulkApplyStatusByAppNo = (
+    applicationNo: string,
+    status: ReviewStatus,
+    visibleRowIds: string[]
+  ) => {
+    const targetApp = applicationNo.trim().toLowerCase();
+    if (!targetApp) return;
+    const visibleSet = new Set(visibleRowIds);
+    let updatedCount = 0;
+
+    setState((prev) => ({
+      ...prev,
+      reviewRows: prev.reviewRows.map((r) => {
+        if (visibleSet.has(r.id) && r.applicationNo.trim().toLowerCase() === targetApp) {
+          updatedCount++;
+          return { ...r, status };
+        }
+        return r;
+      }),
+    }));
+
+    showToast(
+      `Applied status "${status}" to ${updatedCount} row(s) matching App No ${applicationNo}.`
+    );
   };
 
   const handleMarkIssuesMailmerge = () => {
@@ -412,15 +466,120 @@ export default function App() {
     showToast('Workspace reset to default Journal 909 sample data.');
   };
 
+  const handleClearWatchlist = () => {
+    const clearedTotal = state.config.keywords.length + state.config.tmNumbers.length;
+    setState((prev) => ({
+      ...prev,
+      config: {
+        ...prev.config,
+        keywords: [],
+        tmNumbers: [],
+      },
+    }));
+    showToast(`Watchlist cleared (${clearedTotal} criteria removed).`);
+  };
+
+  const handleExportReport = () => {
+    const rowsSource =
+      state.records.length > 0
+        ? state.records.map((r) => [
+            r.journalNo,
+            r.journalDate,
+            r.applicationNo,
+            r.caseNo,
+            r.title,
+            r.classNo,
+            r.matchedTerm,
+            r.matchType,
+            r.decision,
+            r.pdfReady ? 'PDF READY' : 'DOC CREATED',
+            r.remarks,
+          ])
+        : state.reviewRows.map((r) => [
+            r.journalNo,
+            r.journalDate,
+            r.applicationNo,
+            r.caseNo,
+            r.title,
+            r.classNo,
+            r.matchedTerm,
+            r.matchType,
+            r.decision,
+            r.status,
+            r.applicant,
+          ]);
+
+    const csv = exportRowsToCsv(
+      [
+        'JOURNAL NO',
+        'JOURNAL DATE',
+        'APPLICATION NO',
+        'CASE NO',
+        'TITLE',
+        'CLASS',
+        'MATCHED TERM',
+        'MATCH TYPE',
+        'DECISION',
+        'STATUS',
+        'NOTES / APPLICANT',
+      ],
+      rowsSource
+    );
+    const jNo = (state.config.journalNo || '909').replace(/[^a-zA-Z0-9_-]+/g, '_');
+    triggerFileDownload(csv, `Journal_${jNo}_Monitoring_Report.csv`, 'text/csv;charset=utf-8');
+    showToast(`Exported Journal ${state.config.journalNo || '909'} monitoring report (${rowsSource.length} rows).`);
+  };
+
+  const watchlistCount = state.config.keywords.length + state.config.tmNumbers.length;
+  const activeContextCount = useMemo(() => {
+    switch (activeTab) {
+      case 'analyzer':
+        return watchlistCount;
+      case 'journalcheck':
+        return state.journalRows.length;
+      case 'review':
+        return state.reviewRows.length;
+      case 'generator':
+        return state.generatedDocs.length;
+      case 'database':
+        return state.config.caseEntries.length;
+      case 'records':
+        return state.records.length;
+      case 'settings':
+        return watchlistCount + state.config.caseEntries.length;
+      case 'backup':
+        return (
+          state.journalRows.length +
+          state.reviewRows.length +
+          state.records.length +
+          state.config.caseEntries.length
+        );
+      default:
+        return 0;
+    }
+  }, [
+    activeTab,
+    watchlistCount,
+    state.journalRows.length,
+    state.reviewRows.length,
+    state.generatedDocs.length,
+    state.config.caseEntries.length,
+    state.records.length,
+  ]);
+
   return (
     <div className="min-h-screen bg-[#f6f7f9] text-[#111111] flex flex-col">
       <BuiltyHeader
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onRunScan={handleRunScan}
+        activeContextCount={activeContextCount}
+        watchlistCount={watchlistCount}
+        journalRowsCount={state.journalRows.length}
         reviewCount={state.reviewRows.length}
         docsCount={state.generatedDocs.length}
         databaseCount={state.config.caseEntries.length}
+        recordsCount={state.records.length}
         sfxEnabled={sfxEnabled}
         onToggleSfx={handleToggleSfx}
       />
@@ -486,6 +645,7 @@ export default function App() {
           <ReviewQueueView
             rows={state.reviewRows}
             onUpdateRow={handleUpdateReviewRow}
+            onBulkApplyStatusByAppNo={handleBulkApplyStatusByAppNo}
             onMarkIssuesMailmerge={handleMarkIssuesMailmerge}
             onGenerateDocsFromMailmerge={handleGenerateDocsFromMailmerge}
             onOpenDocInGenerator={handleOpenDocInGenerator}
@@ -497,6 +657,11 @@ export default function App() {
             docs={state.generatedDocs}
             selectedDocId={selectedDocId}
             paperSize={state.config.paperSize}
+            activeTab={activeTab}
+            watchlistCount={watchlistCount}
+            onSelectTab={setActiveTab}
+            onClearWatchlist={handleClearWatchlist}
+            onExportReport={handleExportReport}
             onChangePaperSize={(nextPaper: PaperSizeConfig) =>
               handleUpdateConfig({ ...state.config, paperSize: nextPaper })
             }

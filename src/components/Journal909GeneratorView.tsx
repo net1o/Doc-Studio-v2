@@ -1,14 +1,21 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   CheckCircle2,
+  Database,
   Download,
   FileCode2,
+  FileSpreadsheet,
+  FileText,
   ImagePlus,
+  LayoutDashboard,
+  ListChecks,
   Plus,
   Printer,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
+  AppTab,
   GeneratedJournalDoc,
   PaperOrientation,
   PaperSizeConfig,
@@ -28,6 +35,11 @@ interface Journal909GeneratorViewProps {
   docs: GeneratedJournalDoc[];
   selectedDocId: string | null;
   paperSize?: PaperSizeConfig;
+  activeTab: AppTab;
+  watchlistCount: number;
+  onSelectTab: (tab: AppTab) => void;
+  onClearWatchlist: () => void;
+  onExportReport: () => void;
   onChangePaperSize: (next: PaperSizeConfig) => void;
   onSelectDoc: (id: string) => void;
   onUpdateDoc: (id: string, patch: Partial<GeneratedJournalDoc>) => void;
@@ -39,6 +51,11 @@ export function Journal909GeneratorView({
   docs,
   selectedDocId,
   paperSize,
+  activeTab,
+  watchlistCount,
+  onSelectTab,
+  onClearWatchlist,
+  onExportReport,
   onChangePaperSize,
   onSelectDoc,
   onUpdateDoc,
@@ -46,7 +63,18 @@ export function Journal909GeneratorView({
   onMarkPdfGenerated,
 }: Journal909GeneratorViewProps) {
   const [zoom, setZoom] = useState<'fit' | '75' | '100'>('75');
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const journalNoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!confirmClearOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmClearOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmClearOpen]);
 
   const activeDoc = docs.find((d) => d.id === selectedDocId) || docs[0] || null;
   const activePaper = paperSize || DEFAULT_PAPER_SIZE;
@@ -54,6 +82,13 @@ export function Journal909GeneratorView({
     () => resolvePaperDimensionsIn(activePaper),
     [activePaper]
   );
+
+  const sidebarNavItems: { id: AppTab; label: string; icon: typeof LayoutDashboard }[] = [
+    { id: 'analyzer', label: 'Analyzer', icon: LayoutDashboard },
+    { id: 'database', label: 'Database', icon: Database },
+    { id: 'review', label: 'Review', icon: ListChecks },
+    { id: 'generator', label: 'Generator', icon: FileText },
+  ];
 
   const updatePaper = (patch: Partial<PaperSizeConfig>) => {
     onChangePaperSize({
@@ -153,6 +188,65 @@ export function Journal909GeneratorView({
             <Plus className="w-3.5 h-3.5" aria-hidden="true" />
             <span>New</span>
           </button>
+        </div>
+
+        {/* Vertical Navigation Menu + Quick-Access Actions */}
+        <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3 space-y-3">
+          <div>
+            <span className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#555a66] mb-1.5">
+              Quick Workspace Navigation
+            </span>
+            <nav aria-label="Sidebar quick navigation" className="flex flex-col gap-1">
+              {sidebarNavItems.map((nav) => {
+                const Icon = nav.icon;
+                const isActive = activeTab === nav.id;
+                return (
+                  <button
+                    key={nav.id}
+                    type="button"
+                    data-sfx="filter"
+                    data-active={isActive}
+                    onClick={() => onSelectTab(nav.id)}
+                    className={`builty-nav-tab w-full flex items-center justify-between px-3 py-2 text-xs font-bold border text-left transition-all duration-150 ${
+                      isActive
+                        ? 'bg-[#fffef0] border-[#111111] border-l-4 border-l-[#ffee00] text-[#111111]'
+                        : 'bg-white border-[#e2e4ea] text-[#555a66] hover:text-[#111111] hover:border-[#111111]'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>{nav.label}</span>
+                    </span>
+                    {isActive && (
+                      <span className="px-1.5 py-0.5 bg-[#111111] text-[#ffee00] text-[10px] font-extrabold">
+                        Active
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="border-t border-[#e2e4ea] pt-2.5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={watchlistCount === 0}
+              onClick={() => setConfirmClearOpen(true)}
+              className="h-[34px] px-2.5 border border-[#cbd0da] bg-white hover:border-red-600 hover:bg-red-50 hover:text-red-700 text-[11.5px] font-bold text-[#111111] inline-flex items-center justify-center gap-1.5 transition-all duration-150 disabled:opacity-45"
+            >
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Clear Watchlist</span>
+            </button>
+            <button
+              type="button"
+              onClick={onExportReport}
+              className="h-[34px] px-2.5 border border-[#cbd0da] bg-white hover:border-[#111111] hover:bg-[#fffef0] text-[11.5px] font-bold text-[#111111] inline-flex items-center justify-center gap-1.5 transition-all duration-150"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Export Report</span>
+            </button>
+          </div>
         </div>
 
         {/* Document Picker */}
@@ -341,13 +435,32 @@ export function Journal909GeneratorView({
         <div className="space-y-3 border-t border-[#eceef2] pt-4">
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-[11px] font-bold text-[#555a66] mb-1">Journal No</label>
-              <input
-                type="text"
-                value={activeDoc.journalNo}
-                onChange={(e) => onUpdateDoc(activeDoc.id, { journalNo: e.target.value })}
-                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
-              />
+              <label htmlFor="j909-journal-no" className="block text-[11px] font-bold text-[#555a66] mb-1">
+                Journal No
+              </label>
+              <div className="relative">
+                <input
+                  id="j909-journal-no"
+                  ref={journalNoInputRef}
+                  type="text"
+                  value={activeDoc.journalNo}
+                  onChange={(e) => onUpdateDoc(activeDoc.id, { journalNo: e.target.value })}
+                  className="w-full bg-[#f8f9fb] border border-[#cbd0da] pl-2.5 pr-7 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111] focus:outline-none"
+                />
+                {activeDoc.journalNo && (
+                  <button
+                    type="button"
+                    aria-label="Clear Journal No"
+                    onClick={() => {
+                      onUpdateDoc(activeDoc.id, { journalNo: '' });
+                      journalNoInputRef.current?.focus();
+                    }}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#6b7280] hover:text-[#111111]"
+                  >
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-[11px] font-bold text-[#555a66] mb-1">Journal Date</label>
@@ -826,6 +939,46 @@ export function Journal909GeneratorView({
           </div>
         </div>
       </div>
+      {confirmClearOpen && (
+        <div
+          className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setConfirmClearOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-watchlist-dialog-title"
+            className="w-full max-w-md bg-white border border-[#111111] shadow-xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="clear-watchlist-dialog-title" className="text-base font-extrabold text-[#111111]">
+              Clear Watchlist Criteria?
+            </h3>
+            <p className="text-xs text-[#555a66]">
+              This removes all active Watchlist Keywords and 6-digit TM Numbers ({watchlistCount} criteria). You can restore default watchlist entries anytime in Settings.
+            </p>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmClearOpen(false)}
+                className="h-[36px] px-4 border border-[#cbd0da] bg-white text-xs font-bold text-[#111111]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onClearWatchlist();
+                  setConfirmClearOpen(false);
+                }}
+                className="h-[36px] px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold"
+              >
+                Clear Watchlist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

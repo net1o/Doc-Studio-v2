@@ -10,6 +10,47 @@ import {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  duplicates: string[];
+  unique: string[];
+}
+
+/**
+ * Global duplicate guard comparing incoming TM numbers against existing state
+ * before insertion across Analyzer, Watchlist modals, and Database views.
+ */
+export function checkDuplicate(
+  incomingTm: string | string[],
+  existingTms: string[]
+): DuplicateCheckResult {
+  const existingSet = new Set(
+    existingTms.map((tm) => String(tm || '').trim().toLowerCase()).filter(Boolean)
+  );
+  const incomingList = Array.isArray(incomingTm) ? incomingTm : [incomingTm];
+  const seenBatch = new Set<string>();
+  const duplicates: string[] = [];
+  const unique: string[] = [];
+
+  for (const raw of incomingList) {
+    const cleaned = String(raw || '').trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (existingSet.has(key) || seenBatch.has(key)) {
+      duplicates.push(cleaned);
+    } else {
+      seenBatch.add(key);
+      unique.push(cleaned);
+    }
+  }
+
+  return {
+    isDuplicate: duplicates.length > 0,
+    duplicates,
+    unique,
+  };
+}
+
 export function escapeRegExp(str: string): string {
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -12,6 +12,7 @@ import {
 import { CaseEntry, CaseSheetConfig, JournalConfig } from '../types/journal';
 import {
   buildGoogleSheetCsvUrl,
+  checkDuplicate,
   parseCaseLookupInput,
   parseWatchlistImport,
 } from '../lib/journal/engine';
@@ -83,14 +84,13 @@ export function WatchlistImportWizard({
 
   const watchlistDupStats = useMemo(() => {
     const existingKw = new Set(config.keywords.map((k) => k.trim().toLowerCase()));
-    const existingTm = new Set(config.tmNumbers.map((t) => t.trim()));
     const newKw = parsedWatchlist.keywords.filter((k) => !existingKw.has(k.trim().toLowerCase())).length;
-    const newTm = parsedWatchlist.tmNumbers.filter((t) => !existingTm.has(t.trim())).length;
+    const tmDup = checkDuplicate(parsedWatchlist.tmNumbers, config.tmNumbers);
     return {
       newKw,
       dupKw: parsedWatchlist.keywords.length - newKw,
-      newTm,
-      dupTm: parsedWatchlist.tmNumbers.length - newTm,
+      newTm: tmDup.unique.length,
+      dupTm: tmDup.duplicates.length,
     };
   }, [parsedWatchlist, config.keywords, config.tmNumbers]);
 
@@ -107,8 +107,10 @@ export function WatchlistImportWizard({
   );
 
   const caseDupCount = useMemo(() => {
-    const existingTm = new Set(config.caseEntries.map((c) => c.tmNumber.trim()));
-    return parsedCaseMap.entries.filter((e) => existingTm.has(e.tmNumber.trim())).length;
+    return checkDuplicate(
+      parsedCaseMap.entries.map((e) => e.tmNumber),
+      config.caseEntries.map((c) => c.tmNumber)
+    ).duplicates.length;
   }, [parsedCaseMap.entries, config.caseEntries]);
 
   const handleWatchlistFile = async (file: File) => {
@@ -218,8 +220,8 @@ export function WatchlistImportWizard({
           onClick={() => setActiveTab('watchlist')}
           className={`builty-filter-btn px-4 py-2.5 text-xs font-extrabold border-b-2 ${
             activeTab === 'watchlist'
-              ? 'border-[#111111] text-[#111111] bg-[#fffef0]'
-              : 'border-transparent text-[#555a66] hover:text-[#111111]'
+              ? 'border-[#111111] text-[#111111] bg-[#ffee00]'
+              : 'border-transparent text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
           }`}
         >
           1. Keywords &amp; 6-Digit TM Numbers
@@ -231,8 +233,8 @@ export function WatchlistImportWizard({
           onClick={() => setActiveTab('casemap')}
           className={`builty-filter-btn px-4 py-2.5 text-xs font-extrabold border-b-2 ${
             activeTab === 'casemap'
-              ? 'border-[#111111] text-[#111111] bg-[#fffef0]'
-              : 'border-transparent text-[#555a66] hover:text-[#111111]'
+              ? 'border-[#111111] text-[#111111] bg-[#ffee00]'
+              : 'border-transparent text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
           }`}
         >
           2. Case Lookup Map (DATABASE Sheet / CSV)
