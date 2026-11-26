@@ -18,8 +18,12 @@ export function RecordsReportView({
   onOpenGeneratedDoc,
 }: RecordsReportViewProps) {
   const [search, setSearch] = useState('');
+  const [recordFilter, setRecordFilter] = useState<'ALL' | 'TM' | 'KEYWORD' | 'PDF'>('ALL');
 
   const filtered = records.filter((r) => {
+    if (recordFilter === 'TM' && r.matchType !== 'TM') return false;
+    if (recordFilter === 'KEYWORD' && r.matchType !== 'KEYWORD') return false;
+    if (recordFilter === 'PDF' && !r.pdfReady) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -149,20 +153,40 @@ export function RecordsReportView({
 
       {/* Records Ledger */}
       <section className="space-y-4" aria-label="Generated records log">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
             <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">Records Ledger</h2>
             <p className="text-xs text-[#555a66]">
               Archive of generated Journal 909 documents and PDF readiness.
             </p>
           </div>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter records by App No, Case No, or Title…"
-            className="w-full sm:w-80 bg-white border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:outline-none focus:border-[#111111]"
-          />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center border border-[#cbd0da] bg-white">
+              {(['ALL', 'TM', 'KEYWORD', 'PDF'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  data-sfx="filter"
+                  data-active={recordFilter === f}
+                  onClick={() => setRecordFilter(f)}
+                  className={`builty-filter-btn px-3 py-2 text-xs font-bold whitespace-nowrap ${
+                    recordFilter === f
+                      ? 'bg-[#ffee00] text-[#111111]'
+                      : 'text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
+                  }`}
+                >
+                  {f === 'PDF' ? 'PDF READY' : f}
+                </button>
+              ))}
+            </div>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter records by App No, Case No, or Title…"
+              className="w-full sm:w-72 bg-white border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:outline-none focus:border-[#111111]"
+            />
+          </div>
         </div>
 
         <div className="bg-white border border-[#e2e4ea] overflow-x-auto">

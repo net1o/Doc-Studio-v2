@@ -7,13 +7,59 @@ export type AppTab =
   | 'journalcheck'
   | 'review'
   | 'generator'
+  | 'database'
   | 'records'
+  | 'settings'
   | 'backup';
 
 export interface CaseEntry {
   tmNumber: string;
   caseNo: string;
   clientName: string;
+  prefix?: string;
+  clientCode?: string;
+  rawCaseNo?: string;
+  applicationName?: string;
+  classNo?: string;
+  status?: string;
+  subStatus?: string;
+  caseType?: string;
+  agent?: string;
+  date?: string;
+}
+
+export interface CaseSheetConfig {
+  sheetUrlOrId: string;
+  sheetName: string;
+  keyCol: number;
+  prefixCol?: number;
+  clientCodeCol?: number;
+  caseCol: number;
+  clientCol: number;
+  appNameCol?: number;
+  caseSeparator?: string;
+  lastSyncedAt?: string;
+}
+
+export type PaperSizePreset =
+  | 'legal'
+  | 'letter'
+  | 'a4'
+  | 'a5'
+  | 'a3'
+  | 'tabloid'
+  | 'executive'
+  | 'custom';
+
+export type PaperUnit = 'in' | 'mm';
+export type PaperOrientation = 'portrait' | 'landscape';
+
+export interface PaperSizeConfig {
+  preset: PaperSizePreset;
+  orientation: PaperOrientation;
+  customWidth: number;
+  customHeight: number;
+  customUnit: PaperUnit;
 }
 
 export interface JournalConfig {
@@ -25,6 +71,8 @@ export interface JournalConfig {
   keywords: string[];
   tmNumbers: string[];
   caseEntries: CaseEntry[];
+  caseSheetConfig?: CaseSheetConfig;
+  paperSize?: PaperSizeConfig;
 }
 
 export interface JournalCheckRow {

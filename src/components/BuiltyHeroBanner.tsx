@@ -12,8 +12,10 @@ const TAB_LABELS: Record<AppTab, string> = {
   analyzer: 'Analyzer & Watchlist',
   journalcheck: 'JournalCheck Input',
   review: 'Review Queue',
-  generator: 'Journal 909 Legal (8.5×14) Generator',
+  generator: 'Journal 909 Document Generator',
+  database: 'Case & Trademark Database',
   records: 'Records & Analytics Report',
+  settings: 'Scanner & Database Settings (CFG)',
   backup: 'Backup & Diagnostics',
 };
 

@@ -78,8 +78,14 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
               <button type="button" onClick={() => onSelectTab('review')} className="text-left hover:text-[#ffee00]">
                 Review Queue
               </button>
+              <button type="button" onClick={() => onSelectTab('database')} className="text-left hover:text-[#ffee00]">
+                Case Database
+              </button>
               <button type="button" onClick={() => onSelectTab('records')} className="text-left hover:text-[#ffee00]">
                 Records &amp; Report
+              </button>
+              <button type="button" onClick={() => onSelectTab('settings')} className="text-left hover:text-[#ffee00]">
+                Settings (CFG)
               </button>
             </div>
           </div>

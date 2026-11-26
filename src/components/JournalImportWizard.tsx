@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { JournalCheckRow } from '../types/journal';
 import {
+  deduplicateJournalCheckRows,
   detectJournalInputFormat,
   exportRowsToCsv,
   JOURNAL_IMPORT_COLUMNS,
@@ -22,7 +23,7 @@ import {
 type WizardMode = 'file' | 'paste_table' | 'convert_text';
 
 interface JournalImportWizardProps {
-  existingCount: number;
+  existingRows: JournalCheckRow[];
   onImport: (rows: JournalCheckRow[], mode: 'append' | 'replace') => void;
   onClose: () => void;
 }
@@ -30,7 +31,7 @@ interface JournalImportWizardProps {
 const SAMPLE_CSV_URL = '/assets/aistudio/Journal_Pub_909_-_JournalCheck_b78c2532.csv';
 
 export function JournalImportWizard({
-  existingCount,
+  existingRows,
   onImport,
   onClose,
 }: JournalImportWizardProps) {
@@ -92,6 +93,17 @@ export function JournalImportWizard({
       elapsedMs,
     };
   }, [rawInput, wizardMode, normalizeDates, extractEmbeddedPageNo]);
+
+  const dedupeStats = useMemo(() => {
+    const batchOnly = deduplicateJournalCheckRows(parsedResult.rows, []);
+    const againstExisting = deduplicateJournalCheckRows(parsedResult.rows, existingRows);
+    return {
+      batchUniqueCount: batchOnly.uniqueRows.length,
+      batchDupCount: batchOnly.skippedDuplicates,
+      appendUniqueCount: againstExisting.uniqueRows.length,
+      appendDupCount: againstExisting.skippedDuplicates,
+    };
+  }, [parsedResult.rows, existingRows]);
 
   const handleFilePicked = async (file: File) => {
     setErrorMsg(null);
@@ -200,8 +212,10 @@ export function JournalImportWizard({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
             type="button"
+            data-sfx="filter"
+            data-active={wizardMode === 'file'}
             onClick={() => setWizardMode('file')}
-            className={`p-3.5 border text-left transition-colors flex items-start gap-3 ${
+            className={`builty-filter-btn p-3.5 border text-left flex items-start gap-3 ${
               wizardMode === 'file'
                 ? 'bg-[#fffef0] border-[#111111] text-[#111111]'
                 : 'bg-white border-[#e2e4ea] text-[#4b505c] hover:border-[#cbd0da]'
@@ -218,8 +232,10 @@ export function JournalImportWizard({
 
           <button
             type="button"
+            data-sfx="filter"
+            data-active={wizardMode === 'paste_table'}
             onClick={() => setWizardMode('paste_table')}
-            className={`p-3.5 border text-left transition-colors flex items-start gap-3 ${
+            className={`builty-filter-btn p-3.5 border text-left flex items-start gap-3 ${
               wizardMode === 'paste_table'
                 ? 'bg-[#fffef0] border-[#111111] text-[#111111]'
                 : 'bg-white border-[#e2e4ea] text-[#4b505c] hover:border-[#cbd0da]'
@@ -236,8 +252,10 @@ export function JournalImportWizard({
 
           <button
             type="button"
+            data-sfx="filter"
+            data-active={wizardMode === 'convert_text'}
             onClick={() => setWizardMode('convert_text')}
-            className={`p-3.5 border text-left transition-colors flex items-start gap-3 ${
+            className={`builty-filter-btn p-3.5 border text-left flex items-start gap-3 ${
               wizardMode === 'convert_text'
                 ? 'bg-[#fffef0] border-[#111111] text-[#111111]'
                 : 'bg-white border-[#e2e4ea] text-[#4b505c] hover:border-[#cbd0da]'
@@ -446,7 +464,9 @@ export function JournalImportWizard({
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <span className="text-xs text-[#555a66] tabular-nums">
-                Current JournalCheck table has {existingCount} row(s).
+                Current table: {existingRows.length} row(s) · Append adds{' '}
+                <strong className="text-[#111111]">{dedupeStats.appendUniqueCount} new</strong> (
+                {dedupeStats.appendDupCount} duplicate skipped)
               </span>
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
@@ -458,17 +478,19 @@ export function JournalImportWizard({
                 </button>
                 <button
                   type="button"
+                  disabled={dedupeStats.appendUniqueCount === 0}
                   onClick={() => onImport(parsedResult.rows, 'append')}
-                  className="h-[38px] px-4 border border-[#111111] bg-white text-xs font-bold text-[#111111] hover:bg-[#f6f7f9]"
+                  className="h-[38px] px-4 border border-[#111111] bg-white text-xs font-bold text-[#111111] hover:bg-[#f6f7f9] disabled:opacity-40"
                 >
-                  Append {parsedResult.rows.length} Rows
+                  Append {dedupeStats.appendUniqueCount} New Rows
                 </button>
                 <button
                   type="button"
+                  disabled={dedupeStats.batchUniqueCount === 0}
                   onClick={() => onImport(parsedResult.rows, 'replace')}
                   className="builty-btn h-[38px] pl-4 pr-3 gap-2 text-xs"
                 >
-                  <span>Replace Table with {parsedResult.rows.length} Rows</span>
+                  <span>Replace Table ({dedupeStats.batchUniqueCount} Unique)</span>
                 </button>
               </div>
             </div>

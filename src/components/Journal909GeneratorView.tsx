@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   CheckCircle2,
   Download,
@@ -8,16 +8,27 @@ import {
   Printer,
   Trash2,
 } from 'lucide-react';
-import { GeneratedJournalDoc } from '../types/journal';
+import {
+  GeneratedJournalDoc,
+  PaperOrientation,
+  PaperSizeConfig,
+  PaperSizePreset,
+  PaperUnit,
+} from '../types/journal';
 import {
   buildJournal909Html,
   buildJournal909WordDoc,
+  DEFAULT_PAPER_SIZE,
+  resolvePaperDimensionsIn,
+  STANDARD_PAPER_SIZES,
 } from '../lib/journal/journal909Template';
 import { triggerFileDownload } from '../lib/journal/engine';
 
 interface Journal909GeneratorViewProps {
   docs: GeneratedJournalDoc[];
   selectedDocId: string | null;
+  paperSize?: PaperSizeConfig;
+  onChangePaperSize: (next: PaperSizeConfig) => void;
   onSelectDoc: (id: string) => void;
   onUpdateDoc: (id: string, patch: Partial<GeneratedJournalDoc>) => void;
   onCreateBlankDoc: () => void;
@@ -27,6 +38,8 @@ interface Journal909GeneratorViewProps {
 export function Journal909GeneratorView({
   docs,
   selectedDocId,
+  paperSize,
+  onChangePaperSize,
   onSelectDoc,
   onUpdateDoc,
   onCreateBlankDoc,
@@ -36,6 +49,18 @@ export function Journal909GeneratorView({
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const activeDoc = docs.find((d) => d.id === selectedDocId) || docs[0] || null;
+  const activePaper = paperSize || DEFAULT_PAPER_SIZE;
+  const resolvedDims = useMemo(
+    () => resolvePaperDimensionsIn(activePaper),
+    [activePaper]
+  );
+
+  const updatePaper = (patch: Partial<PaperSizeConfig>) => {
+    onChangePaperSize({
+      ...activePaper,
+      ...patch,
+    });
+  };
 
   const handleImageUpload = (file: File) => {
     if (!activeDoc || !file.type.startsWith('image/')) return;
@@ -50,7 +75,7 @@ export function Journal909GeneratorView({
 
   const handleDownloadHtml = () => {
     if (!activeDoc) return;
-    const html = buildJournal909Html(activeDoc);
+    const html = buildJournal909Html(activeDoc, activePaper);
     const safeName = `${activeDoc.caseNo || activeDoc.serialNo}_${activeDoc.applicationNo || '909'}`
       .replace(/[^a-zA-Z0-9_-]+/g, '_');
     triggerFileDownload(html, `${safeName}_Journal909.html`, 'text/html;charset=utf-8');
@@ -58,7 +83,7 @@ export function Journal909GeneratorView({
 
   const handleDownloadWord = () => {
     if (!activeDoc) return;
-    const wordHtml = buildJournal909WordDoc(activeDoc);
+    const wordHtml = buildJournal909WordDoc(activeDoc, activePaper);
     const safeName = `${activeDoc.caseNo || activeDoc.serialNo}_${activeDoc.applicationNo || '909'}`
       .replace(/[^a-zA-Z0-9_-]+/g, '_');
     triggerFileDownload(wordHtml, `${safeName}_Journal909.doc`, 'application/msword;charset=utf-8');
@@ -75,7 +100,7 @@ export function Journal909GeneratorView({
       <div className="bg-white border border-[#e2e4ea] p-10 text-center space-y-4">
         <h2 className="text-xl font-extrabold text-[#111111]">No Generated Journal 909 Documents</h2>
         <p className="text-sm text-[#555a66]">
-          Create a blank Legal 8.5×14 sheet or mark rows as MAILMERGE in Review Queue to generate documents.
+          Create a blank sheet or mark rows as MAILMERGE in Review Queue to generate documents.
         </p>
         <button
           type="button"
@@ -96,17 +121,28 @@ export function Journal909GeneratorView({
       ? 'scale-[0.76] origin-top'
       : 'scale-[0.65] sm:scale-[0.78] xl:scale-[0.88] origin-top';
 
+  const pageCssVars = {
+    '--j909-page-w': `${resolvedDims.widthIn}in`,
+    '--j909-page-h': `${resolvedDims.heightIn}in`,
+    '--j909-content-pad': resolvedDims.compactLayout
+      ? '0.42in 0.42in 0.34in 0.42in'
+      : '0.62in 0.56in 0.48in 0.56in',
+  } as CSSProperties;
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+      {/* Dynamic Print Page Size CSS */}
+      <style>{`@page { size: ${resolvedDims.widthIn}in ${resolvedDims.heightIn}in; margin: 0; }`}</style>
+
       {/* Left Control Rail */}
       <aside className="no-print xl:col-span-4 bg-white border border-[#e2e4ea] p-5 space-y-5">
         <div className="flex items-center justify-between gap-2 border-b border-[#eceef2] pb-3">
           <div>
             <h2 className="text-base font-extrabold text-[#111111]">
-              Journal 909 Legal (8.5×14)
+              Journal 909 ({resolvedDims.label})
             </h2>
             <p className="text-[11.5px] text-[#555a66]">
-              Editorial Print Sheet · Exact Legal Dimensions
+              Editorial Print Sheet · Standard &amp; Custom Paper Sizes
             </p>
           </div>
           <button
@@ -138,6 +174,129 @@ export function Journal909GeneratorView({
           </select>
         </div>
 
+        {/* Paper Size & Custom Dimensions */}
+        <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3.5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="j909-paper-preset" className="text-xs font-extrabold text-[#111111]">
+              Paper Size
+            </label>
+            <span className="text-[11px] font-mono font-bold text-[#555a66] tabular-nums">
+              {resolvedDims.widthIn}&quot; × {resolvedDims.heightIn}&quot;
+            </span>
+          </div>
+
+          <select
+            id="j909-paper-preset"
+            value={activePaper.preset}
+            onChange={(e) => {
+              const preset = e.target.value as PaperSizePreset;
+              if (preset !== 'custom') {
+                const found = STANDARD_PAPER_SIZES.find((p) => p.id === preset);
+                updatePaper({
+                  preset,
+                  customWidth: found ? found.widthIn : activePaper.customWidth,
+                  customHeight: found ? found.heightIn : activePaper.customHeight,
+                  customUnit: 'in',
+                });
+              } else {
+                updatePaper({ preset: 'custom' });
+              }
+            }}
+            className="w-full bg-white border border-[#cbd0da] px-2.5 py-2 text-xs font-semibold text-[#111111] focus:border-[#111111]"
+          >
+            {STANDARD_PAPER_SIZES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} — {p.dimensionsLabel}
+              </option>
+            ))}
+            <option value="custom">Custom Dimensions…</option>
+          </select>
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold text-[#555a66]">Orientation</span>
+            <div className="flex border border-[#cbd0da] bg-white">
+              {(['portrait', 'landscape'] as PaperOrientation[]).map((ori) => (
+                <button
+                  key={ori}
+                  type="button"
+                  data-sfx="filter"
+                  data-active={activePaper.orientation === ori}
+                  onClick={() => updatePaper({ orientation: ori })}
+                  className={`builty-filter-btn px-2.5 py-1 text-[11px] font-bold capitalize ${
+                    activePaper.orientation === ori
+                      ? 'bg-[#ffee00] text-[#111111]'
+                      : 'text-[#555a66] hover:text-[#111111]'
+                  }`}
+                >
+                  {ori}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {activePaper.preset === 'custom' && (
+            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#e2e4ea]">
+              <div>
+                <label htmlFor="j909-custom-w" className="block text-[10.5px] font-bold text-[#555a66] mb-1">
+                  Width
+                </label>
+                <input
+                  id="j909-custom-w"
+                  type="number"
+                  step="0.01"
+                  min={activePaper.customUnit === 'mm' ? 80 : 3}
+                  max={activePaper.customUnit === 'mm' ? 760 : 30}
+                  value={activePaper.customWidth}
+                  onChange={(e) =>
+                    updatePaper({ customWidth: Math.max(1, Number(e.target.value) || 8.5) })
+                  }
+                  className="w-full bg-white border border-[#cbd0da] px-2 py-1.5 text-xs font-mono text-[#111111]"
+                />
+              </div>
+              <div>
+                <label htmlFor="j909-custom-h" className="block text-[10.5px] font-bold text-[#555a66] mb-1">
+                  Height
+                </label>
+                <input
+                  id="j909-custom-h"
+                  type="number"
+                  step="0.01"
+                  min={activePaper.customUnit === 'mm' ? 80 : 3}
+                  max={activePaper.customUnit === 'mm' ? 915 : 36}
+                  value={activePaper.customHeight}
+                  onChange={(e) =>
+                    updatePaper({ customHeight: Math.max(1, Number(e.target.value) || 14) })
+                  }
+                  className="w-full bg-white border border-[#cbd0da] px-2 py-1.5 text-xs font-mono text-[#111111]"
+                />
+              </div>
+              <div>
+                <label htmlFor="j909-custom-unit" className="block text-[10.5px] font-bold text-[#555a66] mb-1">
+                  Unit
+                </label>
+                <select
+                  id="j909-custom-unit"
+                  value={activePaper.customUnit}
+                  onChange={(e) => {
+                    const nextUnit = e.target.value as PaperUnit;
+                    if (nextUnit === activePaper.customUnit) return;
+                    const factor = nextUnit === 'mm' ? 25.4 : 1 / 25.4;
+                    updatePaper({
+                      customUnit: nextUnit,
+                      customWidth: Number((activePaper.customWidth * factor).toFixed(nextUnit === 'mm' ? 0 : 2)),
+                      customHeight: Number((activePaper.customHeight * factor).toFixed(nextUnit === 'mm' ? 0 : 2)),
+                    });
+                  }}
+                  className="w-full bg-white border border-[#cbd0da] px-2 py-1.5 text-xs font-bold text-[#111111]"
+                >
+                  <option value="in">in</option>
+                  <option value="mm">mm</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Primary Export / Print Actions */}
         <div className="space-y-2 pt-1">
           <button
@@ -145,8 +304,8 @@ export function Journal909GeneratorView({
             onClick={handlePrintPdf}
             className="builty-btn w-full justify-between h-[42px] pl-4 pr-2 text-xs"
           >
-            <span>Convert / Print PDF (8.5×14 Legal)</span>
-            <span className="builty-btn-icon-tab w-8 h-7">
+            <span className="truncate">Convert / Print PDF ({resolvedDims.label})</span>
+            <span className="builty-btn-icon-tab w-8 h-7 shrink-0">
               <Printer className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </button>
@@ -315,8 +474,10 @@ export function Journal909GeneratorView({
               <button
                 key={z}
                 type="button"
+                data-sfx="filter"
+                data-active={zoom === z}
                 onClick={() => setZoom(z)}
-                className={`px-2.5 py-1 text-[11px] font-bold ${
+                className={`builty-filter-btn px-2.5 py-1 text-[11px] font-bold ${
                   zoom === z ? 'bg-[#ffee00] text-[#111111]' : 'text-[#555a66] hover:text-[#111111]'
                 }`}
               >
@@ -327,10 +488,10 @@ export function Journal909GeneratorView({
         </div>
       </aside>
 
-      {/* Right Canvas: Exact Journal 909 - Legal Size (8.5in x 14in) Sheet */}
+      {/* Right Canvas: Dynamic Standard / Custom Paper Size Sheet */}
       <div className="xl:col-span-8 overflow-x-auto flex justify-center bg-[#e9ebf0] border border-[#d4d7e0] p-4 sm:p-6 min-h-[760px] print:col-span-12 print:overflow-visible print:block print:bg-white print:border-0 print:p-0 print:min-h-0">
-        <div className={`j909-print-wrapper ${scaleClass}`}>
-          <div className="j909-page">
+        <div className={`j909-print-wrapper ${scaleClass}`} style={pageCssVars}>
+          <div className="j909-page" style={pageCssVars}>
             {/* Exact Outer Frame & Corner Borders SVG */}
             <svg
               className="j909-frame-svg"
@@ -553,13 +714,14 @@ export function Journal909GeneratorView({
                   <img
                     src={activeDoc.imageDataUrl}
                     alt={activeDoc.title || 'Trademark artwork'}
-                    className="max-w-full max-h-[5.1in] object-contain"
+                    style={{ maxWidth: '100%', maxHeight: `${resolvedDims.maxImageHeightIn}in` }}
+                    className="object-contain"
                   />
                 ) : (
                   <button
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
-                    className="no-print border-2 border-dashed border-[#d4d4d4] hover:border-[#290076] px-8 py-12 text-center text-xs text-[#6e6a7a] transition-colors"
+                    className="no-print border-2 border-dashed border-[#d4d4d4] hover:border-[#290076] px-8 py-10 text-center text-xs text-[#6e6a7a]"
                   >
                     Click to attach trademark artwork image (optional)
                   </button>

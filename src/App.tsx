@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppTab,
+  CaseEntry,
   GeneratedJournalDoc,
   JournalCheckRow,
   JournalConfig,
+  PaperSizeConfig,
   RecordRow,
   ReviewRow,
 } from './types/journal';
 import {
   computeReviewStats,
   normalizeJournalCheckDates,
+  refreshReviewCaseNumbers,
   runJournalScan,
 } from './lib/journal/engine';
 import {
@@ -18,13 +21,22 @@ import {
   resetJournalState,
   saveJournalState,
 } from './lib/journal/store';
+import {
+  isSfxEnabled,
+  playClickSfx,
+  playFilterSfx,
+  playSuccessSfx,
+  setSfxEnabled,
+} from './lib/audio/sfx';
 import { BuiltyHeader } from './components/BuiltyHeader';
 import { BuiltyHeroBanner } from './components/BuiltyHeroBanner';
 import { AnalyzerView } from './components/AnalyzerView';
 import { JournalCheckView } from './components/JournalCheckView';
 import { ReviewQueueView } from './components/ReviewQueueView';
 import { Journal909GeneratorView } from './components/Journal909GeneratorView';
+import { DatabaseView } from './components/DatabaseView';
 import { RecordsReportView } from './components/RecordsReportView';
+import { SettingsView } from './components/SettingsView';
 import { BackupToolsView } from './components/BackupToolsView';
 import { BuiltyFooter } from './components/BuiltyFooter';
 
@@ -106,10 +118,14 @@ export default function App() {
     return initial.generatedDocs[0]?.id || null;
   });
   const [toast, setToast] = useState<{ kind: 'info' | 'error'; message: string } | null>(null);
+  const [sfxEnabled, setSfxEnabledState] = useState<boolean>(() => isSfxEnabled());
   const toastTimerRef = useRef<number | null>(null);
 
   const showToast = (message: string, kind: 'info' | 'error' = 'info') => {
     setToast({ message, kind });
+    if (kind === 'info') {
+      playSuccessSfx();
+    }
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     toastTimerRef.current = window.setTimeout(() => setToast(null), 5000);
   };
@@ -117,6 +133,33 @@ export default function App() {
   useEffect(() => {
     saveJournalState(state);
   }, [state]);
+
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const btn = target?.closest('button');
+      if (!btn || btn.disabled) return;
+      const sfxType = btn.getAttribute('data-sfx');
+      if (sfxType === 'none') return;
+      if (sfxType === 'filter') {
+        playFilterSfx();
+      } else {
+        playClickSfx();
+      }
+    };
+
+    document.addEventListener('click', handleDocumentClick, true);
+    return () => document.removeEventListener('click', handleDocumentClick, true);
+  }, []);
+
+  const handleToggleSfx = () => {
+    const next = !sfxEnabled;
+    setSfxEnabled(next);
+    setSfxEnabledState(next);
+    if (next) {
+      playSuccessSfx();
+    }
+  };
 
   const currentStats = useMemo(
     () => computeReviewStats(state.reviewRows, state.config.journalNo),
@@ -377,6 +420,9 @@ export default function App() {
         onRunScan={handleRunScan}
         reviewCount={state.reviewRows.length}
         docsCount={state.generatedDocs.length}
+        databaseCount={state.config.caseEntries.length}
+        sfxEnabled={sfxEnabled}
+        onToggleSfx={handleToggleSfx}
       />
 
       <BuiltyHeroBanner
@@ -415,6 +461,14 @@ export default function App() {
             onUpdateConfig={handleUpdateConfig}
             onRunScan={handleRunScan}
             onGoToTab={setActiveTab}
+            onRefreshReviewCases={(entries: CaseEntry[]) => {
+              const { rows, updatedCount } = refreshReviewCaseNumbers(state.reviewRows, entries);
+              if (updatedCount > 0) {
+                setState((prev) => ({ ...prev, reviewRows: rows }));
+                showToast(`Updated Case No on ${updatedCount} Review Queue row(s).`);
+              }
+            }}
+            onNotify={(msg: string) => showToast(msg)}
           />
         )}
 
@@ -424,6 +478,7 @@ export default function App() {
             onChangeRows={handleUpdateJournalRows}
             onNormalizeDates={handleNormalizeDates}
             onRunScan={handleRunScan}
+            onNotify={(msg: string) => showToast(msg)}
           />
         )}
 
@@ -441,10 +496,31 @@ export default function App() {
           <Journal909GeneratorView
             docs={state.generatedDocs}
             selectedDocId={selectedDocId}
+            paperSize={state.config.paperSize}
+            onChangePaperSize={(nextPaper: PaperSizeConfig) =>
+              handleUpdateConfig({ ...state.config, paperSize: nextPaper })
+            }
             onSelectDoc={setSelectedDocId}
             onUpdateDoc={handleUpdateGeneratedDoc}
             onCreateBlankDoc={handleCreateBlankDoc}
             onMarkPdfGenerated={handleMarkPdfGenerated}
+          />
+        )}
+
+        {activeTab === 'database' && (
+          <DatabaseView
+            config={state.config}
+            onUpdateConfig={handleUpdateConfig}
+            onRefreshReviewCases={(entries: CaseEntry[]) => {
+              const { rows, updatedCount } = refreshReviewCaseNumbers(state.reviewRows, entries);
+              if (updatedCount > 0) {
+                setState((prev) => ({ ...prev, reviewRows: rows }));
+                showToast(`Updated Case No on ${updatedCount} Review Queue row(s).`);
+              } else {
+                showToast('All Review Queue rows already match current Database records.');
+              }
+            }}
+            onNotify={(msg: string) => showToast(msg)}
           />
         )}
 
@@ -455,6 +531,16 @@ export default function App() {
             currentStats={currentStats}
             allTimeStats={allTimeStats}
             onOpenGeneratedDoc={handleOpenGeneratedDocById}
+          />
+        )}
+
+        {activeTab === 'settings' && (
+          <SettingsView
+            config={state.config}
+            onUpdateConfig={handleUpdateConfig}
+            onResetSampleData={handleResetSampleData}
+            onNotify={(msg: string) => showToast(msg)}
+            onOpenDatabase={() => setActiveTab('database')}
           />
         )}
 

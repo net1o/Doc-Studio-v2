@@ -1,4 +1,8 @@
-import { GeneratedJournalDoc } from '../../types/journal';
+import {
+  GeneratedJournalDoc,
+  PaperSizeConfig,
+  PaperSizePreset,
+} from '../../types/journal';
 
 function esc(value: string): string {
   return String(value || '')
@@ -9,7 +13,132 @@ function esc(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function buildJournal909Html(doc: GeneratedJournalDoc): string {
+export interface StandardPaperDefinition {
+  id: Exclude<PaperSizePreset, 'custom'>;
+  label: string;
+  widthIn: number;
+  heightIn: number;
+  dimensionsLabel: string;
+}
+
+export const STANDARD_PAPER_SIZES: StandardPaperDefinition[] = [
+  {
+    id: 'legal',
+    label: 'Legal',
+    widthIn: 8.5,
+    heightIn: 14,
+    dimensionsLabel: '8.5 × 14 in',
+  },
+  {
+    id: 'a4',
+    label: 'A4',
+    widthIn: 8.27,
+    heightIn: 11.69,
+    dimensionsLabel: '210 × 297 mm (8.27 × 11.69 in)',
+  },
+  {
+    id: 'letter',
+    label: 'Letter',
+    widthIn: 8.5,
+    heightIn: 11,
+    dimensionsLabel: '8.5 × 11 in',
+  },
+  {
+    id: 'a5',
+    label: 'A5',
+    widthIn: 5.83,
+    heightIn: 8.27,
+    dimensionsLabel: '148 × 210 mm (5.83 × 8.27 in)',
+  },
+  {
+    id: 'a3',
+    label: 'A3',
+    widthIn: 11.69,
+    heightIn: 16.54,
+    dimensionsLabel: '297 × 420 mm (11.69 × 16.54 in)',
+  },
+  {
+    id: 'tabloid',
+    label: 'Tabloid',
+    widthIn: 11,
+    heightIn: 17,
+    dimensionsLabel: '11 × 17 in',
+  },
+  {
+    id: 'executive',
+    label: 'Executive',
+    widthIn: 7.25,
+    heightIn: 10.5,
+    dimensionsLabel: '7.25 × 10.5 in',
+  },
+];
+
+export const DEFAULT_PAPER_SIZE: PaperSizeConfig = {
+  preset: 'legal',
+  orientation: 'portrait',
+  customWidth: 8.5,
+  customHeight: 14,
+  customUnit: 'in',
+};
+
+export interface ResolvedPaperDimensions {
+  widthIn: number;
+  heightIn: number;
+  label: string;
+  presetName: string;
+  orientation: 'portrait' | 'landscape';
+  compactLayout: boolean;
+  maxImageHeightIn: number;
+}
+
+export function resolvePaperDimensionsIn(paperSize?: PaperSizeConfig): ResolvedPaperDimensions {
+  const cfg = paperSize || DEFAULT_PAPER_SIZE;
+
+  let baseW = 8.5;
+  let baseH = 14;
+  let presetName = 'Legal';
+
+  if (cfg.preset === 'custom') {
+    const unitFactor = cfg.customUnit === 'mm' ? 1 / 25.4 : 1;
+    const rawW = Number(cfg.customWidth) || 8.5;
+    const rawH = Number(cfg.customHeight) || 14;
+    baseW = Math.min(30, Math.max(3, Number((rawW * unitFactor).toFixed(2))));
+    baseH = Math.min(36, Math.max(3, Number((rawH * unitFactor).toFixed(2))));
+    presetName = 'Custom';
+  } else {
+    const match = STANDARD_PAPER_SIZES.find((p) => p.id === cfg.preset) || STANDARD_PAPER_SIZES[0];
+    baseW = match.widthIn;
+    baseH = match.heightIn;
+    presetName = match.label;
+  }
+
+  const isLandscape = cfg.orientation === 'landscape';
+  const widthIn = isLandscape ? Math.max(baseW, baseH) : Math.min(baseW, baseH);
+  const heightIn = isLandscape ? Math.min(baseW, baseH) : Math.max(baseW, baseH);
+
+  const label =
+    cfg.preset === 'custom' && cfg.customUnit === 'mm'
+      ? `Custom ${Math.round((isLandscape ? Math.max(cfg.customWidth, cfg.customHeight) : Math.min(cfg.customWidth, cfg.customHeight)) || 216)}×${Math.round((isLandscape ? Math.min(cfg.customWidth, cfg.customHeight) : Math.max(cfg.customWidth, cfg.customHeight)) || 356)} mm`
+      : `${presetName} ${widthIn}×${heightIn} in${isLandscape ? ' Landscape' : ''}`;
+
+  const compactLayout = heightIn < 11.2 || widthIn < 7.5;
+  const maxImageHeightIn = Math.max(1.2, Number((heightIn - 7.8).toFixed(2)));
+
+  return {
+    widthIn: Number(widthIn.toFixed(2)),
+    heightIn: Number(heightIn.toFixed(2)),
+    label,
+    presetName,
+    orientation: cfg.orientation || 'portrait',
+    compactLayout,
+    maxImageHeightIn,
+  };
+}
+
+export function buildJournal909Html(
+  doc: GeneratedJournalDoc,
+  paperSize?: PaperSizeConfig
+): string {
   const safeJournalNo = esc(doc.journalNo || '909');
   const safeJournalDate = esc(doc.journalDate || '26-Nov-2026');
   const safePubDetails = esc(doc.publishingDetails).replace(/\n/g, '<br />');
@@ -19,8 +148,13 @@ export function buildJournal909Html(doc: GeneratedJournalDoc): string {
   const safeExtraValue = esc(doc.extraValue);
   const safeExtraLabel = esc(doc.extraLabel);
 
+  const dims = resolvePaperDimensionsIn(paperSize);
+  const contentPad = dims.compactLayout
+    ? '0.42in 0.42in 0.34in 0.42in'
+    : '0.62in 0.56in 0.48in 0.56in';
+
   const imageHtml = doc.imageDataUrl
-    ? `<img src="${doc.imageDataUrl}" alt="${safeTitle || 'Trademark artwork'}" style="max-width:100%;max-height:5.1in;object-fit:contain;" />`
+    ? `<img src="${doc.imageDataUrl}" alt="${safeTitle || 'Trademark artwork'}" style="max-width:100%;max-height:${dims.maxImageHeightIn}in;object-fit:contain;" />`
     : '';
 
   return `<!DOCTYPE html>
@@ -28,7 +162,7 @@ export function buildJournal909Html(doc: GeneratedJournalDoc): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Journal ${safeJournalNo} - ${safeTitle || esc(doc.applicationNo)} (8.5x14 Legal)</title>
+  <title>Journal ${safeJournalNo} - ${safeTitle || esc(doc.applicationNo)} (${esc(dims.label)})</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=Orbitron:wght@600;700;800&display=swap" rel="stylesheet" />
@@ -43,63 +177,63 @@ export function buildJournal909Html(doc: GeneratedJournalDoc): string {
       --font-tech: "Chakra Petch", sans-serif;
       --font-body: "Exo 2", sans-serif;
     }
-    @page { size: 8.5in 14in; margin: 0; }
+    @page { size: ${dims.widthIn}in ${dims.heightIn}in; margin: 0; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     html, body { margin: 0; padding: 0; background: #e5e5e5; font-family: var(--font-body); }
-    .page { position: relative; width: 8.5in; height: 14in; margin: 0 auto; background: #ffffff; overflow: hidden; display: flex; flex-direction: column; }
+    .page { position: relative; width: ${dims.widthIn}in; height: ${dims.heightIn}in; margin: 0 auto; background: #ffffff; overflow: hidden; display: flex; flex-direction: column; }
     @media screen { .page { margin: 20px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.25); } }
     @media print { body { background: #ffffff; } .page { margin: 0; box-shadow: none; } }
     .frame-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-    .content { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; padding: 0.62in 0.56in 0.48in 0.56in; }
+    .content { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; padding: ${contentPad}; }
     .top-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.18in; }
     .brand-left { display: flex; align-items: center; gap: 0.22in; padding-left: 0.08in; }
-    .pub-tag { width: 1.18in; height: 1.65in; flex-shrink: 0; }
+    .pub-tag { width: ${dims.compactLayout ? '0.92in' : '1.18in'}; height: ${dims.compactLayout ? '1.3in' : '1.65in'}; flex-shrink: 0; }
     .journal-info { border-left: 2px solid var(--theme); padding-left: 0.18in; padding-top: 0.02in; }
-    .journal-title { margin: 0; font-family: var(--font-display); font-size: 20pt; font-weight: 800; letter-spacing: 1px; color: var(--heading); line-height: 1.15; }
-    .journal-date { margin: 5px 0 11px 0; font-family: var(--font-tech); font-size: 13.5pt; font-weight: 700; letter-spacing: 2px; color: var(--theme); }
+    .journal-title { margin: 0; font-family: var(--font-display); font-size: ${dims.compactLayout ? '16pt' : '20pt'}; font-weight: 800; letter-spacing: 1px; color: var(--heading); line-height: 1.15; }
+    .journal-date { margin: 5px 0 11px 0; font-family: var(--font-tech); font-size: ${dims.compactLayout ? '11.5pt' : '13.5pt'}; font-weight: 700; letter-spacing: 2px; color: var(--theme); }
     .accent-bar-wrap { display: flex; align-items: center; gap: 6px; }
-    .accent-bar { height: 6px; width: 2.2in; background: linear-gradient(90deg, var(--theme-light) 0%, var(--theme-light) 34%, var(--theme) 34%, var(--theme) 100%); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+    .accent-bar { height: 6px; width: ${dims.compactLayout ? '1.5in' : '2.2in'}; background: linear-gradient(90deg, var(--theme-light) 0%, var(--theme-light) 34%, var(--theme) 34%, var(--theme) 100%); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
     .slashes { display: inline-flex; gap: 4px; align-items: center; }
     .slashes span { display: inline-block; width: 6px; height: 12px; transform: skewX(-32deg); }
     .slashes-silver span:nth-child(1) { background: var(--theme); }
     .slashes-silver span:nth-child(2) { background: var(--silver-dark); }
     .slashes-silver span:nth-child(3) { background: var(--silver-mid); }
-    .pub-details-wrap { width: 2.65in; display: flex; flex-direction: column; align-items: stretch; margin-top: 0.08in; }
+    .pub-details-wrap { width: ${dims.compactLayout ? '2.15in' : '2.65in'}; display: flex; flex-direction: column; align-items: stretch; margin-top: 0.08in; }
     .banner-row { display: flex; align-items: center; gap: 5px; }
     .banner-slashes { display: flex; gap: 4px; }
     .banner-slashes span { display: block; width: 9px; height: 28px; background: var(--theme); transform: skewX(-30deg); }
     .banner-slashes span.light { background: var(--theme-light); }
-    .banner-box { flex: 1; height: 28px; background: var(--theme); color: var(--heading); font-family: var(--font-tech); font-size: 11.5pt; font-weight: 700; letter-spacing: 1.2px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%); padding-left: 12px; }
-    .pub-details-input { margin-top: 8px; height: 0.82in; border: 2px solid var(--theme); padding: 6px 8px; font-family: var(--font-body); font-size: 10pt; color: #111; outline: none; }
-    .app-section { margin-top: 0.28in; }
-    .app-header { display: flex; align-items: center; gap: 8px; margin-bottom: 0.16in; }
+    .banner-box { flex: 1; height: 28px; background: var(--theme); color: var(--heading); font-family: var(--font-tech); font-size: 11pt; font-weight: 700; letter-spacing: 1.2px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%); padding-left: 12px; }
+    .pub-details-input { margin-top: 8px; min-height: 0.72in; border: 2px solid var(--theme); padding: 6px 8px; font-family: var(--font-body); font-size: 9.5pt; color: #111; outline: none; }
+    .app-section { margin-top: ${dims.compactLayout ? '0.18in' : '0.28in'}; }
+    .app-header { display: flex; align-items: center; gap: 8px; margin-bottom: 0.14in; }
     .app-banner { display: flex; align-items: center; gap: 5px; }
-    .app-banner-box { height: 30px; background: var(--theme); color: var(--heading); font-family: var(--font-tech); font-size: 12.5pt; font-weight: 700; letter-spacing: 1.2px; display: flex; align-items: center; padding: 0 28px 0 22px; text-transform: uppercase; clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%); }
+    .app-banner-box { height: 30px; background: var(--theme); color: var(--heading); font-family: var(--font-tech); font-size: 12pt; font-weight: 700; letter-spacing: 1.2px; display: flex; align-items: center; padding: 0 28px 0 22px; text-transform: uppercase; clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%); }
     .app-line { flex: 1; height: 2px; background: var(--theme); }
     .details-table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 2px solid var(--theme); }
-    .details-table td { border: 1.5px solid var(--theme); height: 0.44in; padding: 4px 10px; font-family: var(--font-body); font-size: 11.5pt; vertical-align: middle; }
-    .details-table td.label-cell { background: linear-gradient(90deg, #bdbdbd 0%, #efefef 52%, #bdbdbd 100%); color: #000000; font-family: var(--font-tech); font-size: 12.5pt; font-weight: 700; text-align: center; letter-spacing: 0.8px; }
+    .details-table td { border: 1.5px solid var(--theme); height: ${dims.compactLayout ? '0.36in' : '0.44in'}; padding: 4px 10px; font-family: var(--font-body); font-size: 11pt; vertical-align: middle; }
+    .details-table td.label-cell { background: linear-gradient(90deg, #bdbdbd 0%, #efefef 52%, #bdbdbd 100%); color: #000000; font-family: var(--font-tech); font-size: 11.5pt; font-weight: 700; text-align: center; letter-spacing: 0.8px; }
     .details-table td.value-cell { background: #ffffff; color: #111111; outline: none; }
-    .image-header { margin-top: 0.28in; display: flex; align-items: center; justify-content: center; gap: 10px; }
-    .image-line { width: 1.8in; height: 2px; background: var(--theme); }
-    .image-title { margin: 0; padding: 0 12px; font-family: var(--font-display); font-size: 16.5pt; font-weight: 800; letter-spacing: 2px; color: var(--heading); text-transform: uppercase; }
-    .image-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0.2in 0; min-height: 5.5in; }
+    .image-header { margin-top: ${dims.compactLayout ? '0.18in' : '0.28in'}; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .image-line { flex: 1; max-width: 1.8in; height: 2px; background: var(--theme); }
+    .image-title { margin: 0; padding: 0 12px; font-family: var(--font-display); font-size: 15.5pt; font-weight: 800; letter-spacing: 2px; color: var(--heading); text-transform: uppercase; }
+    .image-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0.16in 0; min-height: 1.4in; }
     .footer { margin-top: auto; }
-    .note-bar { background: var(--theme); color: #ffffff; text-align: center; font-family: var(--font-tech); font-size: 9.5pt; font-weight: 600; letter-spacing: 0.8px; padding: 6px 10px; text-transform: uppercase; }
-    .brandex-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0.14in 0 0.12in 0; }
+    .note-bar { background: var(--theme); color: #ffffff; text-align: center; font-family: var(--font-tech); font-size: 9pt; font-weight: 600; letter-spacing: 0.8px; padding: 6px 10px; text-transform: uppercase; }
+    .brandex-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0.12in 0 0.1in 0; }
     .brandex-line { width: 0.9in; height: 1.5px; background: var(--theme); }
     .brandex-logo { text-align: center; line-height: 1; }
     .brandex-sub { font-family: var(--font-tech); font-size: 8pt; font-weight: 600; letter-spacing: 3px; color: var(--theme); margin-bottom: 2px; position: relative; display: inline-block; }
     .brandex-sub .reg { font-family: var(--font-body); font-size: 8.5pt; position: absolute; right: -28px; top: -2px; }
-    .brandex-wordmark { font-family: Georgia, "Times New Roman", serif; font-size: 27pt; font-weight: 500; color: var(--theme); display: flex; align-items: center; justify-content: center; gap: 1px; }
-    .brandex-r-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--heading); color: #ffffff; font-family: var(--font-display); font-size: 13pt; font-weight: 700; margin: 0 2px; position: relative; }
+    .brandex-wordmark { font-family: Georgia, "Times New Roman", serif; font-size: 25pt; font-weight: 500; color: var(--theme); display: flex; align-items: center; justify-content: center; gap: 1px; }
+    .brandex-r-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--heading); color: #ffffff; font-family: var(--font-display); font-size: 12pt; font-weight: 700; margin: 0 2px; position: relative; }
     .brandex-r-badge::after { content: ""; position: absolute; width: 10px; height: 2.5px; background: var(--heading); right: -4px; bottom: 2px; transform: rotate(35deg); }
-    .contact-row { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-body); font-size: 7.5pt; color: #111111; padding: 0 0.05in; }
-    .contact-item { display: flex; align-items: center; gap: 7px; padding: 0 10px; border-right: 1.5px solid var(--theme); }
-    .contact-item:first-child { padding-left: 0; max-width: 2.35in; }
+    .contact-row { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-body); font-size: 7.2pt; color: #111111; padding: 0 0.05in; }
+    .contact-item { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-right: 1.5px solid var(--theme); }
+    .contact-item:first-child { padding-left: 0; max-width: 2.25in; }
     .contact-item:last-child { border-right: none; padding-right: 0; }
-    .contact-icon { width: 22px; height: 22px; flex-shrink: 0; }
-    .contact-label { font-family: var(--font-tech); font-weight: 700; color: var(--theme); font-size: 8.5pt; letter-spacing: 0.4px; display: block; margin-bottom: 1px; }
+    .contact-icon { width: 20px; height: 20px; flex-shrink: 0; }
+    .contact-label { font-family: var(--font-tech); font-weight: 700; color: var(--theme); font-size: 8pt; letter-spacing: 0.4px; display: block; margin-bottom: 1px; }
     .contact-text { line-height: 1.25; }
   </style>
 </head>
@@ -238,14 +372,20 @@ export function buildJournal909Html(doc: GeneratedJournalDoc): string {
 </html>`;
 }
 
-export function buildJournal909WordDoc(doc: GeneratedJournalDoc): string {
+export function buildJournal909WordDoc(
+  doc: GeneratedJournalDoc,
+  paperSize?: PaperSizeConfig
+): string {
+  const dims = resolvePaperDimensionsIn(paperSize);
   const imageTag = doc.imageDataUrl
     ? `<div style="text-align:center;margin:24px 0;"><img src="${doc.imageDataUrl}" style="max-width:460px;max-height:420px;" /></div>`
     : '<p style="text-align:center;color:#777;">[Artwork Space]</p>';
 
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8" /><title>Journal ${esc(doc.journalNo)} - ${esc(doc.title)}</title>
+<head><meta charset="utf-8" /><title>Journal ${esc(doc.journalNo)} - ${esc(doc.title)} (${esc(dims.label)})</title>
 <style>
+  @page Section1 { size: ${dims.widthIn}in ${dims.heightIn}in; margin: 0.5in; }
+  div.Section1 { page: Section1; }
   body { font-family: Arial, sans-serif; color: #111; }
   h1 { color: #f4580b; font-size: 20pt; margin-bottom: 4pt; }
   h2 { color: #290076; font-size: 13pt; margin-top: 14pt; }
@@ -255,25 +395,27 @@ export function buildJournal909WordDoc(doc: GeneratedJournalDoc): string {
 </style>
 </head>
 <body>
-  <h1>JOURNAL ${esc(doc.journalNo)} — ${esc(doc.journalDate)}</h1>
-  <p><strong>Publishing Details:</strong> ${esc(doc.publishingDetails)}</p>
-  <h2>APPLICATION DETAILS</h2>
-  <table>
-    <tr>
-      <td class="lbl">TITLE</td><td>${esc(doc.title)}</td>
-      <td class="lbl">TRADEMARK</td><td>${esc(doc.trademarkField || doc.applicationNo)}</td>
-    </tr>
-    <tr>
-      <td class="lbl">CLASS</td><td>${esc(doc.classNo)}</td>
-      <td class="lbl">${esc(doc.extraLabel || 'PAGE / CASE')}</td><td>${esc(doc.extraValue)}</td>
-    </tr>
-  </table>
-  <h2>IMAGE</h2>
-  ${imageTag}
-  <p style="background:#290076;color:#fff;padding:6pt;text-align:center;font-size:9pt;">
-    NOTE: DEMAND NOTE WILL BE ISSUED AFTER 2 MONTHS FROM THE DATE OF PUBLICATION
-  </p>
-  <p style="text-align:center;font-size:9pt;color:#290076;">GET LEGAL — bRandex | +92 336 0015004 | info@brandex.pk</p>
+  <div class="Section1">
+    <h1>JOURNAL ${esc(doc.journalNo)} — ${esc(doc.journalDate)}</h1>
+    <p><strong>Paper Size:</strong> ${esc(dims.label)} · <strong>Publishing Details:</strong> ${esc(doc.publishingDetails)}</p>
+    <h2>APPLICATION DETAILS</h2>
+    <table>
+      <tr>
+        <td class="lbl">TITLE</td><td>${esc(doc.title)}</td>
+        <td class="lbl">TRADEMARK</td><td>${esc(doc.trademarkField || doc.applicationNo)}</td>
+      </tr>
+      <tr>
+        <td class="lbl">CLASS</td><td>${esc(doc.classNo)}</td>
+        <td class="lbl">${esc(doc.extraLabel || 'PAGE / CASE')}</td><td>${esc(doc.extraValue)}</td>
+      </tr>
+    </table>
+    <h2>IMAGE</h2>
+    ${imageTag}
+    <p style="background:#290076;color:#fff;padding:6pt;text-align:center;font-size:9pt;">
+      NOTE: DEMAND NOTE WILL BE ISSUED AFTER 2 MONTHS FROM THE DATE OF PUBLICATION
+    </p>
+    <p style="text-align:center;font-size:9pt;color:#290076;">GET LEGAL — bRandex | +92 336 0015004 | info@brandex.pk</p>
+  </div>
 </body>
 </html>`;
 }

@@ -610,6 +610,636 @@ export function parseRawJournalTextConvertJournal2(
   };
 }
 
+export interface WatchlistImportResult {
+  keywords: string[];
+  tmNumbers: string[];
+  skippedHeaders: number;
+  skippedDuplicates: number;
+  invalidTmTokens: string[];
+}
+
+export function parseWatchlistImport(
+  rawText: string,
+  target: 'auto' | 'keywords_only' | 'tm_only' = 'auto'
+): WatchlistImportResult {
+  const trimmed = rawText.replace(/^\uFEFF/, '').trim();
+  if (!trimmed) {
+    return {
+      keywords: [],
+      tmNumbers: [],
+      skippedHeaders: 0,
+      skippedDuplicates: 0,
+      invalidTmTokens: [],
+    };
+  }
+
+  const firstLine = trimmed.split(/\r?\n/)[0] || '';
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const delimiter: '\t' | ',' = tabCount >= commaCount && tabCount > 0 ? '\t' : ',';
+
+  const matrix =
+    tabCount > 0 || commaCount > 0
+      ? parseDelimitedMatrix(trimmed, delimiter)
+      : trimmed.split(/\r?\n/).map((line) => [line]);
+
+  const keywords: string[] = [];
+  const keywordLowerSet = new Set<string>();
+  const tmNumbers: string[] = [];
+  const tmSet = new Set<string>();
+  const invalidTmTokens: string[] = [];
+  let skippedHeaders = 0;
+  let skippedDuplicates = 0;
+
+  const addKeyword = (rawVal: string) => {
+    const cleaned = rawVal.trim();
+    if (!cleaned) return;
+    const lower = cleaned.toLowerCase();
+    if (keywordLowerSet.has(lower)) {
+      skippedDuplicates++;
+      return;
+    }
+    keywordLowerSet.add(lower);
+    keywords.push(cleaned);
+  };
+
+  const addTm = (token: string) => {
+    if (tmSet.has(token)) {
+      skippedDuplicates++;
+      return;
+    }
+    tmSet.add(token);
+    tmNumbers.push(token);
+  };
+
+  const isHeaderToken = (val: string) => {
+    const low = val.toLowerCase().trim();
+    return (
+      low === 'keywords' ||
+      low === 'keyword' ||
+      low === 'tm numbers' ||
+      low === 'tm number' ||
+      low === 'tm numbers (6-digit)' ||
+      low === 'tm no' ||
+      low === 'tm/cpr number' ||
+      low === 'application no'
+    );
+  };
+
+  for (const row of matrix) {
+    if (target === 'tm_only') {
+      for (const cell of row) {
+        const tokens = cell.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean);
+        for (const token of tokens) {
+          if (isHeaderToken(token)) {
+            skippedHeaders++;
+            continue;
+          }
+          if (/^\d{6}$/.test(token)) {
+            addTm(token);
+          } else {
+            invalidTmTokens.push(token);
+          }
+        }
+      }
+      continue;
+    }
+
+    if (target === 'keywords_only') {
+      for (const cell of row) {
+        const cleaned = cell.trim().replace(/,+$/, '').trim();
+        if (!cleaned) continue;
+        if (isHeaderToken(cleaned)) {
+          skippedHeaders++;
+          continue;
+        }
+        addKeyword(cleaned);
+      }
+      continue;
+    }
+
+    // Auto mode: supports 2-column Excel paste (Keywords \t TM Numbers (6-digit)) or mixed 1-column
+    if (row.length >= 2) {
+      const col0 = (row[0] || '').trim().replace(/,+$/, '').trim();
+      const col1 = (row[1] || '').trim();
+
+      if (isHeaderToken(col0) || isHeaderToken(col1)) {
+        skippedHeaders++;
+        continue;
+      }
+
+      if (col0) {
+        if (/^\d{6}$/.test(col0)) {
+          addTm(col0);
+        } else {
+          addKeyword(col0);
+        }
+      }
+
+      if (col1) {
+        const tokens = col1.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean);
+        for (const token of tokens) {
+          if (/^\d{6}$/.test(token)) {
+            addTm(token);
+          } else {
+            invalidTmTokens.push(token);
+          }
+        }
+      }
+
+      for (let extra = 2; extra < row.length; extra++) {
+        const cell = (row[extra] || '').trim();
+        if (!cell) continue;
+        if (/^\d{6}$/.test(cell)) addTm(cell);
+      }
+    } else {
+      const single = (row[0] || '').trim().replace(/,+$/, '').trim();
+      if (!single) continue;
+      if (isHeaderToken(single)) {
+        skippedHeaders++;
+        continue;
+      }
+      if (/^\d{6}$/.test(single)) {
+        addTm(single);
+      } else {
+        addKeyword(single);
+      }
+    }
+  }
+
+  return {
+    keywords,
+    tmNumbers,
+    skippedHeaders,
+    skippedDuplicates,
+    invalidTmTokens,
+  };
+}
+
+export function mergeUniqueKeywords(
+  existing: string[],
+  incoming: string[],
+  prependNew = true
+): { merged: string[]; added: number; skippedDuplicates: number } {
+  const seen = new Set(existing.map((k) => k.trim().toLowerCase()).filter(Boolean));
+  const addedList: string[] = [];
+  let skippedDuplicates = 0;
+
+  for (const raw of incoming) {
+    const cleaned = raw.trim();
+    if (!cleaned) continue;
+    const lower = cleaned.toLowerCase();
+    if (seen.has(lower)) {
+      skippedDuplicates++;
+      continue;
+    }
+    seen.add(lower);
+    addedList.push(cleaned);
+  }
+
+  return {
+    merged: prependNew ? [...addedList, ...existing] : [...existing, ...addedList],
+    added: addedList.length,
+    skippedDuplicates,
+  };
+}
+
+export function mergeUniqueTmNumbers(
+  existing: string[],
+  incoming: string[],
+  prependNew = true
+): { merged: string[]; added: number; skippedDuplicates: number } {
+  const seen = new Set(existing.map((t) => t.trim()).filter((t) => /^\d{6}$/.test(t)));
+  const addedList: string[] = [];
+  let skippedDuplicates = 0;
+
+  for (const raw of incoming) {
+    const cleaned = raw.trim();
+    if (!/^\d{6}$/.test(cleaned)) continue;
+    if (seen.has(cleaned)) {
+      skippedDuplicates++;
+      continue;
+    }
+    seen.add(cleaned);
+    addedList.push(cleaned);
+  }
+
+  return {
+    merged: prependNew ? [...addedList, ...existing] : [...existing, ...addedList],
+    added: addedList.length,
+    skippedDuplicates,
+  };
+}
+
+export function getJournalRowDedupeKey(row: JournalCheckRow): string {
+  const appNo = row.applicationNo.trim();
+  if (appNo) return `app:${appNo.toLowerCase()}`;
+  return `meta:${row.title.trim().toLowerCase()}|${row.classNo.trim().toLowerCase()}|${row.dateOfFiling.trim().toLowerCase()}`;
+}
+
+export function deduplicateJournalCheckRows(
+  incoming: JournalCheckRow[],
+  existing: JournalCheckRow[] = []
+): { uniqueRows: JournalCheckRow[]; skippedDuplicates: number } {
+  const seen = new Set<string>(existing.map(getJournalRowDedupeKey));
+  const uniqueRows: JournalCheckRow[] = [];
+  let skippedDuplicates = 0;
+
+  for (const row of incoming) {
+    const key = getJournalRowDedupeKey(row);
+    if (seen.has(key)) {
+      skippedDuplicates++;
+      continue;
+    }
+    seen.add(key);
+    uniqueRows.push(row);
+  }
+
+  return { uniqueRows, skippedDuplicates };
+}
+
+export function formatCompositeCaseNo(
+  prefix?: string,
+  clientCode?: string,
+  rawCaseNo?: string,
+  separator = '-'
+): string {
+  const parts = [prefix, clientCode, rawCaseNo]
+    .map((p) => cleanInlineWhitespace(p || ''))
+    .filter(Boolean);
+  return parts.join(separator);
+}
+
+export interface CaseLookupImportOptions {
+  mappingMode?: 'auto' | 'sheet_col8_345' | 'date_start_22col' | 'three_col' | 'custom';
+  keyCol?: number;        // 1-based (default 8 = TM/CPR NUMBER)
+  prefixCol?: number;     // 1-based (default 3 = TYPE / Prefix)
+  clientCodeCol?: number; // 1-based (default 4 = CLIENT CODE)
+  caseCol?: number;       // 1-based (default 5 = CASE NUMBER)
+  clientCol?: number;     // 1-based (default 6 = CLIENT NAME)
+  appNameCol?: number;    // 1-based (default 7 = APPLICATION NAME)
+  caseSeparator?: string; // default '-'
+}
+
+export interface CaseLookupImportResult {
+  entries: CaseEntry[];
+  detectedLayout: string;
+  skippedRows: number;
+  skippedDuplicates: number;
+}
+
+export function buildGoogleSheetCsvUrl(sheetUrlOrId: string, sheetName?: string): string {
+  const raw = sheetUrlOrId.trim();
+  if (!raw) return '';
+
+  if (/[?&](output=csv|format=csv|tqx=out:csv)/i.test(raw)) {
+    return raw;
+  }
+
+  const idMatch = raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const sheetId = idMatch ? idMatch[1] : /^[a-zA-Z0-9-_]{20,}$/.test(raw) ? raw : '';
+
+  if (!sheetId) {
+    return raw;
+  }
+
+  const gidMatch = raw.match(/[?#&]gid=(\d+)/);
+  const cleanSheetName = (sheetName || '').trim();
+
+  if (cleanSheetName) {
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+      cleanSheetName
+    )}`;
+  }
+
+  if (gidMatch) {
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gidMatch[1]}`;
+  }
+
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+}
+
+export function parseCaseLookupInput(
+  rawText: string,
+  options: CaseLookupImportOptions = {}
+): CaseLookupImportResult {
+  const trimmed = rawText.replace(/^\uFEFF/, '').trim();
+  if (!trimmed) {
+    return { entries: [], detectedLayout: 'empty', skippedRows: 0, skippedDuplicates: 0 };
+  }
+
+  const firstLine = trimmed.split(/\r?\n/)[0] || '';
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const delimiter: '\t' | ',' = tabCount > commaCount ? '\t' : ',';
+
+  const matrix = parseDelimitedMatrix(trimmed, delimiter);
+  if (matrix.length === 0) {
+    return { entries: [], detectedLayout: 'empty', skippedRows: 0, skippedDuplicates: 0 };
+  }
+
+  const sep = options.caseSeparator || '-';
+  const mode = options.mappingMode || 'auto';
+
+  let keyIdx = Math.max(0, (options.keyCol || 8) - 1);
+  let prefixIdx = options.prefixCol ? options.prefixCol - 1 : 2;
+  let clientCodeIdx = options.clientCodeCol ? options.clientCodeCol - 1 : 3;
+  let caseIdx = Math.max(0, (options.caseCol || 5) - 1);
+  let clientIdx = options.clientCol ? options.clientCol - 1 : 5;
+  let appNameIdx = options.appNameCol ? options.appNameCol - 1 : 6;
+
+  let dateIdx = -1;
+  let classIdx = -1;
+  let statusIdx = -1;
+  let subStatusIdx = -1;
+  let caseTypeIdx = -1;
+  let agentIdx = -1;
+
+  let startRow = 0;
+  let detectedLayout = 'Sheet Col 8 (TM) + Case Cols 3-4-5';
+
+  const headerNorm = matrix[0].map((c) => c.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim());
+  const looksLikeHeader =
+    headerNorm.some(
+      (h) =>
+        h.includes('tm') ||
+        h.includes('cpr') ||
+        h.includes('case number') ||
+        h.includes('client code') ||
+        h === 'type'
+    ) && !headerNorm.some((h) => /^\d{6}$/.test(h));
+
+  if (mode === 'three_col') {
+    keyIdx = 0;
+    prefixIdx = -1;
+    clientCodeIdx = -1;
+    caseIdx = 1;
+    clientIdx = 2;
+    appNameIdx = -1;
+    startRow = looksLikeHeader ? 1 : 0;
+    detectedLayout = '3-Column (TM No, Case No, Client)';
+  } else if (mode === 'sheet_col8_345') {
+    keyIdx = 7;
+    prefixIdx = 2;
+    clientCodeIdx = 3;
+    caseIdx = 4;
+    clientIdx = 5;
+    appNameIdx = 6;
+    dateIdx = 1;
+    classIdx = 8;
+    statusIdx = 9;
+    subStatusIdx = 10;
+    caseTypeIdx = 11;
+    agentIdx = 12;
+    startRow = looksLikeHeader ? 1 : 0;
+    detectedLayout = 'Sheet Col 8 (TM/CPR) + Case Cols 3-4-5 (A-32-4)';
+  } else if (mode === 'date_start_22col') {
+    dateIdx = 0;
+    prefixIdx = 1;
+    clientCodeIdx = 2;
+    caseIdx = 3;
+    clientIdx = 4;
+    appNameIdx = 5;
+    keyIdx = 6;
+    classIdx = 7;
+    statusIdx = 8;
+    subStatusIdx = 9;
+    caseTypeIdx = 10;
+    agentIdx = 11;
+    startRow = looksLikeHeader ? 1 : 0;
+    detectedLayout = '22-Col DATE-Start Export (TM Col 7 + Case Cols 2-3-4)';
+  } else if (mode === 'custom') {
+    startRow = looksLikeHeader ? 1 : 0;
+    detectedLayout = `Custom (TM Col ${keyIdx + 1} · Case Cols ${[
+      prefixIdx >= 0 ? prefixIdx + 1 : null,
+      clientCodeIdx >= 0 ? clientCodeIdx + 1 : null,
+      caseIdx + 1,
+    ]
+      .filter(Boolean)
+      .join('-')})`;
+  } else {
+    // Auto-detect
+    if (looksLikeHeader) {
+      startRow = 1;
+      const foundKey = headerNorm.findIndex(
+        (h) => h.includes('tm cpr') || h.includes('tm no') || h.includes('cpr') || h === 'tm'
+      );
+      const foundPrefix = headerNorm.findIndex((h) => h === 'type' || h === 'prefix');
+      const foundClientCode = headerNorm.findIndex((h) => h.includes('client code'));
+      const foundCase = headerNorm.findIndex((h) => h.includes('case number') || h === 'case no' || h === 'case');
+      const foundClient = headerNorm.findIndex((h) => h.includes('client name') || h === 'client');
+      const foundAppName = headerNorm.findIndex((h) => h.includes('application name') || h === 'title');
+      const foundDate = headerNorm.findIndex((h) => h === 'date');
+      const foundClass = headerNorm.findIndex((h) => h === 'class');
+      const foundStatus = headerNorm.findIndex((h) => h === 'status');
+      const foundSubStatus = headerNorm.findIndex((h) => h.includes('sub status'));
+      const foundCaseType = headerNorm.findIndex((h) => h.includes('case type'));
+      const foundAgent = headerNorm.findIndex((h) => h === 'agent');
+
+      if (foundKey >= 0 && foundCase >= 0) {
+        keyIdx = foundKey;
+        prefixIdx = foundPrefix;
+        clientCodeIdx = foundClientCode;
+        caseIdx = foundCase;
+        clientIdx = foundClient;
+        appNameIdx = foundAppName;
+        dateIdx = foundDate;
+        classIdx = foundClass;
+        statusIdx = foundStatus;
+        subStatusIdx = foundSubStatus;
+        caseTypeIdx = foundCaseType;
+        agentIdx = foundAgent;
+        detectedLayout = `Header-matched (TM Col ${keyIdx + 1} · Case ${
+          prefixIdx >= 0 && clientCodeIdx >= 0
+            ? `Cols ${prefixIdx + 1}-${clientCodeIdx + 1}-${caseIdx + 1}`
+            : `Col ${caseIdx + 1}`
+        })`;
+      } else if (matrix[0].length >= 8) {
+        keyIdx = 7;
+        prefixIdx = 2;
+        clientCodeIdx = 3;
+        caseIdx = 4;
+        clientIdx = 5;
+        appNameIdx = 6;
+        detectedLayout = 'Sheet Col 8 (TM/CPR) + Case Cols 3-4-5';
+      } else {
+        keyIdx = 0;
+        prefixIdx = -1;
+        clientCodeIdx = -1;
+        caseIdx = 1;
+        clientIdx = 2;
+        appNameIdx = -1;
+        detectedLayout = '3-Column (TM No, Case No, Client)';
+      }
+    } else {
+      const sampleRow = matrix[0];
+      const looksDateStart22 =
+        sampleRow.length >= 7 &&
+        /\d{1,2}[-/][A-Za-z0-9]+[-/]\d{2,4}/.test(sampleRow[0] || '') &&
+        /^\d{5,7}$/.test((sampleRow[6] || '').trim());
+
+      if (looksDateStart22) {
+        dateIdx = 0;
+        prefixIdx = 1;
+        clientCodeIdx = 2;
+        caseIdx = 3;
+        clientIdx = 4;
+        appNameIdx = 5;
+        keyIdx = 6;
+        classIdx = 7;
+        statusIdx = 8;
+        subStatusIdx = 9;
+        caseTypeIdx = 10;
+        agentIdx = 11;
+        detectedLayout = '22-Col DATE-Start Export (TM Col 7 + Case Cols 2-3-4)';
+      } else if (sampleRow.length >= 8) {
+        keyIdx = 7;
+        prefixIdx = 2;
+        clientCodeIdx = 3;
+        caseIdx = 4;
+        clientIdx = 5;
+        appNameIdx = 6;
+        dateIdx = 1;
+        classIdx = 8;
+        statusIdx = 9;
+        subStatusIdx = 10;
+        caseTypeIdx = 11;
+        agentIdx = 12;
+        detectedLayout = 'Sheet Col 8 (TM/CPR) + Case Cols 3-4-5';
+      } else {
+        keyIdx = 0;
+        prefixIdx = -1;
+        clientCodeIdx = -1;
+        caseIdx = 1;
+        clientIdx = 2;
+        appNameIdx = -1;
+        detectedLayout = '3-Column (TM No, Case No, Client)';
+      }
+    }
+  }
+
+  const seen = new Set<string>();
+  const entries: CaseEntry[] = [];
+  let skippedRows = 0;
+  let skippedDuplicates = 0;
+
+  for (let i = startRow; i < matrix.length; i++) {
+    const cols = matrix[i];
+    const tmNumber = cleanInlineWhitespace(cols[keyIdx] || '');
+    const prefix = prefixIdx >= 0 ? cleanInlineWhitespace(cols[prefixIdx] || '') : '';
+    const clientCode = clientCodeIdx >= 0 ? cleanInlineWhitespace(cols[clientCodeIdx] || '') : '';
+    const rawCaseNo = cleanInlineWhitespace(cols[caseIdx] || '');
+
+    const formattedCaseNo =
+      prefixIdx >= 0 || clientCodeIdx >= 0
+        ? formatCompositeCaseNo(prefix, clientCode, rawCaseNo, sep)
+        : rawCaseNo;
+
+    const clientName = clientIdx >= 0 ? cleanInlineWhitespace(cols[clientIdx] || '') : '';
+    const applicationName = appNameIdx >= 0 ? cleanInlineWhitespace(cols[appNameIdx] || '') : '';
+
+    if (!tmNumber || (!formattedCaseNo && !clientName && !applicationName)) {
+      skippedRows++;
+      continue;
+    }
+
+    if (seen.has(tmNumber)) {
+      skippedDuplicates++;
+      continue;
+    }
+    seen.add(tmNumber);
+
+    entries.push({
+      tmNumber,
+      caseNo: formattedCaseNo || 'NOT FOUND',
+      clientName,
+      prefix: prefix || undefined,
+      clientCode: clientCode || undefined,
+      rawCaseNo: rawCaseNo || undefined,
+      applicationName: applicationName || undefined,
+      classNo: classIdx >= 0 ? cleanInlineWhitespace(cols[classIdx] || '') || undefined : undefined,
+      status: statusIdx >= 0 ? cleanInlineWhitespace(cols[statusIdx] || '') || undefined : undefined,
+      subStatus:
+        subStatusIdx >= 0 ? cleanInlineWhitespace(cols[subStatusIdx] || '') || undefined : undefined,
+      caseType:
+        caseTypeIdx >= 0 ? cleanInlineWhitespace(cols[caseTypeIdx] || '') || undefined : undefined,
+      agent: agentIdx >= 0 ? cleanInlineWhitespace(cols[agentIdx] || '') || undefined : undefined,
+      date: dateIdx >= 0 ? cleanInlineWhitespace(cols[dateIdx] || '') || undefined : undefined,
+    });
+  }
+
+  return { entries, detectedLayout, skippedRows, skippedDuplicates };
+}
+
+export function mergeDatabaseEntries(
+  existing: CaseEntry[],
+  incoming: CaseEntry[],
+  duplicatePolicy: 'skip' | 'update' = 'skip'
+): { merged: CaseEntry[]; added: number; skippedDuplicates: number; updated: number } {
+  const byTm = new Map<string, CaseEntry>();
+  for (const item of existing) {
+    const key = item.tmNumber.trim();
+    if (key && !byTm.has(key)) byTm.set(key, item);
+  }
+
+  let added = 0;
+  let skippedDuplicates = 0;
+  let updated = 0;
+  const newOnes: CaseEntry[] = [];
+
+  for (const item of incoming) {
+    const key = item.tmNumber.trim();
+    if (!key) continue;
+    if (byTm.has(key)) {
+      if (duplicatePolicy === 'update') {
+        byTm.set(key, item);
+        updated++;
+      } else {
+        skippedDuplicates++;
+      }
+    } else {
+      byTm.set(key, item);
+      newOnes.push(item);
+      added++;
+    }
+  }
+
+  if (duplicatePolicy === 'skip') {
+    return {
+      merged: [...newOnes, ...existing],
+      added,
+      skippedDuplicates,
+      updated: 0,
+    };
+  }
+
+  // When updating, keep existing order updated + prepend newly added entries
+  const existingUpdated = existing.map((e) => byTm.get(e.tmNumber.trim()) || e);
+  return {
+    merged: [...newOnes, ...existingUpdated],
+    added,
+    skippedDuplicates: 0,
+    updated,
+  };
+}
+
+export function refreshReviewCaseNumbers(
+  reviewRows: ReviewRow[],
+  caseEntries: CaseEntry[]
+): { rows: ReviewRow[]; updatedCount: number } {
+  const caseMap = buildCaseMap(caseEntries);
+  let updatedCount = 0;
+  const rows = reviewRows.map((row) => {
+    const mapped = caseMap[row.applicationNo.trim()];
+    if (mapped && mapped !== row.caseNo) {
+      updatedCount++;
+      return { ...row, caseNo: mapped };
+    }
+    return row;
+  });
+  return { rows, updatedCount };
+}
+
 export function exportRowsToCsv(headers: string[], matrix: (string | number | boolean)[][]): string {
   const allRows = [headers, ...matrix];
   return allRows

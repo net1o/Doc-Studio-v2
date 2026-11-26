@@ -6,7 +6,16 @@ import {
   ReviewRow,
 } from '../../types/journal';
 
+import {
+  DEFAULT_APPS_SCRIPT_CASE_SHEET_ID,
+  DEFAULT_APPS_SCRIPT_CASE_SHEET_NAME,
+  USER_WATCHLIST_KEYWORDS,
+  USER_WATCHLIST_TM_NUMBERS,
+} from './watchlistSeed';
+
 const STORAGE_KEY = 'journal_monitor_docgen_v2_1';
+const WATCHLIST_MIGRATION_KEY = 'journal_monitor_watchlist_seed_v1';
+const DB_SEED_MIGRATION_KEY = 'journal_monitor_db_seed_v2';
 
 export interface JournalMonitorState {
   config: JournalConfig;
@@ -16,6 +25,18 @@ export interface JournalMonitorState {
   generatedDocs: GeneratedJournalDoc[];
 }
 
+function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const v = raw.trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
 function makeSeedState(): JournalMonitorState {
   const config: JournalConfig = {
     journalNo: '909',
@@ -23,21 +44,81 @@ function makeSeedState(): JournalMonitorState {
     keywordMatchMode: 'word',
     serialPrefix: 'PB-',
     serialPad: 3,
-    keywords: [
-      'ASTRON',
-      'NEXAVOLT',
-      'KINETIC',
-      'AL-NOOR',
-      'VERDANT',
-      'CRESTLINE',
-    ],
-    tmNumbers: ['548291', '548314', '549002', '549188'],
+    keywords: dedupeStrings(USER_WATCHLIST_KEYWORDS),
+    tmNumbers: dedupeStrings(USER_WATCHLIST_TM_NUMBERS),
     caseEntries: [
+      {
+        tmNumber: '590630',
+        caseNo: 'A-32-4',
+        prefix: 'A',
+        clientCode: '32',
+        rawCaseNo: '4',
+        clientName: '',
+        applicationName: 'ITL',
+        classNo: '3',
+        status: 'STAGE 3',
+        subStatus: 'D-NOTE SUBMITTED',
+        caseType: 'TM',
+        date: '10-Mar-22',
+      },
+      {
+        tmNumber: '583969',
+        caseNo: 'X-307-1',
+        prefix: 'X',
+        clientCode: '307',
+        rawCaseNo: '1',
+        clientName: '',
+        applicationName: 'ORAKAL',
+        classNo: '16',
+        status: 'STAGE 3',
+        subStatus: 'D-NOTE SUBMITTED',
+        caseType: 'TM',
+        date: '11-Apr-22',
+      },
+      {
+        tmNumber: '583970',
+        caseNo: 'X-307-2',
+        prefix: 'X',
+        clientCode: '307',
+        rawCaseNo: '2',
+        clientName: '',
+        applicationName: 'DELTA STAR',
+        classNo: '16',
+        status: 'STAGE 3',
+        subStatus: 'D-NOTE SUBMITTED',
+        caseType: 'TM',
+        date: '11-Apr-22',
+      },
+      {
+        tmNumber: '582722',
+        caseNo: 'A-005-2',
+        prefix: 'A',
+        clientCode: '005',
+        rawCaseNo: '2',
+        clientName: '',
+        applicationName: 'NAEEM INFEX',
+        classNo: '9',
+        status: 'STAGE 3',
+        subStatus: 'D-NOTE SUBMITTED',
+        caseType: 'TM',
+        date: '21-Apr-22',
+      },
       { tmNumber: '548291', caseNo: 'PB-1042', clientName: 'Astron Engineering Pvt Ltd' },
       { tmNumber: '548314', caseNo: 'PB-1088', clientName: 'Al-Noor Textiles' },
       { tmNumber: '549002', caseNo: 'PB-1104', clientName: 'Kinetic Power Systems' },
       { tmNumber: '549188', caseNo: 'PB-1129', clientName: 'Verdant Foods' },
     ],
+    caseSheetConfig: {
+      sheetUrlOrId: DEFAULT_APPS_SCRIPT_CASE_SHEET_ID,
+      sheetName: DEFAULT_APPS_SCRIPT_CASE_SHEET_NAME,
+      keyCol: 8,
+      prefixCol: 3,
+      clientCodeCol: 4,
+      caseCol: 5,
+      clientCol: 6,
+      appNameCol: 7,
+      caseSeparator: '-',
+    },
   };
 
   const journalRows: JournalCheckRow[] = [
@@ -232,13 +313,74 @@ export function loadJournalState(): JournalMonitorState {
     if (!raw) {
       const seed = makeSeedState();
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+      window.localStorage.setItem(WATCHLIST_MIGRATION_KEY, '1');
       return seed;
     }
     const parsed = JSON.parse(raw) as JournalMonitorState;
     if (!parsed || !parsed.config || !Array.isArray(parsed.journalRows)) {
-      return makeSeedState();
+      const seed = makeSeedState();
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+      window.localStorage.setItem(WATCHLIST_MIGRATION_KEY, '1');
+      return seed;
     }
-    return parsed;
+
+    let next = parsed;
+    if (window.localStorage.getItem(WATCHLIST_MIGRATION_KEY) !== '1') {
+      const seeded = makeSeedState();
+      next = {
+        ...parsed,
+        config: {
+          ...parsed.config,
+          keywords: dedupeStrings([...seeded.config.keywords, ...(parsed.config.keywords || [])]),
+          tmNumbers: dedupeStrings([...seeded.config.tmNumbers, ...(parsed.config.tmNumbers || [])]),
+          caseSheetConfig: parsed.config.caseSheetConfig || seeded.config.caseSheetConfig,
+        },
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(WATCHLIST_MIGRATION_KEY, '1');
+    } else if (!parsed.config.caseSheetConfig) {
+      const seeded = makeSeedState();
+      next = {
+        ...parsed,
+        config: {
+          ...parsed.config,
+          caseSheetConfig: seeded.config.caseSheetConfig,
+        },
+      };
+    }
+
+    if (window.localStorage.getItem(DB_SEED_MIGRATION_KEY) !== '1') {
+      const seeded = makeSeedState();
+      const existingByTm = new Map<string, typeof seeded.config.caseEntries[number]>();
+      for (const item of seeded.config.caseEntries) {
+        existingByTm.set(item.tmNumber, item);
+      }
+      for (const item of next.config.caseEntries || []) {
+        existingByTm.set(item.tmNumber, item);
+      }
+      next = {
+        ...next,
+        config: {
+          ...next.config,
+          caseEntries: Array.from(existingByTm.values()),
+          caseSheetConfig: {
+            ...seeded.config.caseSheetConfig!,
+            ...(next.config.caseSheetConfig || {}),
+            prefixCol: next.config.caseSheetConfig?.prefixCol ?? 3,
+            clientCodeCol: next.config.caseSheetConfig?.clientCodeCol ?? 4,
+            caseCol:
+              next.config.caseSheetConfig?.caseCol && next.config.caseSheetConfig.caseCol !== 3
+                ? next.config.caseSheetConfig.caseCol
+                : 5,
+            caseSeparator: next.config.caseSheetConfig?.caseSeparator || '-',
+          },
+        },
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(DB_SEED_MIGRATION_KEY, '1');
+    }
+
+    return next;
   } catch {
     return makeSeedState();
   }
@@ -256,5 +398,13 @@ export function saveJournalState(state: JournalMonitorState): void {
 export function resetJournalState(): JournalMonitorState {
   const seed = makeSeedState();
   saveJournalState(seed);
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(WATCHLIST_MIGRATION_KEY, '1');
+      window.localStorage.setItem(DB_SEED_MIGRATION_KEY, '1');
+    } catch {
+      // Non-blocking
+    }
+  }
   return seed;
 }

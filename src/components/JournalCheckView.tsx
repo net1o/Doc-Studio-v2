@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CalendarClock, FileUp, Play, Plus, Trash2 } from 'lucide-react';
 import { JournalCheckRow } from '../types/journal';
+import { deduplicateJournalCheckRows } from '../lib/journal/engine';
 import { JournalImportWizard } from './JournalImportWizard';
 
 interface JournalCheckViewProps {
@@ -8,6 +9,7 @@ interface JournalCheckViewProps {
   onChangeRows: (rows: JournalCheckRow[]) => void;
   onNormalizeDates: () => void;
   onRunScan: () => void;
+  onNotify?: (message: string) => void;
 }
 
 export function JournalCheckView({
@@ -15,6 +17,7 @@ export function JournalCheckView({
   onChangeRows,
   onNormalizeDates,
   onRunScan,
+  onNotify,
 }: JournalCheckViewProps) {
   const [showWizard, setShowWizard] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -58,7 +61,23 @@ export function JournalCheckView({
   };
 
   const handleWizardImport = (importedRows: JournalCheckRow[], mode: 'append' | 'replace') => {
-    onChangeRows(mode === 'replace' ? importedRows : [...importedRows, ...rows]);
+    if (mode === 'replace') {
+      const { uniqueRows, skippedDuplicates } = deduplicateJournalCheckRows(importedRows, []);
+      onChangeRows(uniqueRows);
+      onNotify?.(
+        `Replaced JournalCheck table with ${uniqueRows.length} unique row(s)${
+          skippedDuplicates > 0 ? ` (${skippedDuplicates} duplicate skipped)` : ''
+        }.`
+      );
+    } else {
+      const { uniqueRows, skippedDuplicates } = deduplicateJournalCheckRows(importedRows, rows);
+      onChangeRows([...uniqueRows, ...rows]);
+      onNotify?.(
+        `Appended ${uniqueRows.length} new row(s) to JournalCheck${
+          skippedDuplicates > 0 ? ` (${skippedDuplicates} duplicate(s) skipped)` : ''
+        }.`
+      );
+    }
     setShowWizard(false);
   };
 
@@ -121,7 +140,7 @@ export function JournalCheckView({
 
       {showWizard && (
         <JournalImportWizard
-          existingCount={rows.length}
+          existingRows={rows}
           onImport={handleWizardImport}
           onClose={() => setShowWizard(false)}
         />

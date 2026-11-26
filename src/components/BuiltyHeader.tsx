@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, Play, X } from 'lucide-react';
+import { Menu, Play, Volume2, VolumeX, X } from 'lucide-react';
 import { AppTab } from '../types/journal';
 
 interface BuiltyHeaderProps {
@@ -8,6 +8,9 @@ interface BuiltyHeaderProps {
   onRunScan: () => void;
   reviewCount: number;
   docsCount: number;
+  databaseCount: number;
+  sfxEnabled: boolean;
+  onToggleSfx: () => void;
 }
 
 export function BuiltyHeader({
@@ -16,6 +19,9 @@ export function BuiltyHeader({
   onRunScan,
   reviewCount,
   docsCount,
+  databaseCount,
+  sfxEnabled,
+  onToggleSfx,
 }: BuiltyHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -24,22 +30,24 @@ export function BuiltyHeader({
     { id: 'journalcheck', label: 'JournalCheck' },
     { id: 'review', label: `Review (${reviewCount})` },
     { id: 'generator', label: `Doc Generator (${docsCount})` },
+    { id: 'database', label: `Database (${databaseCount})` },
     { id: 'records', label: 'Records' },
+    { id: 'settings', label: 'Settings' },
     { id: 'backup', label: 'Backup' },
   ];
 
   return (
     <header className="no-print sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e2e4ea]">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-4 xl:gap-6">
         {/* Zone 1: Brand Mark */}
         <button
           type="button"
           onClick={() => onSelectTab('analyzer')}
-          className="flex items-center gap-3 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
+          className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
         >
           <svg
-            width="34"
-            height="34"
+            width="32"
+            height="32"
             viewBox="0 0 36 36"
             fill="none"
             aria-hidden="true"
@@ -49,7 +57,7 @@ export function BuiltyHeader({
             <polygon points="11,30 18,16 25,30" fill="#111111" />
             <rect x="16" y="22" width="4" height="8" fill="#ffee00" />
           </svg>
-          <span className="text-[19px] font-extrabold tracking-tight text-[#111111]">
+          <span className="text-[18px] font-extrabold tracking-tight text-[#111111]">
             Journal Monitor
           </span>
         </button>
@@ -57,7 +65,7 @@ export function BuiltyHeader({
         {/* Zone 2: Single-Line Navigation Links */}
         <nav
           aria-label="Primary navigation"
-          className="hidden lg:flex items-center gap-6 text-[13.5px] font-bold"
+          className="hidden lg:flex items-center lg:gap-3.5 xl:gap-5 text-[12.5px] xl:text-[13px] font-bold"
         >
           {navItems.map((item) => {
             const active = activeTab === item.id;
@@ -65,25 +73,45 @@ export function BuiltyHeader({
               <button
                 key={item.id}
                 type="button"
+                data-sfx="filter"
+                data-active={active}
                 onClick={() => onSelectTab(item.id)}
-                className={`relative py-2 whitespace-nowrap shrink-0 transition-colors focus-visible:outline-2 focus-visible:outline-[#111111] ${
+                className={`builty-filter-btn relative py-2 px-1 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111] ${
                   active ? 'text-[#111111]' : 'text-[#555a66] hover:text-[#111111]'
                 }`}
               >
                 <span className="tabular-nums">{item.label}</span>
-                {active && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[#ffee00]"
-                  />
-                )}
+                <span
+                  aria-hidden="true"
+                  className={`absolute left-0 right-0 bottom-0 h-[3px] bg-[#ffee00] transition-transform duration-200 origin-left ${
+                    active ? 'scale-x-100' : 'scale-x-0'
+                  }`}
+                />
               </button>
             );
           })}
         </nav>
 
-        {/* Zone 3: Single Primary Slanted Builty CTA + Mobile Trigger */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Zone 3: Sound Toggle + Primary Slanted Builty CTA + Mobile Trigger */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={onToggleSfx}
+            aria-label={sfxEnabled ? 'Mute button click sounds' : 'Enable button click sounds'}
+            title={sfxEnabled ? 'Button SFX: On' : 'Button SFX: Muted'}
+            className={`h-[38px] w-[38px] border inline-flex items-center justify-center transition-colors ${
+              sfxEnabled
+                ? 'border-[#cbd0da] bg-[#f8f9fb] text-[#111111] hover:border-[#111111] hover:bg-[#fffef0]'
+                : 'border-[#e2e4ea] bg-white text-[#9ca3af] hover:text-[#111111]'
+            }`}
+          >
+            {sfxEnabled ? (
+              <Volume2 className="w-4 h-4" aria-hidden="true" />
+            ) : (
+              <VolumeX className="w-4 h-4" aria-hidden="true" />
+            )}
+          </button>
+
           <button
             type="button"
             onClick={onRunScan}
@@ -112,6 +140,7 @@ export function BuiltyHeader({
             <button
               key={item.id}
               type="button"
+              data-sfx="filter"
               onClick={() => {
                 onSelectTab(item.id);
                 setMobileMenuOpen(false);

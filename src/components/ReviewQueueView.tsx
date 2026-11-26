@@ -90,11 +90,13 @@ export function ReviewQueueView({
               <button
                 key={t}
                 type="button"
+                data-sfx="filter"
+                data-active={matchFilter === t}
                 onClick={() => setMatchFilter(t)}
-                className={`px-3 py-2 text-xs font-bold transition-colors whitespace-nowrap ${
+                className={`builty-filter-btn px-3 py-2 text-xs font-bold whitespace-nowrap ${
                   matchFilter === t
                     ? 'bg-[#ffee00] text-[#111111]'
-                    : 'text-[#555a66] hover:text-[#111111]'
+                    : 'text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
                 }`}
               >
                 {t}
