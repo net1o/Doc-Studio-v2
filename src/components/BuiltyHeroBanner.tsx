@@ -9,11 +9,11 @@ interface BuiltyHeroBannerProps {
 }
 
 const TAB_LABELS: Record<AppTab, string> = {
-  analyzer: 'Analyzer & Watchlist',
+  analyzer: 'Dashboard & Watchlist',
   journalcheck: 'JournalCheck Input',
   review: 'Review Queue',
   generator: 'Journal 909 Document Generator',
-  database: 'Case & Trademark Database',
+  database: 'Cases Database (24 Columns)',
   records: 'Records & Analytics Report',
   settings: 'Scanner & Database Settings (CFG)',
   backup: 'Backup & Diagnostics',
@@ -47,10 +47,10 @@ export function BuiltyHeroBanner({
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5">
           <div className="space-y-2 max-w-2xl">
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#111111] [text-wrap:balance]">
-              Journal Monitor &amp; Doc Generator
+              Brandex Law Associate
             </h1>
             <p className="text-sm text-[#555a66] leading-relaxed">
-              Trademark journal analyzer, watchlist scanner, and Legal 8.5×14 publication document generator for Journal {journalNo || '909'}.
+              <span className="font-bold text-[#111111]">Database &amp; Journal Monitor System</span> — Trademark watchlist scanner, 24-column case database, and Legal 8.5×14 publication generator for Journal {journalNo || '909'}.
             </p>
           </div>
 

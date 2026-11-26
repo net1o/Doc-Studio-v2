@@ -34,7 +34,7 @@ export function BuiltyHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems: { id: AppTab; label: string; shortcut: string; count: number | null }[] = [
-    { id: 'analyzer', label: 'Analyzer', shortcut: 'Ctrl+1', count: watchlistCount },
+    { id: 'analyzer', label: 'Dashboard', shortcut: 'Ctrl+1', count: watchlistCount },
     { id: 'journalcheck', label: 'JournalCheck', shortcut: 'Ctrl+2', count: journalRowsCount },
     { id: 'review', label: 'Review', shortcut: 'Ctrl+3', count: reviewCount },
     { id: 'generator', label: 'Doc Gen', shortcut: 'Ctrl+4', count: docsCount },
@@ -65,9 +65,14 @@ export function BuiltyHeader({
             <polygon points="11,30 18,16 25,30" fill="#111111" />
             <rect x="16" y="22" width="4" height="8" fill="#ffee00" />
           </svg>
-          <span className="text-[17px] font-extrabold tracking-tight text-[#111111]">
-            Journal Monitor
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-[15px] xl:text-[16px] font-extrabold tracking-tight text-[#111111]">
+              Brandex Law Associate
+            </span>
+            <span className="text-[10.5px] font-bold tracking-tight text-[#555a66]">
+              Database &amp; Journal Monitor System
+            </span>
+          </div>
         </button>
 
         {/* Zone 2: Single-Line Navigation Links */}

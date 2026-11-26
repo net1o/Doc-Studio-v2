@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Database,
   Download,
+  Eye,
   FileCode2,
   FileSpreadsheet,
   FileText,
@@ -64,17 +65,23 @@ export function Journal909GeneratorView({
 }: Journal909GeneratorViewProps) {
   const [zoom, setZoom] = useState<'fit' | '75' | '100'>('75');
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfPreviewZoom, setPdfPreviewZoom] = useState<'fit' | '75' | '100'>('75');
   const imageInputRef = useRef<HTMLInputElement>(null);
   const journalNoInputRef = useRef<HTMLInputElement>(null);
+  const pdfIframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    if (!confirmClearOpen) return;
+    if (!confirmClearOpen && !pdfPreviewOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setConfirmClearOpen(false);
+      if (e.key === 'Escape') {
+        setConfirmClearOpen(false);
+        setPdfPreviewOpen(false);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [confirmClearOpen]);
+  }, [confirmClearOpen, pdfPreviewOpen]);
 
   const activeDoc = docs.find((d) => d.id === selectedDocId) || docs[0] || null;
   const activePaper = paperSize || DEFAULT_PAPER_SIZE;
@@ -83,8 +90,13 @@ export function Journal909GeneratorView({
     [activePaper]
   );
 
+  const previewHtml = useMemo(() => {
+    if (!pdfPreviewOpen || !activeDoc) return '';
+    return buildJournal909Html(activeDoc, activePaper);
+  }, [pdfPreviewOpen, activeDoc, activePaper]);
+
   const sidebarNavItems: { id: AppTab; label: string; icon: typeof LayoutDashboard }[] = [
-    { id: 'analyzer', label: 'Analyzer', icon: LayoutDashboard },
+    { id: 'analyzer', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'database', label: 'Database', icon: Database },
     { id: 'review', label: 'Review', icon: ListChecks },
     { id: 'generator', label: 'Generator', icon: FileText },
@@ -393,16 +405,31 @@ export function Journal909GeneratorView({
 
         {/* Primary Export / Print Actions */}
         <div className="space-y-2 pt-1">
-          <button
-            type="button"
-            onClick={handlePrintPdf}
-            className="builty-btn w-full justify-between h-[42px] pl-4 pr-2 text-xs"
-          >
-            <span className="truncate">Convert / Print PDF ({resolvedDims.label})</span>
-            <span className="builty-btn-icon-tab w-8 h-7 shrink-0">
-              <Printer className="w-3.5 h-3.5" aria-hidden="true" />
-            </span>
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+            <button
+              type="button"
+              onClick={handlePrintPdf}
+              className="builty-btn sm:col-span-7 justify-between h-[42px] pl-3.5 pr-2 text-xs"
+            >
+              <span className="truncate">Print / PDF ({resolvedDims.label})</span>
+              <span className="builty-btn-icon-tab w-7 h-7 shrink-0">
+                <Printer className="w-3.5 h-3.5" aria-hidden="true" />
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPdfPreviewOpen((prev) => !prev)}
+              aria-pressed={pdfPreviewOpen}
+              className={`sm:col-span-5 h-[42px] px-3 border text-xs font-extrabold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                pdfPreviewOpen
+                  ? 'border-[#111111] bg-[#111111] text-[#ffee00]'
+                  : 'border-[#111111] bg-[#fffef0] hover:bg-[#ffee00] text-[#111111]'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{pdfPreviewOpen ? 'Close Preview' : 'PDF Preview'}</span>
+            </button>
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -975,6 +1002,119 @@ export function Journal909GeneratorView({
               >
                 Clear Watchlist
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {pdfPreviewOpen && (
+        <div
+          className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6"
+          onClick={() => setPdfPreviewOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdf-preview-modal-title"
+            className="w-full max-w-6xl h-[92vh] bg-[#d8dce4] border border-[#111111] shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#111111] text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div>
+                <h3 id="pdf-preview-modal-title" className="text-sm font-extrabold">
+                  Print-Ready PDF Preview · {resolvedDims.label} ({resolvedDims.widthIn}&quot; × {resolvedDims.heightIn}&quot;{' '}
+                  {activePaper.orientation})
+                </h3>
+                <p className="text-[11px] text-[#c7c9d1]">
+                  {activeDoc.serialNo} · Journal {activeDoc.journalNo || '909'} · {activeDoc.title || 'Untitled'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex border border-[#3a3f4b] bg-[#1d2028]">
+                  {(['fit', '75', '100'] as const).map((z) => (
+                    <button
+                      key={z}
+                      type="button"
+                      data-sfx="filter"
+                      data-active={pdfPreviewZoom === z}
+                      onClick={() => setPdfPreviewZoom(z)}
+                      className={`px-2.5 py-1 text-[11px] font-bold ${
+                        pdfPreviewZoom === z
+                          ? 'bg-[#ffee00] text-[#111111]'
+                          : 'text-[#d1d5db] hover:text-white'
+                      }`}
+                    >
+                      {z === 'fit' ? 'Fit' : `${z}%`}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadHtml}
+                  className="h-[34px] px-3 border border-[#3a3f4b] bg-[#1d2028] hover:bg-[#2a2f3a] text-white text-xs font-bold inline-flex items-center gap-1.5"
+                >
+                  <FileCode2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>HTML</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onMarkPdfGenerated(activeDoc.id);
+                    const win = pdfIframeRef.current?.contentWindow;
+                    if (win) {
+                      win.focus();
+                      win.print();
+                    } else {
+                      window.print();
+                    }
+                  }}
+                  className="h-[34px] px-3.5 bg-[#ffee00] hover:bg-[#e6d600] text-[#111111] text-xs font-extrabold inline-flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Print / Save PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="Close PDF preview"
+                  onClick={() => setPdfPreviewOpen(false)}
+                  className="h-[34px] w-[34px] border border-[#3a3f4b] bg-[#1d2028] hover:bg-[#2a2f3a] text-white inline-flex items-center justify-center"
+                >
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 sm:p-8 flex justify-center items-start">
+              <div
+                style={{
+                  width: `${resolvedDims.widthIn}in`,
+                  height: `${resolvedDims.heightIn}in`,
+                  transform:
+                    pdfPreviewZoom === '100'
+                      ? 'scale(1)'
+                      : pdfPreviewZoom === '75'
+                      ? 'scale(0.75)'
+                      : 'scale(0.58)',
+                  transformOrigin: 'top center',
+                  marginBottom:
+                    pdfPreviewZoom === '100'
+                      ? '0px'
+                      : pdfPreviewZoom === '75'
+                      ? `-${resolvedDims.heightIn * 96 * 0.25}px`
+                      : `-${resolvedDims.heightIn * 96 * 0.42}px`,
+                }}
+                className="bg-white shadow-2xl border border-[#9ca3af] shrink-0 overflow-hidden"
+              >
+                <iframe
+                  ref={pdfIframeRef}
+                  title="Print-ready PDF preview"
+                  srcDoc={previewHtml}
+                  className="w-full h-full border-0 block bg-white"
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -18,9 +18,53 @@ export function RecordsReportView({
   onOpenGeneratedDoc,
 }: RecordsReportViewProps) {
   const [search, setSearch] = useState('');
+  const [journalFilter, setJournalFilter] = useState<string>('ALL');
   const [recordFilter, setRecordFilter] = useState<'ALL' | 'TM' | 'KEYWORD' | 'PDF'>('ALL');
 
+  const journalSummaryList = (() => {
+    const map = new Map<
+      string,
+      { journalNo: string; matches: number; issue: number; docs: number; records: number }
+    >();
+    for (const [jn, b] of Object.entries(allTimeStats.byJournal)) {
+      map.set(jn, {
+        journalNo: jn,
+        matches: b.total,
+        issue: b.issue,
+        docs: b.docs,
+        records: 0,
+      });
+    }
+    for (const r of records) {
+      const jn = r.journalNo.trim() || 'Unknown';
+      const existing = map.get(jn) || {
+        journalNo: jn,
+        matches: 0,
+        issue: 0,
+        docs: 0,
+        records: 0,
+      };
+      existing.records++;
+      map.set(jn, existing);
+    }
+    if (!map.has(currentJournalNo)) {
+      map.set(currentJournalNo, {
+        journalNo: currentJournalNo,
+        matches: currentStats.total,
+        issue: currentStats.issue,
+        docs: currentStats.docsGenerated,
+        records: 0,
+      });
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      b.journalNo.localeCompare(a.journalNo, undefined, { numeric: true })
+    );
+  })();
+
   const filtered = records.filter((r) => {
+    if (journalFilter !== 'ALL' && (r.journalNo.trim() || 'Unknown') !== journalFilter) {
+      return false;
+    }
     if (recordFilter === 'TM' && r.matchType !== 'TM') return false;
     if (recordFilter === 'KEYWORD' && r.matchType !== 'KEYWORD') return false;
     if (recordFilter === 'PDF' && !r.pdfReady) return false;
@@ -30,7 +74,8 @@ export function RecordsReportView({
       r.applicationNo.toLowerCase().includes(q) ||
       r.caseNo.toLowerCase().includes(q) ||
       r.title.toLowerCase().includes(q) ||
-      r.matchedTerm.toLowerCase().includes(q)
+      r.matchedTerm.toLowerCase().includes(q) ||
+      r.journalNo.toLowerCase().includes(q)
     );
   });
 
@@ -151,16 +196,88 @@ export function RecordsReportView({
         </div>
       </section>
 
+      {/* Monthly Journal Archive Breakdown */}
+      <section className="bg-white border border-[#e2e4ea] p-5 space-y-3" aria-label="Monthly Journal Archive">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eceef2] pb-2.5">
+          <div>
+            <h3 className="text-sm font-extrabold text-[#111111] uppercase tracking-wider">
+              Monthly Journal Archive (By Journal Number)
+            </h3>
+            <p className="text-xs text-[#555a66]">
+              Click any Journal edition below to filter the Records Ledger by month.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-[#111111] bg-[#ffee00] px-2.5 py-0.5 tabular-nums">
+            {journalSummaryList.length} Journal Edition(s)
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-sfx="filter"
+            data-active={journalFilter === 'ALL'}
+            onClick={() => setJournalFilter('ALL')}
+            className={`builty-filter-btn px-3 py-2 border text-xs font-bold tabular-nums ${
+              journalFilter === 'ALL'
+                ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                : 'border-[#cbd0da] bg-[#f8f9fb] text-[#555a66] hover:text-[#111111]'
+            }`}
+          >
+            All Journals ({records.length} records)
+          </button>
+
+          {journalSummaryList.map((j) => {
+            const active = journalFilter === j.journalNo;
+            return (
+              <button
+                key={j.journalNo}
+                type="button"
+                data-sfx="filter"
+                data-active={active}
+                onClick={() => setJournalFilter(j.journalNo)}
+                className={`builty-filter-btn px-3 py-2 border text-xs font-bold tabular-nums text-left ${
+                  active
+                    ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                    : 'border-[#cbd0da] bg-white text-[#111111] hover:border-[#111111]'
+                }`}
+              >
+                <span className="font-mono font-extrabold">Journal {j.journalNo}</span>
+                <span className="text-[11px] font-semibold text-[#555a66] ml-2">
+                  {j.matches} match · {j.issue} issue · {j.records} rec
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Records Ledger */}
       <section className="space-y-4" aria-label="Generated records log">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
-            <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">Records Ledger</h2>
+            <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
+              Records Ledger {journalFilter !== 'ALL' ? `— Journal ${journalFilter}` : ''}
+            </h2>
             <p className="text-xs text-[#555a66]">
-              Archive of generated Journal 909 documents and PDF readiness.
+              Archive of generated documents organized by Monthly Journal Number and PDF readiness.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
+            <select
+              aria-label="Filter records by Journal Number"
+              value={journalFilter}
+              onChange={(e) => setJournalFilter(e.target.value)}
+              className="bg-white border border-[#cbd0da] px-3 py-2 text-xs font-bold text-[#111111] focus:outline-none focus:border-[#111111]"
+            >
+              <option value="ALL">All Journals</option>
+              {journalSummaryList.map((j) => (
+                <option key={j.journalNo} value={j.journalNo}>
+                  Journal {j.journalNo} ({j.records} records)
+                </option>
+              ))}
+            </select>
+
             <div className="flex items-center border border-[#cbd0da] bg-white">
               {(['ALL', 'TM', 'KEYWORD', 'PDF'] as const).map((f) => (
                 <button
@@ -183,7 +300,7 @@ export function RecordsReportView({
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter records by App No, Case No, or Title…"
+              placeholder="Filter records by Journal, App No, Case No, or Title…"
               className="w-full sm:w-72 bg-white border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:outline-none focus:border-[#111111]"
             />
           </div>

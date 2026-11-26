@@ -13,6 +13,7 @@ export type AppTab =
   | 'backup';
 
 export interface CaseEntry {
+  id?: string;
   tmNumber: string;
   caseNo: string;
   clientName: string;
@@ -26,6 +27,17 @@ export interface CaseEntry {
   caseType?: string;
   agent?: string;
   date?: string;
+  offNote?: string;
+  notes?: string;
+  tm5?: string;
+  tm6?: string;
+  tm11?: string;
+  tm16?: string;
+  tm56?: string;
+  journalNumber?: string;
+  journalDate?: string;
+  lastModified?: string;
+  imageUrl?: string;
 }
 
 export interface CaseSheetConfig {

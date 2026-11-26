@@ -1,16 +1,16 @@
 # Changelog
 
-All notable changes to Document Studio are recorded in this file.
+All notable changes to the **Brandex Law Associate — Database & Journal Monitor System** are recorded in this file.
+
+## [2.2.0] - 2026-11-26
+
+### Added & Changed
+- **IP Law Firm Branding**: Rebranded workspace header, hero banner, HTML metadata, and footer to **Brandex Law Associate** with subheading **Database & Journal Monitor System**, and renamed `Analyzer` to **Dashboard**.
+- **24-Column Cases Database & Google Sheet Analysis**: Expanded `CaseEntry` and `DatabaseView` to display all 24 columns (`ID` through `IMAGE`), mapped the Add Single Case Record form to all columns, set default sorting to recent `DATE` descending, and added live Google Sheet analysis & Watchlist sync (`1yu27k_3Z6cCJmcnQI52z1dIC52Zi9ZxaKlo9wJiNFiQ`).
+- **Monthly Journal Tracking**: Added Monthly Journal Edition switcher on Dashboard and per-Journal Number archive breakdown & filtering in `ReviewQueueView` and `RecordsReportView`.
+- **Print-Ready PDF Preview Modal**: Added an interactive PDF Preview modal in `Journal909GeneratorView` scaled to standard or custom paper dimensions with zoom controls and direct iframe print/PDF export.
 
 ## [0.8.0] - 2026-11-26
 
 ### Added
-- Warm paper (`#fbfafc`) and pale gray-lilac (`#f6f5f8`) document-first studio shell with `#7463e8` violet accent.
-- Workspace & folder switcher, role perspective guard (`owner`, `admin`, `editor`, `viewer`), and live search/tag filtering.
-- Rich editorial document canvas with Georgia headings, header/footer blocks, tables, images, page breaks, RTL/LTR toggle, debounced autosave, and failure recovery.
-- Immutable version history with preview and non-destructive restore as a new version.
-- Reusable template picker and save-as-template workflow.
-- Print preview / PDF sheet export, clean HTML export, bounded DOCX/Word export, HTML/Markdown import with DOMPurify sanitization, and retryable export job tracking.
-- Private file attachments with MIME/size validation and SHA-256 checksums.
-- Members & permissions console and immutable audit event log.
-- Semantic five-step rollout progress bar (`Plan`, `Local app`, `Database`, `Vercel`, `Production`).
+- Document Studio initial workspace, watchlist scanner, JournalCheck importer, Review Queue, and Journal 909 Legal (8.5×14) generator.

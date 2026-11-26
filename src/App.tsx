@@ -616,6 +616,7 @@ export default function App() {
           <AnalyzerView
             config={state.config}
             stats={currentStats}
+            allTimeStats={allTimeStats}
             journalRowCount={state.journalRows.length}
             onUpdateConfig={handleUpdateConfig}
             onRunScan={handleRunScan}

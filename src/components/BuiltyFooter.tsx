@@ -18,9 +18,9 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
               <polygon points="11,30 18,16 25,30" fill="#111111" />
             </svg>
             <div>
-              <p className="text-sm font-extrabold text-[#111111]">Journal Monitor &amp; Doc Generator</p>
+              <p className="text-sm font-extrabold text-[#111111]">Brandex Law Associate</p>
               <p className="text-xs text-[#555a66]">
-                Trademark watchlist analysis and Legal 8.5×14 publication automation
+                Database &amp; Journal Monitor System · Trademark watchlist &amp; Legal 8.5×14 automation
               </p>
             </div>
           </div>
@@ -44,7 +44,7 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
           <div className="space-y-2.5">
             <h3 className="text-base font-bold text-white">Information</h3>
             <p className="text-xs text-[#9c9ca6] leading-relaxed max-w-sm">
-              Ports the Google Apps Script Trademark Journal Monitoring workflow into an interactive browser workspace with Journal 909 Legal 8.5×14 output.
+              Brandex Law Associate — Database &amp; Journal Monitor System uniting monthly Trademark Journal scanning, 24-column Google Sheet case synchronization, and Legal 8.5×14 print generation.
             </p>
           </div>
 
@@ -70,7 +70,7 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
             <h3 className="text-base font-bold text-white">Quick Workspace</h3>
             <div className="grid grid-cols-2 gap-2 text-xs text-[#c7c7d1]">
               <button type="button" onClick={() => onSelectTab('analyzer')} className="text-left hover:text-[#ffee00]">
-                Analyzer &amp; Watchlist
+                Dashboard &amp; Watchlist
               </button>
               <button type="button" onClick={() => onSelectTab('journalcheck')} className="text-left hover:text-[#ffee00]">
                 JournalCheck Input
@@ -79,7 +79,7 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
                 Review Queue
               </button>
               <button type="button" onClick={() => onSelectTab('database')} className="text-left hover:text-[#ffee00]">
-                Case Database
+                Cases Database
               </button>
               <button type="button" onClick={() => onSelectTab('records')} className="text-left hover:text-[#ffee00]">
                 Records &amp; Report
@@ -93,7 +93,7 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
 
         <div className="border-t border-[#1d1d22]">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4 text-xs text-[#8e8e98]">
-            <span>Journal Monitor &amp; Doc Generator · Legal 8.5×14 Edition</span>
+            <span>Brandex Law Associate · Database &amp; Journal Monitor System · Legal 8.5×14 Edition</span>
             <button
               type="button"
               onClick={onScrollTop}

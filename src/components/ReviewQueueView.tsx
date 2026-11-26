@@ -24,9 +24,21 @@ export function ReviewQueueView({
   onOpenDocInGenerator,
 }: ReviewQueueViewProps) {
   const [search, setSearch] = useState('');
+  const [journalFilter, setJournalFilter] = useState<string>('ALL');
   const [matchFilter, setMatchFilter] = useState<'ALL' | 'TM' | 'KEYWORD'>('ALL');
   const [decisionFilter, setDecisionFilter] = useState<'ALL' | ReviewDecision>('ALL');
   const [openMenuRowId, setOpenMenuRowId] = useState<string | null>(null);
+
+  const journalOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      const jn = r.journalNo.trim() || 'Unknown';
+      counts.set(jn, (counts.get(jn) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([journalNo, count]) => ({ journalNo, count }))
+      .sort((a, b) => b.journalNo.localeCompare(a.journalNo, undefined, { numeric: true }));
+  }, [rows]);
 
   const mailmergeReadyCount = rows.filter(
     (r) => r.status === 'MAILMERGE' && !r.generatedDocId
@@ -35,6 +47,9 @@ export function ReviewQueueView({
   const filtered = useMemo(
     () =>
       rows.filter((r) => {
+        if (journalFilter !== 'ALL' && (r.journalNo.trim() || 'Unknown') !== journalFilter) {
+          return false;
+        }
         if (matchFilter !== 'ALL' && r.matchType !== matchFilter) return false;
         if (decisionFilter !== 'ALL' && r.decision !== decisionFilter) return false;
         const q = search.trim().toLowerCase();
@@ -44,10 +59,11 @@ export function ReviewQueueView({
           r.caseNo.toLowerCase().includes(q) ||
           r.title.toLowerCase().includes(q) ||
           r.matchedTerm.toLowerCase().includes(q) ||
-          r.applicant.toLowerCase().includes(q)
+          r.applicant.toLowerCase().includes(q) ||
+          r.journalNo.toLowerCase().includes(q)
         );
       }),
-    [rows, matchFilter, decisionFilter, search]
+    [rows, journalFilter, matchFilter, decisionFilter, search]
   );
 
   const visibleRowIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
@@ -125,6 +141,20 @@ export function ReviewQueueView({
               </button>
             ))}
           </div>
+
+          <select
+            aria-label="Filter by monthly journal number"
+            value={journalFilter}
+            onChange={(e) => setJournalFilter(e.target.value)}
+            className="bg-white border border-[#cbd0da] px-3 py-2 text-xs font-bold text-[#111111] focus:outline-none focus:border-[#111111]"
+          >
+            <option value="ALL">All Journals ({rows.length})</option>
+            {journalOptions.map((opt) => (
+              <option key={opt.journalNo} value={opt.journalNo}>
+                Journal {opt.journalNo} ({opt.count})
+              </option>
+            ))}
+          </select>
 
           <select
             aria-label="Filter by decision"

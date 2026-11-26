@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Calendar,
   Check,
   Database,
   FileSpreadsheet,
@@ -35,6 +36,7 @@ import { WatchlistBulkModal } from './WatchlistBulkModal';
 interface AnalyzerViewProps {
   config: JournalConfig;
   stats: JournalStats;
+  allTimeStats?: JournalStats;
   journalRowCount: number;
   onUpdateConfig: (next: JournalConfig) => void;
   onRunScan: () => void;
@@ -48,6 +50,7 @@ const MAX_VISIBLE_LIST = 100;
 export function AnalyzerView({
   config,
   stats,
+  allTimeStats,
   journalRowCount,
   onUpdateConfig,
   onRunScan,
@@ -475,14 +478,66 @@ export function AnalyzerView({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3.5 space-y-1">
-                <div className="text-[#555a66] font-semibold">Active Journal Target</div>
-                <div className="font-extrabold text-[#111111] text-sm tabular-nums">
-                  Journal {config.journalNo || '909'} · {config.journalDate || '26-Nov-2026'}
+              <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[#555a66] font-semibold inline-flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#111111]" aria-hidden="true" />
+                    <span>Monthly Journal Edition</span>
+                  </span>
+                  <button
+                    type="button"
+                    data-sfx="filter"
+                    onClick={() => {
+                      const currNum = parseInt(config.journalNo, 10);
+                      const nextNo = Number.isNaN(currNum) ? '910' : String(currNum + 1);
+                      onUpdateConfig({ ...config, journalNo: nextNo });
+                      onNotify(
+                        `Switched active target to Monthly Journal ${nextNo}. Previous Journal records stay archived under their Journal No.`
+                      );
+                    }}
+                    className="px-2 py-0.5 bg-[#ffee00] hover:bg-[#e6d600] text-[#111111] text-[10.5px] font-extrabold"
+                  >
+                    + Next Month
+                  </button>
                 </div>
-                <div className="text-[#555a66] font-mono">
-                  Serial: {config.serialPrefix}
-                  {String(1).padStart(config.serialPad || 3, '0')}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label htmlFor="dash-journal-no" className="block text-[10.5px] font-bold text-[#555a66] mb-0.5">
+                      Journal No
+                    </label>
+                    <input
+                      id="dash-journal-no"
+                      type="text"
+                      value={config.journalNo}
+                      onChange={(e) => onUpdateConfig({ ...config, journalNo: e.target.value })}
+                      className="w-full bg-white border border-[#cbd0da] px-2 py-1 text-xs font-mono font-extrabold text-[#111111] focus:border-[#111111] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="dash-journal-date" className="block text-[10.5px] font-bold text-[#555a66] mb-0.5">
+                      Month / Date
+                    </label>
+                    <input
+                      id="dash-journal-date"
+                      type="text"
+                      value={config.journalDate}
+                      onChange={(e) => onUpdateConfig({ ...config, journalDate: e.target.value })}
+                      className="w-full bg-white border border-[#cbd0da] px-2 py-1 text-xs font-mono text-[#111111] focus:border-[#111111] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-[#555a66] font-mono">
+                  <span>
+                    Serial: {config.serialPrefix}
+                    {String(1).padStart(config.serialPad || 3, '0')}
+                  </span>
+                  {allTimeStats && (
+                    <span>
+                      {Object.keys(allTimeStats.byJournal).length} Journal(s) archived
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -494,6 +549,9 @@ export function AnalyzerView({
                 <div className="text-[#555a66]">
                   Case Cols {sheetCfg?.prefixCol || 3}-{sheetCfg?.clientCodeCol || 4}-
                   {sheetCfg?.caseCol || 5} → <span className="font-mono font-bold text-[#111111]">A-32-4</span>
+                </div>
+                <div className="text-[11px] text-[#555a66] pt-1">
+                  Sorted by Recent Date · Full 24-Col Sheet
                 </div>
               </div>
             </div>

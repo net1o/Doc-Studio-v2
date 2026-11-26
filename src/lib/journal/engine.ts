@@ -960,6 +960,104 @@ export function buildGoogleSheetCsvUrl(sheetUrlOrId: string, sheetName?: string)
   return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
 }
 
+export interface CaseDatabaseAnalysis {
+  totalRecords: number;
+  uniqueTmCount: number;
+  matchedWatchlistCount: number;
+  missingFromWatchlistTms: string[];
+  topStatuses: { label: string; count: number }[];
+  topAgents: { label: string; count: number }[];
+  topClientCodes: { label: string; count: number }[];
+  latestDate: string;
+  journalLinkedCount: number;
+  tmFlagCounts: {
+    tm5: number;
+    tm6: number;
+    tm11: number;
+    tm16: number;
+    tm56: number;
+  };
+}
+
+export function analyzeCaseEntries(
+  entries: CaseEntry[],
+  watchedTms: string[]
+): CaseDatabaseAnalysis {
+  const watchedSet = new Set(
+    watchedTms.map((t) => t.trim()).filter((t) => /^\d{6}$/.test(t))
+  );
+  const uniqueTmSet = new Set<string>();
+  const missingSet = new Set<string>();
+  const statusMap = new Map<string, number>();
+  const agentMap = new Map<string, number>();
+  const codeMap = new Map<string, number>();
+  let matchedWatchlistCount = 0;
+  let journalLinkedCount = 0;
+  let latestTime = 0;
+  let latestDate = '';
+  const tmFlagCounts = { tm5: 0, tm6: 0, tm11: 0, tm16: 0, tm56: 0 };
+
+  const isTrue = (v?: string) => String(v || '').trim().toUpperCase() === 'TRUE';
+
+  for (const c of entries) {
+    const tm = c.tmNumber.trim();
+    if (tm) {
+      if (!uniqueTmSet.has(tm)) {
+        uniqueTmSet.add(tm);
+        if (watchedSet.has(tm)) {
+          matchedWatchlistCount++;
+        } else if (/^\d{6}$/.test(tm)) {
+          missingSet.add(tm);
+        }
+      }
+    }
+
+    const status = (c.status || '').trim();
+    if (status) statusMap.set(status, (statusMap.get(status) || 0) + 1);
+
+    const agent = (c.agent || '').trim();
+    if (agent) agentMap.set(agent, (agentMap.get(agent) || 0) + 1);
+
+    const clientCode = (c.clientCode || '').trim();
+    if (clientCode) codeMap.set(clientCode, (codeMap.get(clientCode) || 0) + 1);
+
+    if ((c.journalNumber || '').trim()) journalLinkedCount++;
+
+    if (isTrue(c.tm5)) tmFlagCounts.tm5++;
+    if (isTrue(c.tm6)) tmFlagCounts.tm6++;
+    if (isTrue(c.tm11)) tmFlagCounts.tm11++;
+    if (isTrue(c.tm16)) tmFlagCounts.tm16++;
+    if (isTrue(c.tm56)) tmFlagCounts.tm56++;
+
+    if (c.date) {
+      const dt = parseLooseDate(c.date);
+      if (dt && dt.getTime() >= latestTime) {
+        latestTime = dt.getTime();
+        latestDate = cleanInlineWhitespace(c.date);
+      }
+    }
+  }
+
+  const toSorted = (map: Map<string, number>) =>
+    Array.from(map.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+  return {
+    totalRecords: entries.length,
+    uniqueTmCount: uniqueTmSet.size,
+    matchedWatchlistCount,
+    missingFromWatchlistTms: Array.from(missingSet),
+    topStatuses: toSorted(statusMap),
+    topAgents: toSorted(agentMap),
+    topClientCodes: toSorted(codeMap),
+    latestDate,
+    journalLinkedCount,
+    tmFlagCounts,
+  };
+}
+
 export function parseCaseLookupInput(
   rawText: string,
   options: CaseLookupImportOptions = {}
@@ -982,6 +1080,7 @@ export function parseCaseLookupInput(
   const sep = options.caseSeparator || '-';
   const mode = options.mappingMode || 'auto';
 
+  let idIdx = -1;
   let keyIdx = Math.max(0, (options.keyCol || 8) - 1);
   let prefixIdx = options.prefixCol ? options.prefixCol - 1 : 2;
   let clientCodeIdx = options.clientCodeCol ? options.clientCodeCol - 1 : 3;
@@ -995,6 +1094,17 @@ export function parseCaseLookupInput(
   let subStatusIdx = -1;
   let caseTypeIdx = -1;
   let agentIdx = -1;
+  let offNoteIdx = -1;
+  let notesIdx = -1;
+  let tm5Idx = -1;
+  let tm6Idx = -1;
+  let tm11Idx = -1;
+  let tm16Idx = -1;
+  let tm56Idx = -1;
+  let journalNumberIdx = -1;
+  let journalDateIdx = -1;
+  let lastModifiedIdx = -1;
+  let imageIdx = -1;
 
   let startRow = 0;
   let detectedLayout = 'Sheet Col 8 (TM) + Case Cols 3-4-5';
@@ -1007,34 +1117,38 @@ export function parseCaseLookupInput(
         h.includes('cpr') ||
         h.includes('case number') ||
         h.includes('client code') ||
-        h === 'type'
+        h === 'type' ||
+        h === 'id'
     ) && !headerNorm.some((h) => /^\d{6}$/.test(h));
 
-  if (mode === 'three_col') {
-    keyIdx = 0;
-    prefixIdx = -1;
-    clientCodeIdx = -1;
-    caseIdx = 1;
-    clientIdx = 2;
-    appNameIdx = -1;
-    startRow = looksLikeHeader ? 1 : 0;
-    detectedLayout = '3-Column (TM No, Case No, Client)';
-  } else if (mode === 'sheet_col8_345') {
-    keyIdx = 7;
+  const assign24ColIndices = () => {
+    idIdx = 0;
+    dateIdx = 1;
     prefixIdx = 2;
     clientCodeIdx = 3;
     caseIdx = 4;
     clientIdx = 5;
     appNameIdx = 6;
-    dateIdx = 1;
+    keyIdx = 7;
     classIdx = 8;
     statusIdx = 9;
     subStatusIdx = 10;
     caseTypeIdx = 11;
     agentIdx = 12;
-    startRow = looksLikeHeader ? 1 : 0;
-    detectedLayout = 'Sheet Col 8 (TM/CPR) + Case Cols 3-4-5 (A-32-4)';
-  } else if (mode === 'date_start_22col') {
+    offNoteIdx = 13;
+    notesIdx = 14;
+    tm5Idx = 15;
+    tm6Idx = 16;
+    tm11Idx = 17;
+    tm16Idx = 18;
+    tm56Idx = 19;
+    journalNumberIdx = 20;
+    journalDateIdx = 21;
+    lastModifiedIdx = 22;
+    imageIdx = 23;
+  };
+
+  const assign22ColDateStartIndices = () => {
     dateIdx = 0;
     prefixIdx = 1;
     clientCodeIdx = 2;
@@ -1047,6 +1161,34 @@ export function parseCaseLookupInput(
     subStatusIdx = 9;
     caseTypeIdx = 10;
     agentIdx = 11;
+    offNoteIdx = 12;
+    notesIdx = 13;
+    tm5Idx = 14;
+    tm6Idx = 15;
+    tm11Idx = 16;
+    tm16Idx = 17;
+    tm56Idx = 18;
+    journalNumberIdx = 19;
+    journalDateIdx = 20;
+    lastModifiedIdx = 21;
+    imageIdx = 22;
+  };
+
+  if (mode === 'three_col') {
+    keyIdx = 0;
+    prefixIdx = -1;
+    clientCodeIdx = -1;
+    caseIdx = 1;
+    clientIdx = 2;
+    appNameIdx = -1;
+    startRow = looksLikeHeader ? 1 : 0;
+    detectedLayout = '3-Column (TM No, Case No, Client)';
+  } else if (mode === 'sheet_col8_345') {
+    assign24ColIndices();
+    startRow = looksLikeHeader ? 1 : 0;
+    detectedLayout = '24-Col Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
+  } else if (mode === 'date_start_22col') {
+    assign22ColDateStartIndices();
     startRow = looksLikeHeader ? 1 : 0;
     detectedLayout = '22-Col DATE-Start Export (TM Col 7 + Case Cols 2-3-4)';
   } else if (mode === 'custom') {
@@ -1062,6 +1204,7 @@ export function parseCaseLookupInput(
     // Auto-detect
     if (looksLikeHeader) {
       startRow = 1;
+      const foundId = headerNorm.findIndex((h) => h === 'id' || h === 'record id');
       const foundKey = headerNorm.findIndex(
         (h) => h.includes('tm cpr') || h.includes('tm no') || h.includes('cpr') || h === 'tm'
       );
@@ -1076,8 +1219,20 @@ export function parseCaseLookupInput(
       const foundSubStatus = headerNorm.findIndex((h) => h.includes('sub status'));
       const foundCaseType = headerNorm.findIndex((h) => h.includes('case type'));
       const foundAgent = headerNorm.findIndex((h) => h === 'agent');
+      const foundOffNote = headerNorm.findIndex((h) => h === 'off note' || h.includes('off note'));
+      const foundNotes = headerNorm.findIndex((h) => h === 'notes' || h === 'note');
+      const foundTm5 = headerNorm.findIndex((h) => h === 'tm5');
+      const foundTm6 = headerNorm.findIndex((h) => h === 'tm6');
+      const foundTm11 = headerNorm.findIndex((h) => h === 'tm11');
+      const foundTm16 = headerNorm.findIndex((h) => h === 'tm16');
+      const foundTm56 = headerNorm.findIndex((h) => h === 'tm56');
+      const foundJournalNo = headerNorm.findIndex((h) => h.includes('journal number') || h === 'journal no');
+      const foundJournalDate = headerNorm.findIndex((h) => h.includes('journal date'));
+      const foundLastModified = headerNorm.findIndex((h) => h.includes('last modified'));
+      const foundImage = headerNorm.findIndex((h) => h === 'image' || h === 'image url');
 
       if (foundKey >= 0 && foundCase >= 0) {
+        idIdx = foundId;
         keyIdx = foundKey;
         prefixIdx = foundPrefix;
         clientCodeIdx = foundClientCode;
@@ -1090,19 +1245,25 @@ export function parseCaseLookupInput(
         subStatusIdx = foundSubStatus;
         caseTypeIdx = foundCaseType;
         agentIdx = foundAgent;
-        detectedLayout = `Header-matched (TM Col ${keyIdx + 1} · Case ${
+        offNoteIdx = foundOffNote;
+        notesIdx = foundNotes;
+        tm5Idx = foundTm5;
+        tm6Idx = foundTm6;
+        tm11Idx = foundTm11;
+        tm16Idx = foundTm16;
+        tm56Idx = foundTm56;
+        journalNumberIdx = foundJournalNo;
+        journalDateIdx = foundJournalDate;
+        lastModifiedIdx = foundLastModified;
+        imageIdx = foundImage;
+        detectedLayout = `Header-matched (${matrix[0].length} cols · TM Col ${keyIdx + 1} · Case ${
           prefixIdx >= 0 && clientCodeIdx >= 0
             ? `Cols ${prefixIdx + 1}-${clientCodeIdx + 1}-${caseIdx + 1}`
             : `Col ${caseIdx + 1}`
         })`;
       } else if (matrix[0].length >= 8) {
-        keyIdx = 7;
-        prefixIdx = 2;
-        clientCodeIdx = 3;
-        caseIdx = 4;
-        clientIdx = 5;
-        appNameIdx = 6;
-        detectedLayout = 'Sheet Col 8 (TM/CPR) + Case Cols 3-4-5';
+        assign24ColIndices();
+        detectedLayout = '24-Col Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
       } else {
         keyIdx = 0;
         prefixIdx = -1;
@@ -1120,33 +1281,11 @@ export function parseCaseLookupInput(
         /^\d{5,7}$/.test((sampleRow[6] || '').trim());
 
       if (looksDateStart22) {
-        dateIdx = 0;
-        prefixIdx = 1;
-        clientCodeIdx = 2;
-        caseIdx = 3;
-        clientIdx = 4;
-        appNameIdx = 5;
-        keyIdx = 6;
-        classIdx = 7;
-        statusIdx = 8;
-        subStatusIdx = 9;
-        caseTypeIdx = 10;
-        agentIdx = 11;
+        assign22ColDateStartIndices();
         detectedLayout = '22-Col DATE-Start Export (TM Col 7 + Case Cols 2-3-4)';
       } else if (sampleRow.length >= 8) {
-        keyIdx = 7;
-        prefixIdx = 2;
-        clientCodeIdx = 3;
-        caseIdx = 4;
-        clientIdx = 5;
-        appNameIdx = 6;
-        dateIdx = 1;
-        classIdx = 8;
-        statusIdx = 9;
-        subStatusIdx = 10;
-        caseTypeIdx = 11;
-        agentIdx = 12;
-        detectedLayout = 'Sheet Col 8 (TM/CPR) + Case Cols 3-4-5';
+        assign24ColIndices();
+        detectedLayout = '24-Col Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
       } else {
         keyIdx = 0;
         prefixIdx = -1;
@@ -1164,8 +1303,15 @@ export function parseCaseLookupInput(
   let skippedRows = 0;
   let skippedDuplicates = 0;
 
+  const pick = (cols: string[], idx: number): string | undefined => {
+    if (idx < 0 || idx >= cols.length) return undefined;
+    const cleaned = cleanInlineWhitespace(cols[idx] || '');
+    return cleaned || undefined;
+  };
+
   for (let i = startRow; i < matrix.length; i++) {
     const cols = matrix[i];
+    const idVal = pick(cols, idIdx);
     const tmNumber = cleanInlineWhitespace(cols[keyIdx] || '');
     const prefix = prefixIdx >= 0 ? cleanInlineWhitespace(cols[prefixIdx] || '') : '';
     const clientCode = clientCodeIdx >= 0 ? cleanInlineWhitespace(cols[clientCodeIdx] || '') : '';
@@ -1179,7 +1325,7 @@ export function parseCaseLookupInput(
     const clientName = clientIdx >= 0 ? cleanInlineWhitespace(cols[clientIdx] || '') : '';
     const applicationName = appNameIdx >= 0 ? cleanInlineWhitespace(cols[appNameIdx] || '') : '';
 
-    if (!tmNumber || (!formattedCaseNo && !clientName && !applicationName)) {
+    if (!tmNumber || (!formattedCaseNo && !clientName && !applicationName && !idVal)) {
       skippedRows++;
       continue;
     }
@@ -1191,6 +1337,7 @@ export function parseCaseLookupInput(
     seen.add(tmNumber);
 
     entries.push({
+      id: idVal,
       tmNumber,
       caseNo: formattedCaseNo || 'NOT FOUND',
       clientName,
@@ -1198,14 +1345,23 @@ export function parseCaseLookupInput(
       clientCode: clientCode || undefined,
       rawCaseNo: rawCaseNo || undefined,
       applicationName: applicationName || undefined,
-      classNo: classIdx >= 0 ? cleanInlineWhitespace(cols[classIdx] || '') || undefined : undefined,
-      status: statusIdx >= 0 ? cleanInlineWhitespace(cols[statusIdx] || '') || undefined : undefined,
-      subStatus:
-        subStatusIdx >= 0 ? cleanInlineWhitespace(cols[subStatusIdx] || '') || undefined : undefined,
-      caseType:
-        caseTypeIdx >= 0 ? cleanInlineWhitespace(cols[caseTypeIdx] || '') || undefined : undefined,
-      agent: agentIdx >= 0 ? cleanInlineWhitespace(cols[agentIdx] || '') || undefined : undefined,
-      date: dateIdx >= 0 ? cleanInlineWhitespace(cols[dateIdx] || '') || undefined : undefined,
+      classNo: pick(cols, classIdx),
+      status: pick(cols, statusIdx),
+      subStatus: pick(cols, subStatusIdx),
+      caseType: pick(cols, caseTypeIdx),
+      agent: pick(cols, agentIdx),
+      date: pick(cols, dateIdx),
+      offNote: pick(cols, offNoteIdx),
+      notes: pick(cols, notesIdx),
+      tm5: pick(cols, tm5Idx),
+      tm6: pick(cols, tm6Idx),
+      tm11: pick(cols, tm11Idx),
+      tm16: pick(cols, tm16Idx),
+      tm56: pick(cols, tm56Idx),
+      journalNumber: pick(cols, journalNumberIdx),
+      journalDate: pick(cols, journalDateIdx),
+      lastModified: pick(cols, lastModifiedIdx),
+      imageUrl: pick(cols, imageIdx),
     });
   }
 
