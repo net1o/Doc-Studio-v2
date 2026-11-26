@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --builty-bg: #000000;
-  --builty-surface: #0e0e11;
-  --builty-surface-elevated: #16161a;
-  --builty-border: #2a2a30;
-  --builty-border-strong: #3e3e47;
+  --builty-bg: #f6f7f9;
+  --builty-surface: #ffffff;
+  --builty-surface-elevated: #f1f2f5;
+  --builty-border: #e2e4ea;
+  --builty-border-strong: #cbd0da;
   --builty-yellow: #ffee00;
-  --builty-yellow-hover: #e6d600;
-  --builty-text: #ffffff;
-  --builty-muted: #a6a6b0;
+  --builty-yellow-hover: #f2e000;
+  --builty-text: #111111;
+  --builty-muted: #555a66;
 
   /* Journal 909 Legal 8.5x14 Template Tokens */
   --j909-theme: #290076;
@@ -42,7 +42,7 @@
   display: inline-flex;
   align-items: center;
   background-color: var(--builty-yellow);
-  color: #000000;
+  color: #111111;
   font-weight: 700;
   transition: background-color 160ms ease, transform 160ms ease;
   clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
@@ -61,7 +61,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: #000000;
+  background-color: #111111;
   color: var(--builty-yellow);
   clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
 }

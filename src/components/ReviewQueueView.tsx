@@ -41,11 +41,11 @@ export function ReviewQueueView({
 
   return (
     <div className="space-y-5">
-      <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Review Queue</h2>
-          <p className="text-xs text-[#9c9ca6] mt-1">
-            Triage matched trademarks, set Decision &amp; Status (<span className="text-[#ffee00]">MAILMERGE</span>), and generate Legal 8.5×14 Journal 909 documents.
+          <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">Review Queue</h2>
+          <p className="text-xs text-[#555a66] mt-1">
+            Triage matched trademarks, set Decision &amp; Status (<span className="font-bold text-[#111111]">MAILMERGE</span>), and generate Legal 8.5×14 Journal 909 documents.
           </p>
         </div>
 
@@ -53,7 +53,7 @@ export function ReviewQueueView({
           <button
             type="button"
             onClick={onMarkIssuesMailmerge}
-            className="h-[38px] px-3.5 border border-[#3a3a42] bg-[#16161a] text-xs font-semibold text-white hover:border-[#ffee00] hover:text-[#ffee00] inline-flex items-center gap-1.5"
+            className="h-[38px] px-3.5 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white inline-flex items-center gap-1.5 whitespace-nowrap"
           >
             <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Mark Issue Rows MAILMERGE</span>
@@ -63,7 +63,7 @@ export function ReviewQueueView({
             type="button"
             onClick={onGenerateDocsFromMailmerge}
             disabled={mailmergeReadyCount === 0}
-            className="builty-btn h-[38px] pl-4 pr-2 gap-2 text-xs"
+            className="builty-btn h-[38px] pl-4 pr-2 gap-2 text-xs whitespace-nowrap"
           >
             <span>Generate Docs ({mailmergeReadyCount})</span>
             <span className="builty-btn-icon-tab w-6 h-6">
@@ -82,19 +82,19 @@ export function ReviewQueueView({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search App No, Case No, Title, or Matched Term…"
             aria-label="Search Review rows"
-            className="w-full max-w-sm bg-[#0c0c0e] border border-[#2a2a30] px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ffee00]"
+            className="w-full max-w-sm bg-white border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:outline-none focus:border-[#111111]"
           />
 
-          <div className="flex items-center border border-[#2a2a30] bg-[#0c0c0e]">
+          <div className="flex items-center border border-[#cbd0da] bg-white">
             {(['ALL', 'TM', 'KEYWORD'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setMatchFilter(t)}
-                className={`px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`px-3 py-2 text-xs font-bold transition-colors whitespace-nowrap ${
                   matchFilter === t
-                    ? 'bg-[#ffee00] text-black'
-                    : 'text-[#c7c7d1] hover:text-white'
+                    ? 'bg-[#ffee00] text-[#111111]'
+                    : 'text-[#555a66] hover:text-[#111111]'
                 }`}
               >
                 {t}
@@ -106,7 +106,7 @@ export function ReviewQueueView({
             aria-label="Filter by decision"
             value={decisionFilter}
             onChange={(e) => setDecisionFilter(e.target.value as 'ALL' | ReviewDecision)}
-            className="bg-[#0c0c0e] border border-[#2a2a30] px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ffee00]"
+            className="bg-white border border-[#cbd0da] px-3 py-2 text-xs font-semibold text-[#111111] focus:outline-none focus:border-[#111111]"
           >
             <option value="ALL">All Decisions</option>
             <option value="PENDING REVIEW">PENDING REVIEW</option>
@@ -115,16 +115,16 @@ export function ReviewQueueView({
           </select>
         </div>
 
-        <span className="text-xs text-[#9c9ca6] tabular-nums">
+        <span className="text-xs font-semibold text-[#555a66] tabular-nums">
           {filtered.length} of {rows.length} matches
         </span>
       </div>
 
       {/* Review Table */}
-      <div className="bg-[#0c0c0e] border border-[#2a2a30] overflow-x-auto">
+      <div className="bg-white border border-[#e2e4ea] overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[1120px]">
           <thead>
-            <tr className="bg-[#ffee00] text-black text-[11.5px] font-extrabold uppercase tracking-wider">
+            <tr className="bg-[#111111] text-white text-[11.5px] font-extrabold uppercase tracking-wider">
               <th className="py-2.5 px-3">Jrn</th>
               <th className="py-2.5 px-3">App No</th>
               <th className="py-2.5 px-3">Case No</th>
@@ -137,39 +137,39 @@ export function ReviewQueueView({
               <th className="py-2.5 px-3 text-right">909 Doc</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#1f1f24] text-xs">
+          <tbody className="divide-y divide-[#eceef2] text-xs">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-8 text-center text-[#9c9ca6]">
+                <td colSpan={10} className="py-10 text-center text-[#555a66]">
                   No Review rows found. Load JournalCheck data and click Run Scan.
                 </td>
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={row.id} className="hover:bg-[#141418]">
-                  <td className="py-2.5 px-3 font-mono text-[#c7c7d1] tabular-nums">
+                <tr key={row.id} className="hover:bg-[#f7f8fa]">
+                  <td className="py-2.5 px-3 font-mono text-[#555a66] tabular-nums">
                     {row.journalNo}
                   </td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-white tabular-nums">
+                  <td className="py-2.5 px-3 font-mono font-bold text-[#111111] tabular-nums">
                     {row.applicationNo}
                   </td>
-                  <td className="py-2.5 px-3 text-[#d0d0d8] max-w-[180px] truncate" title={row.caseNo}>
+                  <td className="py-2.5 px-3 text-[#374151] max-w-[180px] truncate" title={row.caseNo}>
                     {row.caseNo}
                   </td>
                   <td className="py-2.5 px-3">
-                    <div className="font-bold text-white">{row.title}</div>
-                    <div className="text-[11px] text-[#8f8f99] truncate max-w-[230px]" title={row.applicant}>
+                    <div className="font-bold text-[#111111]">{row.title}</div>
+                    <div className="text-[11px] text-[#555a66] truncate max-w-[230px]" title={row.applicant}>
                       {row.applicant}
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 text-center font-mono text-white tabular-nums">
+                  <td className="py-2.5 px-3 text-center font-mono font-semibold text-[#111111] tabular-nums">
                     {row.classNo}
                   </td>
                   <td className="py-2.5 px-3">
-                    <div className="font-mono text-[#ffee00]">{row.matchedTerm}</div>
-                    <div className="text-[11px] text-[#9c9ca6]">{row.matchType}</div>
+                    <div className="font-mono font-bold text-[#111111]">{row.matchedTerm}</div>
+                    <div className="text-[11px] text-[#555a66]">{row.matchType}</div>
                   </td>
-                  <td className="py-2.5 px-3 text-center font-mono text-[#c7c7d1] tabular-nums">
+                  <td className="py-2.5 px-3 text-center font-mono text-[#555a66] tabular-nums">
                     {row.pageNo || '—'}
                   </td>
                   <td className="py-2.5 px-3">
@@ -179,7 +179,7 @@ export function ReviewQueueView({
                       onChange={(e) =>
                         onUpdateRow(row.id, { decision: e.target.value as ReviewDecision })
                       }
-                      className="bg-[#16161a] border border-[#2f2f36] px-2 py-1.5 text-[11.5px] text-white focus:border-[#ffee00]"
+                      className="bg-[#f8f9fb] border border-[#cbd0da] px-2 py-1.5 text-[11.5px] font-semibold text-[#111111] focus:bg-white focus:border-[#111111]"
                     >
                       <option value="PENDING REVIEW">PENDING REVIEW</option>
                       <option value="ISSUE - OPPOSE">ISSUE - OPPOSE</option>
@@ -193,12 +193,12 @@ export function ReviewQueueView({
                       onChange={(e) =>
                         onUpdateRow(row.id, { status: e.target.value as ReviewStatus })
                       }
-                      className={`border px-2 py-1.5 text-[11.5px] font-semibold focus:border-[#ffee00] ${
+                      className={`border px-2 py-1.5 text-[11.5px] font-bold focus:border-[#111111] ${
                         row.status === 'GENERATED'
-                          ? 'bg-[#17281b] border-[#2f6f3e] text-[#86efac]'
+                          ? 'bg-emerald-50 border-emerald-400 text-emerald-900'
                           : row.status === 'MAILMERGE'
-                          ? 'bg-[#292507] border-[#ffee00] text-[#ffee00]'
-                          : 'bg-[#16161a] border-[#2f2f36] text-white'
+                          ? 'bg-[#fffbeb] border-[#d97706] text-[#92400e]'
+                          : 'bg-[#f8f9fb] border-[#cbd0da] text-[#111111]'
                       }`}
                     >
                       <option value="REVIEW">REVIEW</option>
@@ -210,9 +210,9 @@ export function ReviewQueueView({
                     <button
                       type="button"
                       onClick={() => onOpenDocInGenerator(row)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-[#3a3a42] bg-[#16161a] hover:border-[#ffee00] hover:text-[#ffee00] text-[11.5px] font-semibold text-white"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-[#ffee00] text-[11.5px] font-bold text-[#111111] transition-colors"
                     >
-                      <FileText className="w-3.5 h-3.5 text-[#ffee00]" aria-hidden="true" />
+                      <FileText className="w-3.5 h-3.5 text-[#111111]" aria-hidden="true" />
                       <span>
                         {row.generatedDocId
                           ? row.generatedPdfReady

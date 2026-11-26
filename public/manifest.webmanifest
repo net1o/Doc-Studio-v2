@@ -4,7 +4,7 @@
   "description": "Trademark journal analyzer, watchlist scanner, review queue, and Legal 8.5x14 Journal 909 document generator.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
+  "background_color": "#ffffff",
   "theme_color": "#ffee00",
   "icons": [
     {

@@ -370,7 +370,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] text-white flex flex-col">
+    <div className="min-h-screen bg-[#f6f7f9] text-[#111111] flex flex-col">
       <BuiltyHeader
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -392,15 +392,15 @@ export default function App() {
             role="status"
             className={`no-print mb-6 px-4 py-3 border text-xs font-semibold flex items-center justify-between gap-4 ${
               toast.kind === 'error'
-                ? 'bg-[#1f0e0e] border-[#ef4444] text-[#fca5a5]'
-                : 'bg-[#141416] border-[#ffee00] text-[#ffee00]'
+                ? 'bg-red-50 border-red-300 text-red-900'
+                : 'bg-[#fffef0] border-[#111111] text-[#111111]'
             }`}
           >
             <span>{toast.message}</span>
             <button
               type="button"
               onClick={() => setToast(null)}
-              className="underline text-white hover:text-[#ffee00] shrink-0"
+              className="underline font-bold hover:opacity-75 shrink-0"
             >
               Dismiss
             </button>

@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
-import { CalendarClock, ClipboardPaste, FileUp, Play, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { CalendarClock, FileUp, Play, Plus, Trash2 } from 'lucide-react';
 import { JournalCheckRow } from '../types/journal';
-import { parseDelimitedJournalInput } from '../lib/journal/engine';
+import { JournalImportWizard } from './JournalImportWizard';
 
 interface JournalCheckViewProps {
   rows: JournalCheckRow[];
@@ -16,10 +16,8 @@ export function JournalCheckView({
   onNormalizeDates,
   onRunScan,
 }: JournalCheckViewProps) {
-  const [showPasteBox, setShowPasteBox] = useState(false);
-  const [pasteText, setPasteText] = useState('');
+  const [showWizard, setShowWizard] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = rows.filter((r) => {
     const q = searchText.trim().toLowerCase();
@@ -28,7 +26,8 @@ export function JournalCheckView({
       r.applicationNo.toLowerCase().includes(q) ||
       r.title.toLowerCase().includes(q) ||
       r.applicant.toLowerCase().includes(q) ||
-      r.agent.toLowerCase().includes(q)
+      r.agent.toLowerCase().includes(q) ||
+      r.pageNo.toLowerCase().includes(q)
     );
   });
 
@@ -58,29 +57,20 @@ export function JournalCheckView({
     onChangeRows(rows.filter((r) => r.id !== id));
   };
 
-  const handleImportPaste = (replaceExisting: boolean) => {
-    const parsed = parseDelimitedJournalInput(pasteText);
-    if (parsed.length === 0) return;
-    onChangeRows(replaceExisting ? parsed : [...parsed, ...rows]);
-    setPasteText('');
-    setShowPasteBox(false);
-  };
-
-  const handleUploadCsv = async (file: File) => {
-    const text = await file.text();
-    const parsed = parseDelimitedJournalInput(text);
-    if (parsed.length > 0) {
-      onChangeRows([...parsed, ...rows]);
-    }
+  const handleWizardImport = (importedRows: JournalCheckRow[], mode: 'append' | 'replace') => {
+    onChangeRows(mode === 'replace' ? importedRows : [...importedRows, ...rows]);
+    setShowWizard(false);
   };
 
   return (
     <div className="space-y-5">
-      <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">JournalCheck Input Table</h2>
-          <p className="text-xs text-[#9c9ca6] mt-1">
-            Paste VBA ConvertJournal2() output, upload CSV/TSV, normalize filing dates (dd-MMM-yy), and run the scan.
+          <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
+            JournalCheck Input Table
+          </h2>
+          <p className="text-xs text-[#555a66] mt-1">
+            Import 7-column CSV/TSV files, convert raw PDF-to-Text journals with ConvertJournal2, normalize filing dates, and run the scan.
           </p>
         </div>
 
@@ -88,7 +78,7 @@ export function JournalCheckView({
           <button
             type="button"
             onClick={handleAddRow}
-            className="h-[38px] px-3.5 border border-[#3a3a42] bg-[#16161a] text-xs font-semibold text-white hover:border-[#ffee00] hover:text-[#ffee00] inline-flex items-center gap-1.5"
+            className="h-[38px] px-3.5 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white inline-flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Add Row</span>
@@ -96,39 +86,21 @@ export function JournalCheckView({
 
           <button
             type="button"
-            onClick={() => setShowPasteBox((prev) => !prev)}
-            className="h-[38px] px-3.5 border border-[#3a3a42] bg-[#16161a] text-xs font-semibold text-white hover:border-[#ffee00] hover:text-[#ffee00] inline-flex items-center gap-1.5"
-          >
-            <ClipboardPaste className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Paste CSV / TSV</span>
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.tsv,.txt"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) {
-                handleUploadCsv(f);
-                e.target.value = '';
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="h-[38px] px-3.5 border border-[#3a3a42] bg-[#16161a] text-xs font-semibold text-white hover:border-[#ffee00] hover:text-[#ffee00] inline-flex items-center gap-1.5"
+            onClick={() => setShowWizard((prev) => !prev)}
+            className={`h-[38px] px-3.5 border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+              showWizard
+                ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                : 'border-[#111111] bg-white text-[#111111] hover:bg-[#fffef0]'
+            }`}
           >
             <FileUp className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Import CSV</span>
+            <span>{showWizard ? 'Hide Import Wizard' : 'Import Wizard'}</span>
           </button>
 
           <button
             type="button"
             onClick={onNormalizeDates}
-            className="h-[38px] px-3.5 border border-[#3a3a42] bg-[#16161a] text-xs font-semibold text-white hover:border-[#ffee00] hover:text-[#ffee00] inline-flex items-center gap-1.5"
+            className="h-[38px] px-3.5 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white inline-flex items-center gap-1.5 whitespace-nowrap"
           >
             <CalendarClock className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Re-normalize Dates</span>
@@ -137,7 +109,7 @@ export function JournalCheckView({
           <button
             type="button"
             onClick={onRunScan}
-            className="builty-btn h-[38px] pl-4 pr-2 gap-2 text-xs"
+            className="builty-btn h-[38px] pl-4 pr-2 gap-2 text-xs whitespace-nowrap"
           >
             <span>Run Scan</span>
             <span className="builty-btn-icon-tab w-6 h-6">
@@ -147,91 +119,58 @@ export function JournalCheckView({
         </div>
       </div>
 
-      {showPasteBox && (
-        <div className="bg-[#0c0c0e] border border-[#ffee00]/60 p-5 space-y-3">
-          <p className="text-xs text-[#d0d0d8]">
-            Paste tab-separated or comma-separated rows matching the 7 columns:
-            <span className="text-[#ffee00] font-mono">
-              {' '}Application No, Title, Class, Applicant Name and Address, Agent Name and Address, Date of Filing, Page No
-            </span>
-          </p>
-          <textarea
-            rows={5}
-            value={pasteText}
-            onChange={(e) => setPasteText(e.target.value)}
-            placeholder="554120&#9;NOVA SHIELD&#9;9&#9;Nova Labs Lahore&#9;Ali & Co&#9;18/11/2026&#9;212"
-            className="w-full bg-[#16161a] border border-[#2f2f36] p-3 text-xs font-mono text-white focus:outline-none focus:border-[#ffee00]"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => handleImportPaste(false)}
-              className="px-4 py-2 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600]"
-            >
-              Append Rows
-            </button>
-            <button
-              type="button"
-              onClick={() => handleImportPaste(true)}
-              className="px-4 py-2 border border-[#3a3a42] text-white text-xs font-semibold hover:border-[#ffee00]"
-            >
-              Replace Table
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPasteBox(false)}
-              className="px-3 py-2 text-xs text-[#9c9ca6] hover:text-white"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      {showWizard && (
+        <JournalImportWizard
+          existingCount={rows.length}
+          onImport={handleWizardImport}
+          onClose={() => setShowWizard(false)}
+        />
       )}
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <input
           type="search"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Filter JournalCheck rows by App No, Title, Applicant, or Agent…"
+          placeholder="Filter JournalCheck rows by App No, Title, Applicant, Agent, or Page…"
           aria-label="Filter JournalCheck rows"
-          className="w-full max-w-md bg-[#0c0c0e] border border-[#2a2a30] px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#ffee00]"
+          className="w-full max-w-md bg-white border border-[#cbd0da] px-3.5 py-2 text-xs text-[#111111] focus:outline-none focus:border-[#111111]"
         />
-        <span className="text-xs text-[#9c9ca6] tabular-nums shrink-0">
+        <span className="text-xs font-semibold text-[#555a66] tabular-nums shrink-0">
           Showing {filtered.length} of {rows.length} rows
         </span>
       </div>
 
-      <div className="bg-[#0c0c0e] border border-[#2a2a30] overflow-x-auto">
+      <div className="bg-white border border-[#e2e4ea] overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[980px]">
           <thead>
-            <tr className="bg-[#ffee00] text-black text-xs font-extrabold uppercase tracking-wider">
+            <tr className="bg-[#111111] text-white text-[11.5px] font-extrabold uppercase tracking-wider">
               <th className="py-2.5 px-3 w-[110px]">App No</th>
               <th className="py-2.5 px-3 w-[180px]">Title</th>
-              <th className="py-2.5 px-3 w-[70px]">Class</th>
+              <th className="py-2.5 px-3 w-[70px] text-center">Class</th>
               <th className="py-2.5 px-3">Applicant Name and Address</th>
               <th className="py-2.5 px-3">Agent Name and Address</th>
-              <th className="py-2.5 px-3 w-[115px]">Date of Filing</th>
-              <th className="py-2.5 px-3 w-[80px]">Page No</th>
+              <th className="py-2.5 px-3 w-[120px]">Date of Filing</th>
+              <th className="py-2.5 px-3 w-[80px] text-center">Page No</th>
               <th className="py-2.5 px-3 w-[48px] text-center">Del</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#1f1f24] text-xs">
+          <tbody className="divide-y divide-[#eceef2] text-xs">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-[#9c9ca6]">
-                  No rows match your filter. Add a row or paste CSV/TSV data above.
+                <td colSpan={8} className="py-10 text-center text-[#555a66]">
+                  No rows match your filter. Click <span className="font-bold text-[#111111]">Import Wizard</span> or <span className="font-bold text-[#111111]">Add Row</span> above.
                 </td>
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={row.id} className="hover:bg-[#141418]">
+                <tr key={row.id} className="hover:bg-[#f7f8fa]">
                   <td className="p-2">
                     <input
                       type="text"
                       value={row.applicationNo}
                       onChange={(e) => handleCellChange(row.id, 'applicationNo', e.target.value)}
-                      className="w-full bg-transparent border border-transparent focus:border-[#ffee00] px-2 py-1 font-mono text-white tabular-nums"
+                      className="w-full bg-transparent border border-transparent focus:bg-[#fffef0] focus:border-[#111111] px-2 py-1 font-mono font-bold text-[#111111] tabular-nums"
                     />
                   </td>
                   <td className="p-2">
@@ -239,7 +178,7 @@ export function JournalCheckView({
                       type="text"
                       value={row.title}
                       onChange={(e) => handleCellChange(row.id, 'title', e.target.value)}
-                      className="w-full bg-transparent border border-transparent focus:border-[#ffee00] px-2 py-1 font-semibold text-white"
+                      className="w-full bg-transparent border border-transparent focus:bg-[#fffef0] focus:border-[#111111] px-2 py-1 font-bold text-[#111111]"
                     />
                   </td>
                   <td className="p-2">
@@ -247,7 +186,7 @@ export function JournalCheckView({
                       type="text"
                       value={row.classNo}
                       onChange={(e) => handleCellChange(row.id, 'classNo', e.target.value)}
-                      className="w-full bg-transparent border border-transparent focus:border-[#ffee00] px-2 py-1 text-center text-white tabular-nums"
+                      className="w-full bg-transparent border border-transparent focus:bg-[#fffef0] focus:border-[#111111] px-2 py-1 text-center font-mono text-[#111111] tabular-nums"
                     />
                   </td>
                   <td className="p-2">
@@ -255,7 +194,7 @@ export function JournalCheckView({
                       type="text"
                       value={row.applicant}
                       onChange={(e) => handleCellChange(row.id, 'applicant', e.target.value)}
-                      className="w-full bg-transparent border border-transparent focus:border-[#ffee00] px-2 py-1 text-[#d0d0d8]"
+                      className="w-full bg-transparent border border-transparent focus:bg-[#fffef0] focus:border-[#111111] px-2 py-1 text-[#374151]"
                     />
                   </td>
                   <td className="p-2">
@@ -263,7 +202,7 @@ export function JournalCheckView({
                       type="text"
                       value={row.agent}
                       onChange={(e) => handleCellChange(row.id, 'agent', e.target.value)}
-                      className="w-full bg-transparent border border-transparent focus:border-[#ffee00] px-2 py-1 text-[#d0d0d8]"
+                      className="w-full bg-transparent border border-transparent focus:bg-[#fffef0] focus:border-[#111111] px-2 py-1 text-[#374151]"
                     />
                   </td>
                   <td className="p-2">
@@ -271,7 +210,7 @@ export function JournalCheckView({
                       type="text"
                       value={row.dateOfFiling}
                       onChange={(e) => handleCellChange(row.id, 'dateOfFiling', e.target.value)}
-                      className="w-full bg-transparent border border-transparent focus:border-[#ffee00] px-2 py-1 font-mono text-white tabular-nums"
+                      className="w-full bg-transparent border border-transparent focus:bg-[#fffef0] focus:border-[#111111] px-2 py-1 font-mono text-[#111111] tabular-nums"
                     />
                   </td>
                   <td className="p-2">
@@ -279,7 +218,7 @@ export function JournalCheckView({
                       type="text"
                       value={row.pageNo}
                       onChange={(e) => handleCellChange(row.id, 'pageNo', e.target.value)}
-                      className="w-full bg-transparent border border-transparent focus:border-[#ffee00] px-2 py-1 text-center font-mono text-white tabular-nums"
+                      className="w-full bg-transparent border border-transparent focus:bg-[#fffef0] focus:border-[#111111] px-2 py-1 text-center font-mono text-[#111111] tabular-nums"
                     />
                   </td>
                   <td className="p-2 text-center">
@@ -287,7 +226,7 @@ export function JournalCheckView({
                       type="button"
                       onClick={() => handleDeleteRow(row.id)}
                       aria-label={`Delete row ${row.applicationNo || row.title}`}
-                      className="p-1.5 text-[#85858f] hover:text-[#ff5c5c]"
+                      className="p-1.5 text-[#6b7280] hover:text-red-600"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

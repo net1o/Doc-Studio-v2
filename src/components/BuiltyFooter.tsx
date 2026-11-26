@@ -10,16 +10,16 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
   return (
     <footer className="no-print mt-12">
       {/* Builty Consultation Strip */}
-      <div className="bg-[#1b1b1e] border-t border-b border-[#2b2b30]">
+      <div className="bg-white border-t border-b border-[#e2e4ea]">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true">
-              <polygon points="4,30 18,4 32,30" fill="#ffee00" />
-              <polygon points="11,30 18,16 25,30" fill="#000000" />
+              <polygon points="4,30 18,4 32,30" fill="#ffee00" stroke="#111111" strokeWidth="1.5" />
+              <polygon points="11,30 18,16 25,30" fill="#111111" />
             </svg>
             <div>
-              <p className="text-sm font-bold text-white">Journal Monitor &amp; Doc Generator</p>
-              <p className="text-xs text-[#b5b5be]">
+              <p className="text-sm font-extrabold text-[#111111]">Journal Monitor &amp; Doc Generator</p>
+              <p className="text-xs text-[#555a66]">
                 Trademark watchlist analysis and Legal 8.5×14 publication automation
               </p>
             </div>
@@ -38,8 +38,8 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
         </div>
       </div>
 
-      {/* Main Dark Footer */}
-      <div className="bg-[#000000] text-white">
+      {/* Main Corporate Footer */}
+      <div className="bg-[#111111] text-white">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-2.5">
             <h3 className="text-base font-bold text-white">Information</h3>

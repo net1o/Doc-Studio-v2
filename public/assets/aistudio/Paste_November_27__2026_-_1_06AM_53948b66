@@ -1,0 +1,740 @@
+set import wizerd to this attached
+also sending you one text and convert to text vba code.
+we use pdf to text converter then use this vba to make a excel formatted sheet. then copypaste it to sheet and run
+Refactor the UI components to match the 'Builty Construction' design language, replacing the default dark theme with a cleaner, corporate aesthetic using light backgrounds, bold typography, and a structured, grid-based layout.
+Sub ConvertJournal2()
+Dim filePath As String
+Dim textData As String
+Dim records() As String
+Dim outputSheet As Worksheet
+Dim i As Long, rowNum As Long, totalRecords As Long
+Dim startTime As Double
+Code
+' Select the text file (UTF-8 or ANSI)
+filePath = Application.GetOpenFilename("Text Files (*.txt), *.txt")
+If filePath = "False" Then Exit Sub
+
+' Start timer
+startTime = Timer
+
+' Read file with UTF-8 encoding (supports Urdu/English)
+textData = ReadTextFile(filePath)
+
+' Split records by "Advertised under section 28(1)"
+records = Split(textData, "Advertised under section 28(1) of Trade Mark Ordinance 2001.")
+totalRecords = UBound(records)
+
+' Set up status bar progress indicator
+Application.statusBar = "Preparing to process " & totalRecords & " records..."
+
+' Set up output sheet
+Set outputSheet = ThisWorkbook.Sheets.Add
+outputSheet.Name = "Trademark Data"
+outputSheet.Range("A1:F1").value = Array("Application No", "Title", "Class", "Applicant Name and Address", "Agent Name and Address", "Date of Filing")
+
+' Apply initial formatting
+With outputSheet
+    ' Set column widths
+    .Columns("A:A").ColumnWidth = 10
+    .Columns("B:B").ColumnWidth = 10
+    .Columns("C:C").ColumnWidth = 10
+    .Columns("D:D").ColumnWidth = 15
+    .Columns("E:E").ColumnWidth = 6
+    .Columns("F:F").ColumnWidth = 25
+    
+    ' Set header formatting
+    With .Range("A1:F1")
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Font.Bold = True
+        .Interior.Color = RGB(200, 200, 200)
+    End With
+End With
+
+' Process each record
+rowNum = 2
+For i = 1 To UBound(records) ' Skip first empty record
+    Dim recordText As String
+    recordText = records(i)
+    
+    ' Update status bar every 100 records
+    If i Mod 100 = 0 Then
+        Application.statusBar = "Processing record " & i & " of " & totalRecords & " (" & Format(i / totalRecords, "0%") & ")"
+        DoEvents ' Allow screen updates
+    End If
+    
+    ' Skip if empty
+    If Trim(recordText) = "" Then GoTo NextRecord
+    
+    ' Extract fields
+    Dim appNo As String, title As String, class_ As String
+    Dim applicant As String, agent As String, filingDate As String
+    
+    ' Application No
+    appNo = ExtractField(recordText, "Application No:\s*(\d+)")
+    
+    ' Title (handle multi-line titles)
+    title = ExtractField(recordText, "Title\s+([^\n]+?)\nClass:")
+    If title = "" Then title = ExtractField(recordText, "Title\s+([^\n]+)")
+    
+    ' Class
+    class_ = ExtractField(recordText, "Class:\s*(\d+)")
+    
+    ' Applicant Name & Address (multi-line)
+    applicant = ExtractMultiLineField(recordText, "Name and address\s+of Applicant:\s*([\s\S]+?)(?=\n\s*(Agent|Date|Description))")
+    
+    ' Agent Name & Address (multi-line)
+    agent = ExtractMultiLineField(recordText, "Agent’s name\s+And address:\s*([\s\S]+?)(?=\n\s*(Description|Date|$))")
+    
+    ' Date of Filing (convert to dd-mmm-yyyy)
+    filingDate = ExtractField(recordText, "Date of filing:\s*(\d{2}/\d{2}/\d{4})")
+    If filingDate <> "" Then
+        filingDate = Format(CDate(filingDate), "dd-mmm-yyyy")
+    End If
+    
+    ' Write to Excel
+    With outputSheet
+        .Cells(rowNum, 1).value = appNo
+        .Cells(rowNum, 2).value = title
+        .Cells(rowNum, 3).value = class_
+        .Cells(rowNum, 4).value = CleanText(applicant)
+        .Cells(rowNum, 5).value = CleanText(agent)
+        .Cells(rowNum, 6).value = filingDate
+        
+        ' Apply cell formatting
+        .Range("A" & rowNum & ":C" & rowNum).HorizontalAlignment = xlCenter
+        .Range("E" & rowNum).HorizontalAlignment = xlCenter
+        .Range("D" & rowNum & ":F" & rowNum).HorizontalAlignment = xlLeft
+        .Range("A" & rowNum & ":F" & rowNum).VerticalAlignment = xlCenter
+    End With
+    
+    rowNum = rowNum + 1
+NextRecord:
+Next i
+Code
+' Final formatting
+With outputSheet
+    ' AutoFit rows for better visibility
+    .UsedRange.Rows.AutoFit
+    
+    ' Add borders to all cells
+    With .UsedRange
+        .Borders(xlEdgeLeft).LineStyle = xlContinuous
+        .Borders(xlEdgeTop).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        .Borders(xlEdgeRight).LineStyle = xlContinuous
+        .Borders(xlInsideVertical).LineStyle = xlContinuous
+        .Borders(xlInsideHorizontal).LineStyle = xlContinuous
+    End With
+    
+    ' Freeze header row
+    .Rows("2:2").Select
+    ActiveWindow.FreezePanes = True
+End With
+
+' Calculate processing time
+Dim elapsedTime As Double
+elapsedTime = Timer - startTime
+
+' Reset status bar
+Application.statusBar = False
+
+' Final message with count and time
+Dim processedCount As Long
+processedCount = rowNum - 2
+MsgBox "Conversion Complete!" & vbCrLf & vbCrLf & _
+       "Total records in file: " & totalRecords & vbCrLf & _
+       "Processed records: " & processedCount & vbCrLf & _
+       "Processing time: " & Format(elapsedTime, "0.00") & " seconds", vbInformation, "Process Completed"
+End Sub
+' [Keep all your existing helper functions: ReadTextFile, ExtractField, ExtractMultiLineField, CleanText]
+' Helper function to read text file (supports UTF-8)
+Function ReadTextFile(filePath As String) As String
+Dim stream As Object
+Set stream = CreateObject("ADODB.Stream")
+stream.Charset = "utf-8" ' For Urdu/English mixed text
+stream.Open
+stream.LoadFromFile filePath
+ReadTextFile = stream.ReadText
+stream.Close
+End Function
+' Extract field using regex
+Function ExtractField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+If regex.Test(text) Then
+ExtractField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractField = ""
+End If
+End Function
+' Extract multi-line field (e.g., addresses)
+Function ExtractMultiLineField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+regex.MultiLine = True
+If regex.Test(text) Then
+ExtractMultiLineField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractMultiLineField = ""
+End If
+End Function
+' Clean text (replace newlines with spaces)
+Function CleanText(text As String) As String
+CleanText = Replace(Replace(text, vbCr, " "), vbLf, " ")
+End Function
+Journal Pub 909 - JournalCheck.csv
+J_909.txt
+J_909.pdf
+Gemini 4 Hydrogen
+Ran for 1s
+Your message exceeded the maximum number of tokens allowed.
+Checkpoint
+set import wizerd to this attached
+also sending you one text and convert to text vba code.
+we use pdf to text converter then use this vba to make a excel formatted sheet. then copypaste it to sheet and run
+Refactor the UI components to match the 'Builty Construction' design language, replacing the default dark theme with a cleaner, corporate aesthetic using light backgrounds, bold typography, and a structured, grid-based layout.
+Sub ConvertJournal2()
+Dim filePath As String
+Dim textData As String
+Dim records() As String
+Dim outputSheet As Worksheet
+Dim i As Long, rowNum As Long, totalRecords As Long
+Dim startTime As Double
+Code
+' Select the text file (UTF-8 or ANSI)
+filePath = Application.GetOpenFilename("Text Files (*.txt), *.txt")
+If filePath = "False" Then Exit Sub
+' Start timer
+startTime = Timer
+' Read file with UTF-8 encoding (supports Urdu/English)
+textData = ReadTextFile(filePath)
+' Split records by "Advertised under section 28(1)"
+records = Split(textData, "Advertised under section 28(1) of Trade Mark Ordinance 2001.")
+totalRecords = UBound(records)
+' Set up status bar progress indicator
+Application.statusBar = "Preparing to process " & totalRecords & " records..."
+' Set up output sheet
+Set outputSheet = ThisWorkbook.Sheets.Add
+outputSheet.Name = "Trademark Data"
+outputSheet.Range("A1:F1").value = Array("Application No", "Title", "Class", "Applicant Name and Address", "Agent Name and Address", "Date of Filing")
+' Apply initial formatting
+With outputSheet
+' Set column widths
+.Columns("A:A").ColumnWidth = 10
+.Columns("B:B").ColumnWidth = 10
+.Columns("C:C").ColumnWidth = 10
+.Columns("D:D").ColumnWidth = 15
+.Columns("E:E").ColumnWidth = 6
+.Columns("F:F").ColumnWidth = 25
+Code
+' Set header formatting
+With .Range("A1:F1")
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlCenter
+    .Font.Bold = True
+    .Interior.Color = RGB(200, 200, 200)
+End With
+End With
+' Process each record
+rowNum = 2
+For i = 1 To UBound(records) ' Skip first empty record
+Dim recordText As String
+recordText = records(i)
+Code
+' Update status bar every 100 records
+If i Mod 100 = 0 Then
+    Application.statusBar = "Processing record " & i & " of " & totalRecords & " (" & Format(i / totalRecords, "0%") & ")"
+    DoEvents ' Allow screen updates
+End If
+
+' Skip if empty
+If Trim(recordText) = "" Then GoTo NextRecord
+
+' Extract fields
+Dim appNo As String, title As String, class_ As String
+Dim applicant As String, agent As String, filingDate As String
+
+' Application No
+appNo = ExtractField(recordText, "Application No:\s*(\d+)")
+
+' Title (handle multi-line titles)
+title = ExtractField(recordText, "Title\s+([^\n]+?)\nClass:")
+If title = "" Then title = ExtractField(recordText, "Title\s+([^\n]+)")
+
+' Class
+class_ = ExtractField(recordText, "Class:\s*(\d+)")
+
+' Applicant Name & Address (multi-line)
+applicant = ExtractMultiLineField(recordText, "Name and address\s+of Applicant:\s*([\s\S]+?)(?=\n\s*(Agent|Date|Description))")
+
+' Agent Name & Address (multi-line)
+agent = ExtractMultiLineField(recordText, "Agent’s name\s+And address:\s*([\s\S]+?)(?=\n\s*(Description|Date|$))")
+
+' Date of Filing (convert to dd-mmm-yyyy)
+filingDate = ExtractField(recordText, "Date of filing:\s*(\d{2}/\d{2}/\d{4})")
+If filingDate <> "" Then
+    filingDate = Format(CDate(filingDate), "dd-mmm-yyyy")
+End If
+
+' Write to Excel
+With outputSheet
+    .Cells(rowNum, 1).value = appNo
+    .Cells(rowNum, 2).value = title
+    .Cells(rowNum, 3).value = class_
+    .Cells(rowNum, 4).value = CleanText(applicant)
+    .Cells(rowNum, 5).value = CleanText(agent)
+    .Cells(rowNum, 6).value = filingDate
+    
+    ' Apply cell formatting
+    .Range("A" & rowNum & ":C" & rowNum).HorizontalAlignment = xlCenter
+    .Range("E" & rowNum).HorizontalAlignment = xlCenter
+    .Range("D" & rowNum & ":F" & rowNum).HorizontalAlignment = xlLeft
+    .Range("A" & rowNum & ":F" & rowNum).VerticalAlignment = xlCenter
+End With
+
+rowNum = rowNum + 1
+NextRecord:
+Next i
+Code
+' Final formatting
+With outputSheet
+' AutoFit rows for better visibility
+.UsedRange.Rows.AutoFit
+Code
+' Add borders to all cells
+With .UsedRange
+    .Borders(xlEdgeLeft).LineStyle = xlContinuous
+    .Borders(xlEdgeTop).LineStyle = xlContinuous
+    .Borders(xlEdgeBottom).LineStyle = xlContinuous
+    .Borders(xlEdgeRight).LineStyle = xlContinuous
+    .Borders(xlInsideVertical).LineStyle = xlContinuous
+    .Borders(xlInsideHorizontal).LineStyle = xlContinuous
+End With
+
+' Freeze header row
+.Rows("2:2").Select
+ActiveWindow.FreezePanes = True
+End With
+' Calculate processing time
+Dim elapsedTime As Double
+elapsedTime = Timer - startTime
+' Reset status bar
+Application.statusBar = False
+' Final message with count and time
+Dim processedCount As Long
+processedCount = rowNum - 2
+MsgBox "Conversion Complete!" & vbCrLf & vbCrLf & _
+"Total records in file: " & totalRecords & vbCrLf & _
+"Processed records: " & processedCount & vbCrLf & _
+"Processing time: " & Format(elapsedTime, "0.00") & " seconds", vbInformation, "Process Completed"
+End Sub
+' [Keep all your existing helper functions: ReadTextFile, ExtractField, ExtractMultiLineField, CleanText]
+' Helper function to read text file (supports UTF-8)
+Function ReadTextFile(filePath As String) As String
+Dim stream As Object
+Set stream = CreateObject("ADODB.Stream")
+stream.Charset = "utf-8" ' For Urdu/English mixed text
+stream.Open
+stream.LoadFromFile filePath
+ReadTextFile = stream.ReadText
+stream.Close
+End Function
+' Extract field using regex
+Function ExtractField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+If regex.Test(text) Then
+ExtractField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractField = ""
+End If
+End Function
+' Extract multi-line field (e.g., addresses)
+Function ExtractMultiLineField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+regex.MultiLine = True
+If regex.Test(text) Then
+ExtractMultiLineField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractMultiLineField = ""
+End If
+End Function
+' Clean text (replace newlines with spaces)
+Function CleanText(text As String) As String
+CleanText = Replace(Replace(text, vbCr, " "), vbLf, " ")
+End Function
+J_909 - Copy__comp.pdf
+J_909 - Copy.txt
+Gemini 4 Hydrogen
+Ran for 0s
+Your message exceeded the maximum number of tokens allowed.
+Checkpoint
+set import wizerd to this attached
+also sending you one text and convert to text vba code.
+we use pdf to text converter then use this vba to make a excel formatted sheet. then copypaste it to sheet and run
+Refactor the UI components to match the 'Builty Construction' design language, replacing the default dark theme with a cleaner, corporate aesthetic using light backgrounds, bold typography, and a structured, grid-based layout.
+Sub ConvertJournal2()
+Dim filePath As String
+Dim textData As String
+Dim records() As String
+Dim outputSheet As Worksheet
+Dim i As Long, rowNum As Long, totalRecords As Long
+Dim startTime As Double
+Code
+' Select the text file (UTF-8 or ANSI)
+filePath = Application.GetOpenFilename("Text Files (*.txt), *.txt")
+If filePath = "False" Then Exit Sub
+' Start timer
+startTime = Timer
+' Read file with UTF-8 encoding (supports Urdu/English)
+textData = ReadTextFile(filePath)
+' Split records by "Advertised under section 28(1)"
+records = Split(textData, "Advertised under section 28(1) of Trade Mark Ordinance 2001.")
+totalRecords = UBound(records)
+' Set up status bar progress indicator
+Application.statusBar = "Preparing to process " & totalRecords & " records..."
+' Set up output sheet
+Set outputSheet = ThisWorkbook.Sheets.Add
+outputSheet.Name = "Trademark Data"
+outputSheet.Range("A1:F1").value = Array("Application No", "Title", "Class", "Applicant Name and Address", "Agent Name and Address", "Date of Filing")
+' Apply initial formatting
+With outputSheet
+' Set column widths
+.Columns("A:A").ColumnWidth = 10
+.Columns("B:B").ColumnWidth = 10
+.Columns("C:C").ColumnWidth = 10
+.Columns("D:D").ColumnWidth = 15
+.Columns("E:E").ColumnWidth = 6
+.Columns("F:F").ColumnWidth = 25
+Code
+' Set header formatting
+With .Range("A1:F1")
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlCenter
+    .Font.Bold = True
+    .Interior.Color = RGB(200, 200, 200)
+End With
+End With
+' Process each record
+rowNum = 2
+For i = 1 To UBound(records) ' Skip first empty record
+Dim recordText As String
+recordText = records(i)
+Code
+' Update status bar every 100 records
+If i Mod 100 = 0 Then
+    Application.statusBar = "Processing record " & i & " of " & totalRecords & " (" & Format(i / totalRecords, "0%") & ")"
+    DoEvents ' Allow screen updates
+End If
+
+' Skip if empty
+If Trim(recordText) = "" Then GoTo NextRecord
+
+' Extract fields
+Dim appNo As String, title As String, class_ As String
+Dim applicant As String, agent As String, filingDate As String
+
+' Application No
+appNo = ExtractField(recordText, "Application No:\s*(\d+)")
+
+' Title (handle multi-line titles)
+title = ExtractField(recordText, "Title\s+([^\n]+?)\nClass:")
+If title = "" Then title = ExtractField(recordText, "Title\s+([^\n]+)")
+
+' Class
+class_ = ExtractField(recordText, "Class:\s*(\d+)")
+
+' Applicant Name & Address (multi-line)
+applicant = ExtractMultiLineField(recordText, "Name and address\s+of Applicant:\s*([\s\S]+?)(?=\n\s*(Agent|Date|Description))")
+
+' Agent Name & Address (multi-line)
+agent = ExtractMultiLineField(recordText, "Agent’s name\s+And address:\s*([\s\S]+?)(?=\n\s*(Description|Date|$))")
+
+' Date of Filing (convert to dd-mmm-yyyy)
+filingDate = ExtractField(recordText, "Date of filing:\s*(\d{2}/\d{2}/\d{4})")
+If filingDate <> "" Then
+    filingDate = Format(CDate(filingDate), "dd-mmm-yyyy")
+End If
+
+' Write to Excel
+With outputSheet
+    .Cells(rowNum, 1).value = appNo
+    .Cells(rowNum, 2).value = title
+    .Cells(rowNum, 3).value = class_
+    .Cells(rowNum, 4).value = CleanText(applicant)
+    .Cells(rowNum, 5).value = CleanText(agent)
+    .Cells(rowNum, 6).value = filingDate
+    
+    ' Apply cell formatting
+    .Range("A" & rowNum & ":C" & rowNum).HorizontalAlignment = xlCenter
+    .Range("E" & rowNum).HorizontalAlignment = xlCenter
+    .Range("D" & rowNum & ":F" & rowNum).HorizontalAlignment = xlLeft
+    .Range("A" & rowNum & ":F" & rowNum).VerticalAlignment = xlCenter
+End With
+
+rowNum = rowNum + 1
+NextRecord:
+Next i
+Code
+' Final formatting
+With outputSheet
+' AutoFit rows for better visibility
+.UsedRange.Rows.AutoFit
+Code
+' Add borders to all cells
+With .UsedRange
+    .Borders(xlEdgeLeft).LineStyle = xlContinuous
+    .Borders(xlEdgeTop).LineStyle = xlContinuous
+    .Borders(xlEdgeBottom).LineStyle = xlContinuous
+    .Borders(xlEdgeRight).LineStyle = xlContinuous
+    .Borders(xlInsideVertical).LineStyle = xlContinuous
+    .Borders(xlInsideHorizontal).LineStyle = xlContinuous
+End With
+
+' Freeze header row
+.Rows("2:2").Select
+ActiveWindow.FreezePanes = True
+End With
+' Calculate processing time
+Dim elapsedTime As Double
+elapsedTime = Timer - startTime
+' Reset status bar
+Application.statusBar = False
+' Final message with count and time
+Dim processedCount As Long
+processedCount = rowNum - 2
+MsgBox "Conversion Complete!" & vbCrLf & vbCrLf & _
+"Total records in file: " & totalRecords & vbCrLf & _
+"Processed records: " & processedCount & vbCrLf & _
+"Processing time: " & Format(elapsedTime, "0.00") & " seconds", vbInformation, "Process Completed"
+End Sub
+' [Keep all your existing helper functions: ReadTextFile, ExtractField, ExtractMultiLineField, CleanText]
+' Helper function to read text file (supports UTF-8)
+Function ReadTextFile(filePath As String) As String
+Dim stream As Object
+Set stream = CreateObject("ADODB.Stream")
+stream.Charset = "utf-8" ' For Urdu/English mixed text
+stream.Open
+stream.LoadFromFile filePath
+ReadTextFile = stream.ReadText
+stream.Close
+End Function
+' Extract field using regex
+Function ExtractField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+If regex.Test(text) Then
+ExtractField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractField = ""
+End If
+End Function
+' Extract multi-line field (e.g., addresses)
+Function ExtractMultiLineField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+regex.MultiLine = True
+If regex.Test(text) Then
+ExtractMultiLineField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractMultiLineField = ""
+End If
+End Function
+' Clean text (replace newlines with spaces)
+Function CleanText(text As String) As String
+CleanText = Replace(Replace(text, vbCr, " "), vbLf, " ")
+End Function
+Journal Pub 909 - JournalCheck.csv
+J_909.txt
+J_909.pdf
+Gemini 4 Hydrogen
+Ran for 1s
+Your message exceeded the maximum number of tokens allowed.
+Checkpoint
+set import wizerd to this attached
+also sending you one text and convert to text vba code.
+we use pdf to text converter then use this vba to make a excel formatted sheet. then copypaste it to sheet and run
+Refactor the UI components to match the 'Builty Construction' design language, replacing the default dark theme with a cleaner, corporate aesthetic using light backgrounds, bold typography, and a structured, grid-based layout.
+Sub ConvertJournal2()
+Dim filePath As String
+Dim textData As String
+Dim records() As String
+Dim outputSheet As Worksheet
+Dim i As Long, rowNum As Long, totalRecords As Long
+Dim startTime As Double
+Code
+' Select the text file (UTF-8 or ANSI)
+filePath = Application.GetOpenFilename("Text Files (*.txt), *.txt")
+If filePath = "False" Then Exit Sub
+' Start timer
+startTime = Timer
+' Read file with UTF-8 encoding (supports Urdu/English)
+textData = ReadTextFile(filePath)
+' Split records by "Advertised under section 28(1)"
+records = Split(textData, "Advertised under section 28(1) of Trade Mark Ordinance 2001.")
+totalRecords = UBound(records)
+' Set up status bar progress indicator
+Application.statusBar = "Preparing to process " & totalRecords & " records..."
+' Set up output sheet
+Set outputSheet = ThisWorkbook.Sheets.Add
+outputSheet.Name = "Trademark Data"
+outputSheet.Range("A1:F1").value = Array("Application No", "Title", "Class", "Applicant Name and Address", "Agent Name and Address", "Date of Filing")
+' Apply initial formatting
+With outputSheet
+' Set column widths
+.Columns("A:A").ColumnWidth = 10
+.Columns("B:B").ColumnWidth = 10
+.Columns("C:C").ColumnWidth = 10
+.Columns("D:D").ColumnWidth = 15
+.Columns("E:E").ColumnWidth = 6
+.Columns("F:F").ColumnWidth = 25
+Code
+' Set header formatting
+With .Range("A1:F1")
+.HorizontalAlignment = xlCenter
+.VerticalAlignment = xlCenter
+.Font.Bold = True
+.Interior.Color = RGB(200, 200, 200)
+End With
+End With
+' Process each record
+rowNum = 2
+For i = 1 To UBound(records) ' Skip first empty record
+Dim recordText As String
+recordText = records(i)
+Code
+' Update status bar every 100 records
+If i Mod 100 = 0 Then
+Application.statusBar = "Processing record " & i & " of " & totalRecords & " (" & Format(i / totalRecords, "0%") & ")"
+DoEvents ' Allow screen updates
+End If
+' Skip if empty
+If Trim(recordText) = "" Then GoTo NextRecord
+' Extract fields
+Dim appNo As String, title As String, class_ As String
+Dim applicant As String, agent As String, filingDate As String
+' Application No
+appNo = ExtractField(recordText, "Application No:\s*(\d+)")
+' Title (handle multi-line titles)
+title = ExtractField(recordText, "Title\s+([^\n]+?)\nClass:")
+If title = "" Then title = ExtractField(recordText, "Title\s+([^\n]+)")
+' Class
+class_ = ExtractField(recordText, "Class:\s*(\d+)")
+' Applicant Name & Address (multi-line)
+applicant = ExtractMultiLineField(recordText, "Name and address\s+of Applicant:\s*([\s\S]+?)(?=\n\s*(Agent|Date|Description))")
+' Agent Name & Address (multi-line)
+agent = ExtractMultiLineField(recordText, "Agent’s name\s+And address:\s*([\s\S]+?)(?=\n\s*(Description|Date|$))")
+' Date of Filing (convert to dd-mmm-yyyy)
+filingDate = ExtractField(recordText, "Date of filing:\s*(\d{2}/\d{2}/\d{4})")
+If filingDate <> "" Then
+filingDate = Format(CDate(filingDate), "dd-mmm-yyyy")
+End If
+' Write to Excel
+With outputSheet
+.Cells(rowNum, 1).value = appNo
+.Cells(rowNum, 2).value = title
+.Cells(rowNum, 3).value = class_
+.Cells(rowNum, 4).value = CleanText(applicant)
+.Cells(rowNum, 5).value = CleanText(agent)
+.Cells(rowNum, 6).value = filingDate
+Code
+' Apply cell formatting
+.Range("A" & rowNum & ":C" & rowNum).HorizontalAlignment = xlCenter
+.Range("E" & rowNum).HorizontalAlignment = xlCenter
+.Range("D" & rowNum & ":F" & rowNum).HorizontalAlignment = xlLeft
+.Range("A" & rowNum & ":F" & rowNum).VerticalAlignment = xlCenter
+End With
+rowNum = rowNum + 1
+NextRecord:
+Next i
+Code
+' Final formatting
+With outputSheet
+' AutoFit rows for better visibility
+.UsedRange.Rows.AutoFit
+Code
+' Add borders to all cells
+With .UsedRange
+.Borders(xlEdgeLeft).LineStyle = xlContinuous
+.Borders(xlEdgeTop).LineStyle = xlContinuous
+.Borders(xlEdgeBottom).LineStyle = xlContinuous
+.Borders(xlEdgeRight).LineStyle = xlContinuous
+.Borders(xlInsideVertical).LineStyle = xlContinuous
+.Borders(xlInsideHorizontal).LineStyle = xlContinuous
+End With
+' Freeze header row
+.Rows("2:2").Select
+ActiveWindow.FreezePanes = True
+End With
+' Calculate processing time
+Dim elapsedTime As Double
+elapsedTime = Timer - startTime
+' Reset status bar
+Application.statusBar = False
+' Final message with count and time
+Dim processedCount As Long
+processedCount = rowNum - 2
+MsgBox "Conversion Complete!" & vbCrLf & vbCrLf & _
+"Total records in file: " & totalRecords & vbCrLf & _
+"Processed records: " & processedCount & vbCrLf & _
+"Processing time: " & Format(elapsedTime, "0.00") & " seconds", vbInformation, "Process Completed"
+End Sub
+' [Keep all your existing helper functions: ReadTextFile, ExtractField, ExtractMultiLineField, CleanText]
+' Helper function to read text file (supports UTF-8)
+Function ReadTextFile(filePath As String) As String
+Dim stream As Object
+Set stream = CreateObject("ADODB.Stream")
+stream.Charset = "utf-8" ' For Urdu/English mixed text
+stream.Open
+stream.LoadFromFile filePath
+ReadTextFile = stream.ReadText
+stream.Close
+End Function
+' Extract field using regex
+Function ExtractField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+If regex.Test(text) Then
+ExtractField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractField = ""
+End If
+End Function
+' Extract multi-line field (e.g., addresses)
+Function ExtractMultiLineField(text As String, pattern As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+regex.pattern = pattern
+regex.IgnoreCase = True
+regex.MultiLine = True
+If regex.Test(text) Then
+ExtractMultiLineField = Trim(regex.Execute(text)(0).SubMatches(0))
+Else
+ExtractMultiLineField = ""
+End If
+End Function
+' Clean text (replace newlines with spaces)
+Function CleanText(text As String) As String
+CleanText = Replace(Replace(text, vbCr, " "), vbLf, " ")
+End Function
+DO I SHARE OTHER ALSO LIKE FILE EXAMPLE
+Gemini 4 Hydrogen
+Ran for 0s
+Your message exceeded the maximum number of tokens allowed.
+SET IMORT FORMAT TO

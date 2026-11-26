@@ -141,16 +141,16 @@ export function AnalyzerView({
             return (
               <div
                 key={card.label}
-                className="bg-[#0c0c0e] border border-[#2a2a30] flex items-stretch justify-between min-h-[104px]"
+                className="bg-white border border-[#e2e4ea] flex items-stretch justify-between min-h-[108px]"
               >
                 <div className="p-5 flex flex-col justify-center min-w-0">
-                  <h2 className="text-[15px] font-bold text-white">{card.label}</h2>
-                  <p className="mt-1 text-lg font-extrabold text-[#ffee00] tabular-nums">
+                  <h2 className="text-[14px] font-bold text-[#111111]">{card.label}</h2>
+                  <p className="mt-1 text-xl font-extrabold text-[#111111] tabular-nums">
                     {card.value}
                   </p>
-                  <p className="mt-0.5 text-xs text-[#9c9ca6] truncate">{card.sub}</p>
+                  <p className="mt-0.5 text-xs text-[#555a66] truncate">{card.sub}</p>
                 </div>
-                <div className="w-[96px] sm:w-[112px] bg-[#ffee00] text-black flex items-center justify-center shrink-0">
+                <div className="w-[96px] sm:w-[112px] bg-[#ffee00] text-[#111111] flex items-center justify-center shrink-0">
                   <Icon className="w-9 h-9 stroke-[1.75]" aria-hidden="true" />
                 </div>
               </div>
@@ -160,25 +160,29 @@ export function AnalyzerView({
       </section>
 
       {/* Two-Column Split: Workflow Checklist + Journal Configuration */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-5 bg-[#0c0c0e] border border-[#2a2a30] p-6 space-y-4">
-          <h2 className="text-xl font-bold text-white">
-            What&apos;s Included in Pipeline
-          </h2>
-          <ul className="space-y-3">
-            {checklistItems.map((line) => (
-              <li key={line} className="flex items-start gap-3 text-sm text-[#c7c7d1]">
-                <Check className="w-4 h-4 text-[#ffee00] shrink-0 mt-0.5" aria-hidden="true" />
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="lg:col-span-5 bg-white border border-[#e2e4ea] p-6 flex flex-col justify-between gap-5">
+          <div className="space-y-4">
+            <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
+              What&apos;s Included in Pipeline
+            </h2>
+            <ul className="space-y-3">
+              {checklistItems.map((line) => (
+                <li key={line} className="flex items-start gap-3 text-sm text-[#374151]">
+                  <span className="inline-flex items-center justify-center w-5 h-5 bg-[#ffee00] text-[#111111] shrink-0 mt-0.5">
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" aria-hidden="true" />
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-          <div className="pt-4 border-t border-[#232328] flex flex-wrap gap-3">
+          <div className="pt-4 border-t border-[#eceef2] flex flex-wrap gap-2.5">
             <button
               type="button"
               onClick={onRunScan}
-              className="builty-btn h-[40px] pl-4 pr-2 gap-2.5 text-xs"
+              className="builty-btn h-[40px] pl-4 pr-2 gap-2.5 text-xs whitespace-nowrap"
             >
               <span>Run Scan Now</span>
               <span className="builty-btn-icon-tab w-7 h-7">
@@ -188,33 +192,33 @@ export function AnalyzerView({
             <button
               type="button"
               onClick={() => onGoToTab('journalcheck')}
-              className="h-[40px] px-4 border border-[#3a3a42] text-xs font-semibold text-white hover:border-[#ffee00] hover:text-[#ffee00] transition-colors"
+              className="h-[40px] px-4 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white transition-colors whitespace-nowrap"
             >
               Edit JournalCheck Data
             </button>
             <button
               type="button"
               onClick={() => onGoToTab('review')}
-              className="h-[40px] px-4 border border-[#3a3a42] text-xs font-semibold text-white hover:border-[#ffee00] hover:text-[#ffee00] transition-colors"
+              className="h-[40px] px-4 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white transition-colors whitespace-nowrap"
             >
               Open Review Queue
             </button>
           </div>
         </div>
 
-        <div className="lg:col-span-7 bg-[#0c0c0e] border border-[#2a2a30] p-6 space-y-5">
-          <div className="flex items-center justify-between gap-2 border-b border-[#232328] pb-3">
-            <h2 className="text-lg font-bold text-white">
+        <div className="lg:col-span-7 bg-white border border-[#e2e4ea] p-6 space-y-5">
+          <div className="flex items-center justify-between gap-2 border-b border-[#eceef2] pb-3">
+            <h2 className="text-lg font-extrabold tracking-tight text-[#111111]">
               Dashboard Settings (CFG)
             </h2>
-            <span className="text-xs text-[#9c9ca6] tabular-nums">
-              Serial prefix: {config.serialPrefix}
+            <span className="text-xs font-semibold text-[#555a66] tabular-nums">
+              Serial prefix: <span className="text-[#111111] font-mono">{config.serialPrefix}</span>
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="cfg-journal-no" className="block text-xs font-semibold text-[#c7c7d1] mb-1.5">
+              <label htmlFor="cfg-journal-no" className="block text-xs font-bold text-[#374151] mb-1.5">
                 Journal No (Dashboard B2)
               </label>
               <input
@@ -222,12 +226,12 @@ export function AnalyzerView({
                 type="text"
                 value={config.journalNo}
                 onChange={(e) => onUpdateConfig({ ...config, journalNo: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#ffee00]"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2.5 text-sm text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
               />
             </div>
 
             <div>
-              <label htmlFor="cfg-journal-date" className="block text-xs font-semibold text-[#c7c7d1] mb-1.5">
+              <label htmlFor="cfg-journal-date" className="block text-xs font-bold text-[#374151] mb-1.5">
                 Journal Date (Dashboard B3)
               </label>
               <input
@@ -236,12 +240,12 @@ export function AnalyzerView({
                 value={config.journalDate}
                 onChange={(e) => onUpdateConfig({ ...config, journalDate: e.target.value })}
                 placeholder="26-Nov-2026"
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#ffee00]"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2.5 text-sm text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
               />
             </div>
 
             <div>
-              <label htmlFor="cfg-match-mode" className="block text-xs font-semibold text-[#c7c7d1] mb-1.5">
+              <label htmlFor="cfg-match-mode" className="block text-xs font-bold text-[#374151] mb-1.5">
                 Keyword Match Mode
               </label>
               <select
@@ -253,7 +257,7 @@ export function AnalyzerView({
                     keywordMatchMode: e.target.value as KeywordMatchMode,
                   })
                 }
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#ffee00]"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2.5 text-sm text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
               >
                 <option value="word">Word Boundary (Recommended)</option>
                 <option value="contains">Substring Contains</option>
@@ -261,7 +265,7 @@ export function AnalyzerView({
             </div>
 
             <div>
-              <label htmlFor="cfg-serial-prefix" className="block text-xs font-semibold text-[#c7c7d1] mb-1.5">
+              <label htmlFor="cfg-serial-prefix" className="block text-xs font-bold text-[#374151] mb-1.5">
                 Serial Prefix
               </label>
               <input
@@ -269,7 +273,7 @@ export function AnalyzerView({
                 type="text"
                 value={config.serialPrefix}
                 onChange={(e) => onUpdateConfig({ ...config, serialPrefix: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#ffee00]"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2.5 text-sm text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
               />
             </div>
           </div>
@@ -279,10 +283,10 @@ export function AnalyzerView({
       {/* Watchlist Section: Keywords + 6-Digit TM Numbers + Case Lookup */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Keywords */}
-        <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 flex flex-col gap-4">
-          <div className="flex items-center justify-between border-b border-[#232328] pb-3">
-            <h3 className="text-base font-bold text-white">Watchlist Keywords</h3>
-            <span className="text-xs text-[#ffee00] font-bold tabular-nums">
+        <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
+            <h3 className="text-base font-extrabold text-[#111111]">Watchlist Keywords</h3>
+            <span className="text-xs text-[#111111] bg-[#ffee00] px-2 py-0.5 font-extrabold tabular-nums">
               {config.keywords.length}
             </span>
           </div>
@@ -294,29 +298,29 @@ export function AnalyzerView({
               onChange={(e) => setNewKeyword(e.target.value)}
               placeholder="Add keyword (or comma-separated)"
               aria-label="Add watchlist keyword"
-              className="flex-1 min-w-0 bg-[#16161a] border border-[#2f2f36] px-3 py-2 text-xs text-white focus:outline-none focus:border-[#ffee00]"
+              className="flex-1 min-w-0 bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
             />
             <button
               type="submit"
-              className="px-3 py-2 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600] inline-flex items-center gap-1 shrink-0"
+              className="px-3 py-2 bg-[#ffee00] text-[#111111] text-xs font-bold hover:bg-[#f2e000] inline-flex items-center gap-1 shrink-0"
             >
               <Plus className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Add</span>
             </button>
           </form>
 
-          <ul className="divide-y divide-[#1e1e23] max-h-[240px] overflow-y-auto">
+          <ul className="divide-y divide-[#eceef2] max-h-[240px] overflow-y-auto">
             {config.keywords.map((kw) => (
               <li
                 key={kw}
-                className="py-2 flex items-center justify-between gap-2 text-xs text-[#e2e2e8]"
+                className="py-2 flex items-center justify-between gap-2 text-xs text-[#111111]"
               >
-                <span className="font-mono">{kw}</span>
+                <span className="font-mono font-medium">{kw}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveKeyword(kw)}
                   aria-label={`Remove keyword ${kw}`}
-                  className="p-1 text-[#85858f] hover:text-[#ff5c5c]"
+                  className="p-1 text-[#6b7280] hover:text-red-600"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -326,10 +330,10 @@ export function AnalyzerView({
         </div>
 
         {/* 6-Digit TM Numbers */}
-        <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 flex flex-col gap-4">
-          <div className="flex items-center justify-between border-b border-[#232328] pb-3">
-            <h3 className="text-base font-bold text-white">TM Numbers (6-digit)</h3>
-            <span className="text-xs text-[#ffee00] font-bold tabular-nums">
+        <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
+            <h3 className="text-base font-extrabold text-[#111111]">TM Numbers (6-digit)</h3>
+            <span className="text-xs text-[#111111] bg-[#ffee00] px-2 py-0.5 font-extrabold tabular-nums">
               {config.tmNumbers.length}
             </span>
           </div>
@@ -342,31 +346,31 @@ export function AnalyzerView({
                 onChange={(e) => setNewTm(e.target.value)}
                 placeholder="6-digit TM No (e.g. 548291)"
                 aria-label="Add 6-digit TM number"
-                className="flex-1 min-w-0 bg-[#16161a] border border-[#2f2f36] px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#ffee00]"
+                className="flex-1 min-w-0 bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] font-mono focus:bg-white focus:outline-none focus:border-[#111111]"
               />
               <button
                 type="submit"
-                className="px-3 py-2 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600] inline-flex items-center gap-1 shrink-0"
+                className="px-3 py-2 bg-[#ffee00] text-[#111111] text-xs font-bold hover:bg-[#f2e000] inline-flex items-center gap-1 shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Add</span>
               </button>
             </div>
-            {tmError && <p className="text-[11px] text-[#ff6b6b]">{tmError}</p>}
+            {tmError && <p className="text-[11px] font-semibold text-red-600">{tmError}</p>}
           </form>
 
-          <ul className="divide-y divide-[#1e1e23] max-h-[240px] overflow-y-auto">
+          <ul className="divide-y divide-[#eceef2] max-h-[240px] overflow-y-auto">
             {config.tmNumbers.map((tm) => (
               <li
                 key={tm}
-                className="py-2 flex items-center justify-between gap-2 text-xs text-[#e2e2e8]"
+                className="py-2 flex items-center justify-between gap-2 text-xs text-[#111111]"
               >
-                <span className="font-mono tabular-nums">{tm}</span>
+                <span className="font-mono font-medium tabular-nums">{tm}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveTm(tm)}
                   aria-label={`Remove TM ${tm}`}
-                  className="p-1 text-[#85858f] hover:text-[#ff5c5c]"
+                  className="p-1 text-[#6b7280] hover:text-red-600"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -376,10 +380,10 @@ export function AnalyzerView({
         </div>
 
         {/* Case Lookup Directory */}
-        <div className="bg-[#0c0c0e] border border-[#2a2a30] p-5 flex flex-col gap-4">
-          <div className="flex items-center justify-between border-b border-[#232328] pb-3">
-            <h3 className="text-base font-bold text-white">Case Lookup Map</h3>
-            <span className="text-xs text-[#ffee00] font-bold tabular-nums">
+        <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
+            <h3 className="text-base font-extrabold text-[#111111]">Case Lookup Map</h3>
+            <span className="text-xs text-[#111111] bg-[#ffee00] px-2 py-0.5 font-extrabold tabular-nums">
               {config.caseEntries.length}
             </span>
           </div>
@@ -391,7 +395,7 @@ export function AnalyzerView({
               onChange={(e) => setCaseTm(e.target.value)}
               placeholder="TM No"
               aria-label="Case TM Number"
-              className="bg-[#16161a] border border-[#2f2f36] px-2 py-2 text-xs text-white font-mono"
+              className="bg-[#f8f9fb] border border-[#cbd0da] px-2 py-2 text-xs text-[#111111] font-mono focus:bg-white focus:outline-none focus:border-[#111111]"
             />
             <input
               type="text"
@@ -399,7 +403,7 @@ export function AnalyzerView({
               onChange={(e) => setCaseNo(e.target.value)}
               placeholder="Case No"
               aria-label="Case Number"
-              className="bg-[#16161a] border border-[#2f2f36] px-2 py-2 text-xs text-white"
+              className="bg-[#f8f9fb] border border-[#cbd0da] px-2 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
             />
             <div className="flex gap-1">
               <input
@@ -408,33 +412,33 @@ export function AnalyzerView({
                 onChange={(e) => setCaseClient(e.target.value)}
                 placeholder="Client"
                 aria-label="Client Name"
-                className="flex-1 min-w-0 bg-[#16161a] border border-[#2f2f36] px-2 py-2 text-xs text-white"
+                className="flex-1 min-w-0 bg-[#f8f9fb] border border-[#cbd0da] px-2 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
               />
               <button
                 type="submit"
                 aria-label="Add case mapping"
-                className="px-2.5 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600]"
+                className="px-2.5 bg-[#ffee00] text-[#111111] text-xs font-bold hover:bg-[#f2e000]"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           </form>
 
-          <ul className="divide-y divide-[#1e1e23] max-h-[240px] overflow-y-auto">
+          <ul className="divide-y divide-[#eceef2] max-h-[240px] overflow-y-auto">
             {config.caseEntries.map((c) => (
               <li
                 key={c.tmNumber}
                 className="py-2 flex items-center justify-between gap-2 text-xs"
               >
                 <div className="min-w-0">
-                  <span className="font-mono text-[#ffee00] tabular-nums">{c.tmNumber}</span>
-                  <span className="text-[#85858f]"> · </span>
-                  <span className="text-white font-medium">{c.caseNo}</span>
+                  <span className="font-mono font-bold text-[#111111] tabular-nums">{c.tmNumber}</span>
+                  <span className="text-[#9ca3af]"> · </span>
+                  <span className="text-[#111111] font-semibold">{c.caseNo}</span>
                   {c.clientName && (
-                    <span className="text-[#9c9ca6]"> — {c.clientName}</span>
+                    <span className="text-[#555a66]"> — {c.clientName}</span>
                   )}
                 </div>
-                <FileText className="w-3.5 h-3.5 text-[#646470] shrink-0" aria-hidden="true" />
+                <FileText className="w-3.5 h-3.5 text-[#6b7280] shrink-0" aria-hidden="true" />
               </li>
             ))}
           </ul>

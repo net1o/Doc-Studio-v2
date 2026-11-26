@@ -269,63 +269,345 @@ export function computeReviewStats(
   };
 }
 
-export function parseDelimitedJournalInput(rawText: string): JournalCheckRow[] {
-  const lines = rawText
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (lines.length === 0) return [];
+export const JOURNAL_IMPORT_COLUMNS = [
+  'Application No',
+  'Title',
+  'Class',
+  'Applicant Name and Address',
+  'Agent Name and Address',
+  'Date of Filing',
+  'Page No',
+] as const;
 
-  const delimiter = lines[0].includes('\t') ? '\t' : ',';
-  const splitLine = (line: string): string[] => {
-    if (delimiter === '\t') return line.split('\t').map((c) => c.trim());
-    const cells: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+export interface JournalImportOptions {
+  normalizeDates?: boolean;
+  extractEmbeddedPageNo?: boolean;
+}
+
+export interface ConvertJournalTextResult {
+  rows: JournalCheckRow[];
+  totalSegments: number;
+  processedCount: number;
+  skippedEmpty: number;
+  elapsedMs: number;
+}
+
+const JOURNAL_HEADER_ARTIFACT_RE =
+  /THE\s+TRADE\s+MARKS?\s+JOURNAL\s*\(\s*No\.?\s*\d+[^)]*\)\s*(\d+)?/gi;
+
+function cleanInlineWhitespace(value: string): string {
+  return String(value || '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function applyPostProcessing(
+  row: JournalCheckRow,
+  options: JournalImportOptions
+): JournalCheckRow {
+  let applicant = cleanInlineWhitespace(row.applicant);
+  let agent = cleanInlineWhitespace(row.agent);
+  let pageNo = cleanInlineWhitespace(row.pageNo);
+  const title = cleanInlineWhitespace(row.title);
+  let dateOfFiling = cleanInlineWhitespace(row.dateOfFiling);
+
+  if (options.extractEmbeddedPageNo) {
+    const extractFromField = (field: string): string => {
+      return field
+        .replace(JOURNAL_HEADER_ARTIFACT_RE, (_full, pg) => {
+          if (pg && !pageNo) {
+            pageNo = String(pg).trim();
+          }
+          return ' ';
+        })
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    };
+    applicant = extractFromField(applicant);
+    agent = extractFromField(agent);
+  }
+
+  if (options.normalizeDates && dateOfFiling) {
+    const parsed = parseLooseDate(dateOfFiling);
+    if (parsed) {
+      dateOfFiling = formatDdMmmYy(parsed);
+    }
+  }
+
+  return {
+    ...row,
+    applicationNo: cleanInlineWhitespace(row.applicationNo),
+    title,
+    classNo: cleanInlineWhitespace(row.classNo),
+    applicant,
+    agent,
+    dateOfFiling,
+    pageNo,
+  };
+}
+
+function parseDelimitedMatrix(rawText: string, delimiter: ',' | '\t'): string[][] {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentCell = '';
+  let inQuotes = false;
+
+  const text = rawText.replace(/^\uFEFF/, '');
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (delimiter === ',') {
       if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
+        if (inQuotes && text[i + 1] === '"') {
+          currentCell += '"';
           i++;
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (ch === ',' && !inQuotes) {
-        cells.push(current.trim());
-        current = '';
-      } else {
-        current += ch;
+        continue;
+      }
+
+      if (ch === ',' && !inQuotes) {
+        currentRow.push(currentCell);
+        currentCell = '';
+        continue;
+      }
+    } else {
+      if (ch === '"' && !inQuotes && currentCell === '') {
+        inQuotes = true;
+        continue;
+      }
+      if (ch === '"' && inQuotes) {
+        if (text[i + 1] === '"') {
+          currentCell += '"';
+          i++;
+          continue;
+        }
+        if (
+          text[i + 1] === '\t' ||
+          text[i + 1] === '\r' ||
+          text[i + 1] === '\n' ||
+          i + 1 === text.length
+        ) {
+          inQuotes = false;
+          continue;
+        }
+      }
+      if (ch === '\t' && !inQuotes) {
+        currentRow.push(currentCell);
+        currentCell = '';
+        continue;
       }
     }
-    cells.push(current.trim());
-    return cells;
-  };
 
-  const firstCells = splitLine(lines[0]).map((c) => c.toLowerCase());
-  const looksLikeHeader =
-    firstCells.some((c) => c.includes('application')) ||
-    firstCells.some((c) => c.includes('title'));
+    if ((ch === '\r' || ch === '\n') && !inQuotes) {
+      if (ch === '\r' && text[i + 1] === '\n') {
+        i++;
+      }
+      currentRow.push(currentCell);
+      if (currentRow.some((cell) => cell.trim() !== '')) {
+        rows.push(currentRow);
+      }
+      currentRow = [];
+      currentCell = '';
+      continue;
+    }
 
-  const startIdx = looksLikeHeader ? 1 : 0;
-  const rows: JournalCheckRow[] = [];
+    currentCell += ch;
+  }
 
-  for (let i = startIdx; i < lines.length; i++) {
-    const cols = splitLine(lines[i]);
-    if (cols.every((c) => !c)) continue;
-    rows.push({
-      id: `jc_${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 5)}`,
-      applicationNo: cols[0] || '',
-      title: cols[1] || '',
-      classNo: cols[2] || '',
-      applicant: cols[3] || '',
-      agent: cols[4] || '',
-      dateOfFiling: cols[5] || '',
-      pageNo: cols[6] || '',
-    });
+  currentRow.push(currentCell);
+  if (currentRow.some((cell) => cell.trim() !== '')) {
+    rows.push(currentRow);
   }
 
   return rows;
+}
+
+function resolveColumnMapping(headerCells: string[]): Record<keyof Omit<JournalCheckRow, 'id'>, number> | null {
+  const normalized = headerCells.map((c) => c.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim());
+  const looksLikeHeader =
+    normalized.some((c) => c.includes('application') || c === 'app no' || c === 'tm no') &&
+    normalized.some((c) => c.includes('title') || c.includes('class'));
+
+  if (!looksLikeHeader) return null;
+
+  const findIdx = (matchers: ((h: string) => boolean)[], fallback: number): number => {
+    for (const matcher of matchers) {
+      const idx = normalized.findIndex(matcher);
+      if (idx >= 0) return idx;
+    }
+    return fallback;
+  };
+
+  return {
+    applicationNo: findIdx([(h) => h.includes('application'), (h) => h === 'app no', (h) => h.includes('tm no')], 0),
+    title: findIdx([(h) => h.includes('title'), (h) => h.includes('mark')], 1),
+    classNo: findIdx([(h) => h === 'class' || h.includes('class')], 2),
+    applicant: findIdx([(h) => h.includes('applicant')], 3),
+    agent: findIdx([(h) => h.includes('agent')], 4),
+    dateOfFiling: findIdx([(h) => h.includes('filing') || h.includes('date')], 5),
+    pageNo: findIdx([(h) => h.includes('page')], 6),
+  };
+}
+
+export function detectJournalInputFormat(rawText: string): 'journal_text' | 'csv_tsv' {
+  const sample = rawText.slice(0, 6000);
+  if (
+    /Advertised\s+under\s+section\s+28\(1\)/i.test(sample) ||
+    (/Application\s+No:\s*\d+/i.test(sample) && /Name\s+and\s+address\s+of\s+Applicant:/i.test(sample))
+  ) {
+    return 'journal_text';
+  }
+  return 'csv_tsv';
+}
+
+export function parseDelimitedJournalInput(
+  rawText: string,
+  options: JournalImportOptions = { normalizeDates: true, extractEmbeddedPageNo: true }
+): JournalCheckRow[] {
+  const trimmed = rawText.trim();
+  if (!trimmed) return [];
+
+  const firstLine = trimmed.split(/\r?\n/)[0] || '';
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const delimiter: '\t' | ',' = tabCount > commaCount ? '\t' : ',';
+
+  const matrix = parseDelimitedMatrix(rawText, delimiter);
+  if (matrix.length === 0) return [];
+
+  const mapping = resolveColumnMapping(matrix[0]);
+  const startIdx = mapping ? 1 : 0;
+  const rows: JournalCheckRow[] = [];
+
+  for (let i = startIdx; i < matrix.length; i++) {
+    const cols = matrix[i];
+    if (cols.every((c) => !c.trim())) continue;
+
+    const rawRow: JournalCheckRow = {
+      id: `jc_${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 5)}`,
+      applicationNo: cols[mapping ? mapping.applicationNo : 0] || '',
+      title: cols[mapping ? mapping.title : 1] || '',
+      classNo: cols[mapping ? mapping.classNo : 2] || '',
+      applicant: cols[mapping ? mapping.applicant : 3] || '',
+      agent: cols[mapping ? mapping.agent : 4] || '',
+      dateOfFiling: cols[mapping ? mapping.dateOfFiling : 5] || '',
+      pageNo: cols[mapping ? mapping.pageNo : 6] || '',
+    };
+
+    const processed = applyPostProcessing(rawRow, options);
+    if (
+      !processed.applicationNo &&
+      !processed.title &&
+      !processed.applicant &&
+      !processed.agent
+    ) {
+      continue;
+    }
+    rows.push(processed);
+  }
+
+  return rows;
+}
+
+/**
+ * Browser port of the Excel VBA macro ConvertJournal2():
+ * Splits PDF-extracted text on "Advertised under section 28(1) of Trade Mark Ordinance 2001."
+ * and extracts Application No, Title, Class, Applicant Name & Address, Agent Name & Address,
+ * Date of Filing, and embedded Page No.
+ */
+export function parseRawJournalTextConvertJournal2(
+  rawText: string,
+  options: JournalImportOptions = { normalizeDates: true, extractEmbeddedPageNo: true }
+): ConvertJournalTextResult {
+  const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const normalizedText = rawText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const splitRegex = /Advertised\s+under\s+section\s+28\(1\)\s+of\s+Trade\s+Mark\s+Ordinance\s+2001\.?/i;
+  const segments = normalizedText.split(splitRegex);
+  const totalSegments = Math.max(0, segments.length - 1);
+
+  const rows: JournalCheckRow[] = [];
+  let skippedEmpty = 0;
+
+  // VBA starts at index 1 (skipping preamble before first Advertisement marker) unless no marker was found
+  const startIndex = segments.length > 1 ? 1 : 0;
+
+  for (let i = startIndex; i < segments.length; i++) {
+    const recordText = segments[i];
+    if (!recordText || !recordText.trim()) {
+      skippedEmpty++;
+      continue;
+    }
+
+    const appNoMatch = recordText.match(/Application\s+No:\s*(\d+)/i);
+    const appNo = appNoMatch ? appNoMatch[1].trim() : '';
+
+    let title = '';
+    const titleMulti = recordText.match(/Title\s+([\s\S]+?)(?=\n\s*Class:)/i);
+    if (titleMulti) {
+      title = titleMulti[1];
+    } else {
+      const titleSingle = recordText.match(/Title\s+([^\n]+)/i);
+      if (titleSingle) title = titleSingle[1];
+    }
+
+    const classMatch = recordText.match(/Class:\s*(\d+)/i);
+    const classNo = classMatch ? classMatch[1].trim() : '';
+
+    const applicantMatch = recordText.match(
+      /Name\s+and\s+address\s+of\s+Applicant:\s*([\s\S]+?)(?=\n\s*(?:Agent|Date|Description)|$)/i
+    );
+    const applicant = applicantMatch ? applicantMatch[1] : '';
+
+    const agentMatch = recordText.match(
+      /Agent[’']?s?\s+name\s+And\s+address:\s*([\s\S]+?)(?=\n\s*(?:Description|Date)|$)/i
+    );
+    const agent = agentMatch ? agentMatch[1] : '';
+
+    const filingMatch = recordText.match(
+      /Date\s+of\s+filing:\s*(\d{1,2}[/-](?:\d{1,2}|[A-Za-z]{3})[/-]\d{2,4})/i
+    );
+    const dateOfFiling = filingMatch ? filingMatch[1].trim() : '';
+
+    const pageMatch =
+      recordText.match(/THE\s+TRADE\s+MARKS?\s+JOURNAL\s*\(\s*No\.?\s*\d+[^)]*\)\s*(\d+)/i) ||
+      recordText.match(/\bPage\s*(?:No\.?)?:?\s*(\d+)\b/i);
+    const pageNo = pageMatch ? pageMatch[1].trim() : '';
+
+    if (!appNo && !title.trim() && !applicant.trim()) {
+      skippedEmpty++;
+      continue;
+    }
+
+    const processed = applyPostProcessing(
+      {
+        id: `jc_vba_${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 5)}`,
+        applicationNo: appNo,
+        title,
+        classNo,
+        applicant,
+        agent,
+        dateOfFiling,
+        pageNo,
+      },
+      options
+    );
+
+    rows.push(processed);
+  }
+
+  const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  return {
+    rows,
+    totalSegments,
+    processedCount: rows.length,
+    skippedEmpty,
+    elapsedMs: Math.max(1, Math.round(end - start)),
+  };
 }
 
 export function exportRowsToCsv(headers: string[], matrix: (string | number | boolean)[][]): string {

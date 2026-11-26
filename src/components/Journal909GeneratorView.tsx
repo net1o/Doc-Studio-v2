@@ -72,9 +72,9 @@ export function Journal909GeneratorView({
 
   if (!activeDoc) {
     return (
-      <div className="bg-[#0c0c0e] border border-[#2a2a30] p-10 text-center space-y-4">
-        <h2 className="text-xl font-bold text-white">No Generated Journal 909 Documents</h2>
-        <p className="text-sm text-[#9c9ca6]">
+      <div className="bg-white border border-[#e2e4ea] p-10 text-center space-y-4">
+        <h2 className="text-xl font-extrabold text-[#111111]">No Generated Journal 909 Documents</h2>
+        <p className="text-sm text-[#555a66]">
           Create a blank Legal 8.5×14 sheet or mark rows as MAILMERGE in Review Queue to generate documents.
         </p>
         <button
@@ -99,20 +99,20 @@ export function Journal909GeneratorView({
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
       {/* Left Control Rail */}
-      <aside className="no-print xl:col-span-4 bg-[#0c0c0e] border border-[#2a2a30] p-5 space-y-5">
-        <div className="flex items-center justify-between gap-2 border-b border-[#232328] pb-3">
+      <aside className="no-print xl:col-span-4 bg-white border border-[#e2e4ea] p-5 space-y-5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#eceef2] pb-3">
           <div>
-            <h2 className="text-base font-bold text-white">
+            <h2 className="text-base font-extrabold text-[#111111]">
               Journal 909 Legal (8.5×14)
             </h2>
-            <p className="text-[11.5px] text-[#9c9ca6]">
-              Futuristic Fonts · Exact Legal Print Sheet
+            <p className="text-[11.5px] text-[#555a66]">
+              Editorial Print Sheet · Exact Legal Dimensions
             </p>
           </div>
           <button
             type="button"
             onClick={onCreateBlankDoc}
-            className="px-2.5 py-1.5 bg-[#ffee00] text-black text-xs font-bold hover:bg-[#e6d600] inline-flex items-center gap-1"
+            className="px-2.5 py-1.5 bg-[#ffee00] text-[#111111] text-xs font-bold hover:bg-[#f2e000] inline-flex items-center gap-1"
           >
             <Plus className="w-3.5 h-3.5" aria-hidden="true" />
             <span>New</span>
@@ -121,14 +121,14 @@ export function Journal909GeneratorView({
 
         {/* Document Picker */}
         <div>
-          <label htmlFor="j909-doc-select" className="block text-xs font-semibold text-[#c7c7d1] mb-1.5">
+          <label htmlFor="j909-doc-select" className="block text-xs font-bold text-[#374151] mb-1.5">
             Active Document ({docs.length})
           </label>
           <select
             id="j909-doc-select"
             value={activeDoc.id}
             onChange={(e) => onSelectDoc(e.target.value)}
-            className="w-full bg-[#16161a] border border-[#2f2f36] px-3 py-2 text-xs text-white focus:border-[#ffee00]"
+            className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs font-semibold text-[#111111] focus:bg-white focus:border-[#111111]"
           >
             {docs.map((d) => (
               <option key={d.id} value={d.id}>
@@ -155,7 +155,7 @@ export function Journal909GeneratorView({
             <button
               type="button"
               onClick={handleDownloadHtml}
-              className="h-[38px] px-3 border border-[#3a3a42] bg-[#16161a] hover:border-[#ffee00] hover:text-[#ffee00] text-xs font-semibold text-white inline-flex items-center justify-center gap-1.5"
+              className="h-[38px] px-3 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center justify-center gap-1.5"
             >
               <FileCode2 className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Export HTML</span>
@@ -163,7 +163,7 @@ export function Journal909GeneratorView({
             <button
               type="button"
               onClick={handleDownloadWord}
-              className="h-[38px] px-3 border border-[#3a3a42] bg-[#16161a] hover:border-[#ffee00] hover:text-[#ffee00] text-xs font-semibold text-white inline-flex items-center justify-center gap-1.5"
+              className="h-[38px] px-3 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center justify-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Export Word</span>
@@ -171,7 +171,7 @@ export function Journal909GeneratorView({
           </div>
 
           {activeDoc.pdfGenerated && (
-            <p className="text-[11.5px] text-[#86efac] inline-flex items-center gap-1.5 pt-1">
+            <p className="text-[11.5px] font-semibold text-emerald-700 inline-flex items-center gap-1.5 pt-1">
               <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
               PDF status marked generated in Review &amp; Records
             </p>
@@ -179,97 +179,97 @@ export function Journal909GeneratorView({
         </div>
 
         {/* Editable Merge Fields */}
-        <div className="space-y-3 border-t border-[#232328] pt-4">
+        <div className="space-y-3 border-t border-[#eceef2] pt-4">
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-[11px] text-[#9c9ca6] mb-1">Journal No</label>
+              <label className="block text-[11px] font-bold text-[#555a66] mb-1">Journal No</label>
               <input
                 type="text"
                 value={activeDoc.journalNo}
                 onChange={(e) => onUpdateDoc(activeDoc.id, { journalNo: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-[#9c9ca6] mb-1">Journal Date</label>
+              <label className="block text-[11px] font-bold text-[#555a66] mb-1">Journal Date</label>
               <input
                 type="text"
                 value={activeDoc.journalDate}
                 onChange={(e) => onUpdateDoc(activeDoc.id, { journalDate: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] text-[#9c9ca6] mb-1">Publishing Details Box</label>
+            <label className="block text-[11px] font-bold text-[#555a66] mb-1">Publishing Details Box</label>
             <textarea
               rows={3}
               value={activeDoc.publishingDetails}
               onChange={(e) =>
                 onUpdateDoc(activeDoc.id, { publishingDetails: e.target.value })
               }
-              className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white"
+              className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-[11px] text-[#9c9ca6] mb-1">TITLE</label>
+              <label className="block text-[11px] font-bold text-[#555a66] mb-1">TITLE</label>
               <input
                 type="text"
                 value={activeDoc.title}
                 onChange={(e) => onUpdateDoc(activeDoc.id, { title: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-[#9c9ca6] mb-1">TRADEMARK (App No)</label>
+              <label className="block text-[11px] font-bold text-[#555a66] mb-1">TRADEMARK (App No)</label>
               <input
                 type="text"
                 value={activeDoc.trademarkField}
                 onChange={(e) =>
                   onUpdateDoc(activeDoc.id, { trademarkField: e.target.value })
                 }
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white font-mono"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] font-mono focus:bg-white focus:border-[#111111]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-[11px] text-[#9c9ca6] mb-1">CLASS</label>
+              <label className="block text-[11px] font-bold text-[#555a66] mb-1">CLASS</label>
               <input
                 type="text"
                 value={activeDoc.classNo}
                 onChange={(e) => onUpdateDoc(activeDoc.id, { classNo: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-[#9c9ca6] mb-1">Cell 4 Label</label>
+              <label className="block text-[11px] font-bold text-[#555a66] mb-1">Cell 4 Label</label>
               <input
                 type="text"
                 value={activeDoc.extraLabel}
                 onChange={(e) => onUpdateDoc(activeDoc.id, { extraLabel: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-[#9c9ca6] mb-1">Cell 4 Value</label>
+              <label className="block text-[11px] font-bold text-[#555a66] mb-1">Cell 4 Value</label>
               <input
                 type="text"
                 value={activeDoc.extraValue}
                 onChange={(e) => onUpdateDoc(activeDoc.id, { extraValue: e.target.value })}
-                className="w-full bg-[#16161a] border border-[#2f2f36] px-2.5 py-1.5 text-xs text-white"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-1.5 text-xs text-[#111111] focus:bg-white focus:border-[#111111]"
               />
             </div>
           </div>
         </div>
 
         {/* Artwork Upload for IMAGE section */}
-        <div className="border-t border-[#232328] pt-4 space-y-2.5">
-          <span className="block text-xs font-semibold text-[#c7c7d1]">
+        <div className="border-t border-[#eceef2] pt-4 space-y-2.5">
+          <span className="block text-xs font-bold text-[#374151]">
             Trademark Artwork (IMAGE Area)
           </span>
           <input
@@ -289,9 +289,9 @@ export function Journal909GeneratorView({
             <button
               type="button"
               onClick={() => imageInputRef.current?.click()}
-              className="flex-1 h-[36px] px-3 border border-[#3a3a42] bg-[#16161a] hover:border-[#ffee00] hover:text-[#ffee00] text-xs font-semibold text-white inline-flex items-center justify-center gap-1.5"
+              className="flex-1 h-[36px] px-3 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center justify-center gap-1.5"
             >
-              <ImagePlus className="w-3.5 h-3.5 text-[#ffee00]" aria-hidden="true" />
+              <ImagePlus className="w-3.5 h-3.5 text-[#111111]" aria-hidden="true" />
               <span>{activeDoc.imageDataUrl ? 'Replace Artwork' : 'Upload Artwork'}</span>
             </button>
             {activeDoc.imageDataUrl && (
@@ -299,7 +299,7 @@ export function Journal909GeneratorView({
                 type="button"
                 onClick={() => onUpdateDoc(activeDoc.id, { imageDataUrl: '' })}
                 aria-label="Clear artwork"
-                className="h-[36px] px-2.5 border border-[#3a3a42] bg-[#16161a] text-[#9c9ca6] hover:text-[#ff5c5c]"
+                className="h-[36px] px-2.5 border border-[#cbd0da] bg-[#f8f9fb] text-[#555a66] hover:text-red-600"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -308,16 +308,16 @@ export function Journal909GeneratorView({
         </div>
 
         {/* Preview Scale */}
-        <div className="border-t border-[#232328] pt-3 flex items-center justify-between text-xs">
-          <span className="text-[#9c9ca6]">Preview Zoom</span>
-          <div className="flex border border-[#2f2f36]">
+        <div className="border-t border-[#eceef2] pt-3 flex items-center justify-between text-xs">
+          <span className="font-semibold text-[#555a66]">Preview Zoom</span>
+          <div className="flex border border-[#cbd0da] bg-white">
             {(['fit', '75', '100'] as const).map((z) => (
               <button
                 key={z}
                 type="button"
                 onClick={() => setZoom(z)}
-                className={`px-2.5 py-1 text-[11px] font-semibold ${
-                  zoom === z ? 'bg-[#ffee00] text-black' : 'text-[#c7c7d1] hover:text-white'
+                className={`px-2.5 py-1 text-[11px] font-bold ${
+                  zoom === z ? 'bg-[#ffee00] text-[#111111]' : 'text-[#555a66] hover:text-[#111111]'
                 }`}
               >
                 {z === 'fit' ? 'Fit' : `${z}%`}
@@ -328,7 +328,7 @@ export function Journal909GeneratorView({
       </aside>
 
       {/* Right Canvas: Exact Journal 909 - Legal Size (8.5in x 14in) Sheet */}
-      <div className="xl:col-span-8 overflow-x-auto flex justify-center bg-[#141418] border border-[#2a2a30] p-4 sm:p-6 min-h-[760px] print:col-span-12 print:overflow-visible print:block print:bg-white print:border-0 print:p-0 print:min-h-0">
+      <div className="xl:col-span-8 overflow-x-auto flex justify-center bg-[#e9ebf0] border border-[#d4d7e0] p-4 sm:p-6 min-h-[760px] print:col-span-12 print:overflow-visible print:block print:bg-white print:border-0 print:p-0 print:min-h-0">
         <div className={`j909-print-wrapper ${scaleClass}`}>
           <div className="j909-page">
             {/* Exact Outer Frame & Corner Borders SVG */}
