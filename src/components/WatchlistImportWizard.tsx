@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Database,
   FileSpreadsheet,
   FileUp,
@@ -11,8 +13,8 @@ import {
 } from 'lucide-react';
 import { CaseEntry, CaseSheetConfig, JournalConfig } from '../types/journal';
 import {
-  buildGoogleSheetCsvUrl,
   checkDuplicate,
+  fetchGoogleSheetCsvSmart,
   parseCaseLookupInput,
   parseWatchlistImport,
 } from '../lib/journal/engine';
@@ -28,6 +30,7 @@ export type WatchlistWizardTab = 'watchlist' | 'casemap';
 interface WatchlistImportWizardProps {
   initialTab?: WatchlistWizardTab;
   config: JournalConfig;
+  pageSize?: number;
   onApplyWatchlist: (
     keywords: string[],
     tmNumbers: string[],
@@ -45,10 +48,12 @@ interface WatchlistImportWizardProps {
 export function WatchlistImportWizard({
   initialTab = 'watchlist',
   config,
+  pageSize = 50,
   onApplyWatchlist,
   onApplyCaseEntries,
   onClose,
 }: WatchlistImportWizardProps) {
+  const safePageSize = Math.max(1, pageSize || 50);
   const [activeTab, setActiveTab] = useState<WatchlistWizardTab>(initialTab);
 
   // Watchlist import state
@@ -57,7 +62,7 @@ export function WatchlistImportWizard({
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const watchlistFileRef = useRef<HTMLInputElement>(null);
 
-  // Case Lookup import state
+  // Case Lookup import state (aligned to 24-col DATABASE defaults: Col 8 TM, Cols 3-4-5 Case, Col 6 Client, Col 7 App Name)
   const [sheetUrlOrId, setSheetUrlOrId] = useState(
     config.caseSheetConfig?.sheetUrlOrId || DEFAULT_APPS_SCRIPT_CASE_SHEET_ID
   );
@@ -68,13 +73,17 @@ export function WatchlistImportWizard({
     'auto' | 'apps_script_database' | 'three_col' | 'custom'
   >('auto');
   const [keyCol, setKeyCol] = useState(config.caseSheetConfig?.keyCol || 8);
-  const [caseCol, setCaseCol] = useState(config.caseSheetConfig?.caseCol || 3);
-  const [clientCol, setClientCol] = useState(config.caseSheetConfig?.clientCol || 4);
+  const [prefixCol, setPrefixCol] = useState(config.caseSheetConfig?.prefixCol || 3);
+  const [clientCodeCol, setClientCodeCol] = useState(config.caseSheetConfig?.clientCodeCol || 4);
+  const [caseCol, setCaseCol] = useState(config.caseSheetConfig?.caseCol || 5);
+  const [clientCol, setClientCol] = useState(config.caseSheetConfig?.clientCol || 6);
+  const [appNameCol, setAppNameCol] = useState(config.caseSheetConfig?.appNameCol || 7);
   const [caseRaw, setCaseRaw] = useState('');
   const [caseSourceLabel, setCaseSourceLabel] = useState('');
   const [fetchingSheet, setFetchingSheet] = useState(false);
   const [caseError, setCaseError] = useState<string | null>(null);
   const [refreshReviewOnImport, setRefreshReviewOnImport] = useState(true);
+  const [previewPage, setPreviewPage] = useState(1);
   const caseFileRef = useRef<HTMLInputElement>(null);
 
   const parsedWatchlist = useMemo(
@@ -100,18 +109,30 @@ export function WatchlistImportWizard({
         mappingMode:
           mappingMode === 'apps_script_database' ? 'sheet_col8_345' : mappingMode,
         keyCol,
+        prefixCol,
+        clientCodeCol,
         caseCol,
         clientCol,
+        appNameCol,
+        caseSeparator: config.caseSheetConfig?.caseSeparator || '-',
+        preserveDuplicateTms: true,
       }),
-    [caseRaw, mappingMode, keyCol, caseCol, clientCol]
+    [caseRaw, mappingMode, keyCol, prefixCol, clientCodeCol, caseCol, clientCol, appNameCol, config.caseSheetConfig?.caseSeparator]
   );
 
   const caseDupCount = useMemo(() => {
     return checkDuplicate(
-      parsedCaseMap.entries.map((e) => e.tmNumber),
-      config.caseEntries.map((c) => c.tmNumber)
+      parsedCaseMap.entries.map((e) => e.tmNumber).filter(Boolean),
+      config.caseEntries.map((c) => c.tmNumber).filter(Boolean)
     ).duplicates.length;
   }, [parsedCaseMap.entries, config.caseEntries]);
+
+  const totalPreviewPages = Math.max(1, Math.ceil(parsedCaseMap.entries.length / safePageSize));
+  const safePreviewPage = Math.min(previewPage, totalPreviewPages);
+  const previewSlice = useMemo(() => {
+    const start = (safePreviewPage - 1) * safePageSize;
+    return parsedCaseMap.entries.slice(start, start + safePageSize);
+  }, [parsedCaseMap.entries, safePreviewPage, safePageSize]);
 
   const handleWatchlistFile = async (file: File) => {
     setWatchlistError(null);
@@ -119,7 +140,7 @@ export function WatchlistImportWizard({
       const text = await file.text();
       setWatchlistRaw(text);
     } catch {
-      setWatchlistError('Could not read the selected file. Ensure it is UTF-8 text, CSV, or TSV.');
+      setWatchlistError('Could not read the selected file.');
     }
   };
 
@@ -128,6 +149,7 @@ export function WatchlistImportWizard({
     try {
       const text = await file.text();
       setCaseRaw(text);
+      setPreviewPage(1);
       setCaseSourceLabel(file.name);
     } catch {
       setCaseError('Could not read the selected CSV file.');
@@ -135,8 +157,7 @@ export function WatchlistImportWizard({
   };
 
   const handleFetchGoogleSheet = async () => {
-    const csvUrl = buildGoogleSheetCsvUrl(sheetUrlOrId, sheetName);
-    if (!csvUrl) {
+    if (!sheetUrlOrId.trim()) {
       setCaseError('Enter a Google Sheet URL, Sheet ID, or Published CSV link.');
       return;
     }
@@ -144,26 +165,19 @@ export function WatchlistImportWizard({
     setFetchingSheet(true);
     setCaseError(null);
     try {
-      const res = await fetch(csvUrl);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const text = await res.text();
-      const trimmedLower = text.trim().slice(0, 200).toLowerCase();
-      if (trimmedLower.startsWith('<!doctype') || trimmedLower.startsWith('<html')) {
-        throw new Error('GOOGLE_LOGIN_HTML');
-      }
+      const { text } = await fetchGoogleSheetCsvSmart(sheetUrlOrId, sheetName);
       setCaseRaw(text);
-      setCaseSourceLabel(`Google Sheet (${sheetName || 'CSV'})`);
+      setPreviewPage(1);
+      setCaseSourceLabel(`Google Sheet (${sheetName || 'DATABASE'})`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg === 'GOOGLE_LOGIN_HTML') {
         setCaseError(
-          'Google returned a sign-in page because this spreadsheet is private. Either set sharing to "Anyone with the link -> Viewer", paste a File -> Share -> Publish to web CSV link, or download the DATABASE sheet as CSV and upload it below.'
+          'Sheet is private. Set sharing to "Anyone with the link -> Viewer" or paste CSV rows below.'
         );
       } else {
         setCaseError(
-          'Unable to fetch Google Sheet CSV directly (usually due to private sharing or CORS). Export the DATABASE tab as .csv or publish to web as CSV and paste/upload it below.'
+          'Unable to fetch Google Sheet CSV directly. Export or paste CSV rows below.'
         );
       }
     } finally {
@@ -175,8 +189,12 @@ export function WatchlistImportWizard({
     sheetUrlOrId: sheetUrlOrId.trim(),
     sheetName: sheetName.trim(),
     keyCol,
+    prefixCol,
+    clientCodeCol,
     caseCol,
     clientCol,
+    appNameCol,
+    caseSeparator: config.caseSheetConfig?.caseSeparator || '-',
     lastSyncedAt: new Date().toISOString(),
   };
 
@@ -193,11 +211,8 @@ export function WatchlistImportWizard({
           </div>
           <div>
             <h3 className="text-sm font-extrabold tracking-tight">
-              Watchlist &amp; Case Lookup Import System
+              Watchlist &amp; Case Import
             </h3>
-            <p className="text-xs text-[#c7c9d1]">
-              Bulk-import Keywords, 6-digit TM Numbers, and Google Sheet DATABASE Case Mappings
-            </p>
           </div>
         </div>
 
@@ -224,7 +239,7 @@ export function WatchlistImportWizard({
               : 'border-transparent text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
           }`}
         >
-          1. Keywords &amp; 6-Digit TM Numbers
+          1. Keywords &amp; TM Numbers
         </button>
         <button
           type="button"
@@ -237,7 +252,7 @@ export function WatchlistImportWizard({
               : 'border-transparent text-[#555a66] hover:text-[#111111] hover:bg-[#f6f7f9]'
           }`}
         >
-          2. Case Lookup Map (DATABASE Sheet / CSV)
+          2. Case Database Sheet / CSV
         </button>
       </div>
 
@@ -245,14 +260,8 @@ export function WatchlistImportWizard({
       {activeTab === 'watchlist' && (
         <div className="p-6 space-y-5">
           <div className="bg-[#f6f7f9] border border-[#e2e4ea] p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="space-y-1">
-              <div className="text-xs font-bold text-[#111111]">
-                Supported Formats: Excel 2-Column Paste (Keywords + TM Numbers), CSV, or Plain Lists
-              </div>
-              <div className="text-xs text-[#555a66]">
-                Paste directly from Excel/Google Sheets or upload a .csv/.tsv/.txt file. Headers like
-                &quot;Keywords&quot; and &quot;TM Numbers (6-digit)&quot; are skipped automatically.
-              </div>
+            <div className="text-xs font-bold text-[#111111]">
+              Paste from Excel, Sheets, CSV, or plain lists.
             </div>
 
             <button
@@ -264,8 +273,7 @@ export function WatchlistImportWizard({
             >
               <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
               <span>
-                Ensure Seed List ({USER_WATCHLIST_KEYWORDS.length} KW ·{' '}
-                {USER_WATCHLIST_TM_NUMBERS.length} TMs)
+                Load Seed List ({USER_WATCHLIST_KEYWORDS.length} KW · {USER_WATCHLIST_TM_NUMBERS.length} TMs)
               </span>
             </button>
           </div>
@@ -281,7 +289,7 @@ export function WatchlistImportWizard({
                 onChange={(e) =>
                   setWatchlistTarget(e.target.value as 'auto' | 'keywords_only' | 'tm_only')
                 }
-                className="bg-[#f8f9fb] border border-[#cbd0da] px-3 py-1.5 text-xs font-semibold text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+                className="bg-[#f8f9fb] border border-[#cbd0da] px-3 py-1.5 text-xs font-semibold text-[#111111]"
               >
                 <option value="auto">Auto-detect (Keywords + 6-digit TMs)</option>
                 <option value="keywords_only">Keywords Only</option>
@@ -324,10 +332,10 @@ export function WatchlistImportWizard({
           </div>
 
           <textarea
-            rows={6}
+            rows={5}
             value={watchlistRaw}
             onChange={(e) => setWatchlistRaw(e.target.value)}
-            placeholder={`Keywords\tTM Numbers (6-digit)\nA2Z CONSULTANTS\t210199\nAIMA Management\t234336\n\t506000`}
+            placeholder={`Keywords\tTM Numbers (6-digit)\nA2Z CONSULTANTS\t210199\n\t506000`}
             aria-label="Paste keywords or 6-digit TM numbers"
             className="w-full bg-[#f8f9fb] border border-[#cbd0da] p-3 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
           />
@@ -343,29 +351,18 @@ export function WatchlistImportWizard({
               <div className="flex flex-wrap items-center gap-2 text-xs text-[#111111] tabular-nums">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
                 <span className="font-bold">
-                  {parsedWatchlist.keywords.length} keyword(s) ({watchlistDupStats.newKw} new, {watchlistDupStats.dupKw} dup)
+                  {parsedWatchlist.keywords.length} keyword(s) ({watchlistDupStats.newKw} new) ·{' '}
+                  {parsedWatchlist.tmNumbers.length} TM(s) ({watchlistDupStats.newTm} new)
                 </span>
-                <span aria-hidden="true" className="text-[#9ca3af]">·</span>
-                <span className="font-bold">
-                  {parsedWatchlist.tmNumbers.length} TM(s) ({watchlistDupStats.newTm} new, {watchlistDupStats.dupTm} dup)
-                </span>
-                {parsedWatchlist.invalidTmTokens.length > 0 && (
-                  <>
-                    <span aria-hidden="true" className="text-[#9ca3af]">·</span>
-                    <span className="text-amber-800">
-                      {parsedWatchlist.invalidTmTokens.length} non-6-digit token(s) ignored
-                    </span>
-                  </>
-                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border border-[#e2e4ea] p-3 bg-[#f8f9fb] max-h-[160px] overflow-y-auto">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-[#555a66] mb-2">
-                    Keywords Preview (first 30)
+                    Keywords ({parsedWatchlist.keywords.length})
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {parsedWatchlist.keywords.slice(0, 30).map((kw) => (
+                    {parsedWatchlist.keywords.slice(0, safePageSize).map((kw) => (
                       <span
                         key={kw}
                         className="px-2 py-0.5 bg-white border border-[#d4d7e0] text-[11px] font-mono text-[#111111]"
@@ -373,18 +370,15 @@ export function WatchlistImportWizard({
                         {kw}
                       </span>
                     ))}
-                    {parsedWatchlist.keywords.length === 0 && (
-                      <span className="text-xs text-[#555a66]">None in pasted data</span>
-                    )}
                   </div>
                 </div>
 
                 <div className="border border-[#e2e4ea] p-3 bg-[#f8f9fb] max-h-[160px] overflow-y-auto">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-[#555a66] mb-2">
-                    TM Numbers Preview (first 30)
+                    TM Numbers ({parsedWatchlist.tmNumbers.length})
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {parsedWatchlist.tmNumbers.slice(0, 30).map((tm) => (
+                    {parsedWatchlist.tmNumbers.slice(0, safePageSize).map((tm) => (
                       <span
                         key={tm}
                         className="px-2 py-0.5 bg-white border border-[#d4d7e0] text-[11px] font-mono tabular-nums text-[#111111]"
@@ -392,9 +386,6 @@ export function WatchlistImportWizard({
                         {tm}
                       </span>
                     ))}
-                    {parsedWatchlist.tmNumbers.length === 0 && (
-                      <span className="text-xs text-[#555a66]">None in pasted data</span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -403,30 +394,22 @@ export function WatchlistImportWizard({
                 <button
                   type="button"
                   onClick={() => {
-                    onApplyWatchlist(
-                      parsedWatchlist.keywords,
-                      parsedWatchlist.tmNumbers,
-                      'append'
-                    );
+                    onApplyWatchlist(parsedWatchlist.keywords, parsedWatchlist.tmNumbers, 'append');
                     setWatchlistRaw('');
                   }}
                   className="h-[38px] px-4 border border-[#111111] bg-white text-xs font-bold text-[#111111] hover:bg-[#f6f7f9]"
                 >
-                  Append / Merge into Watchlist
+                  Append / Merge
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    onApplyWatchlist(
-                      parsedWatchlist.keywords,
-                      parsedWatchlist.tmNumbers,
-                      'replace'
-                    );
+                    onApplyWatchlist(parsedWatchlist.keywords, parsedWatchlist.tmNumbers, 'replace');
                     setWatchlistRaw('');
                   }}
                   className="builty-btn h-[38px] pl-4 pr-3 gap-2 text-xs"
                 >
-                  <span>Replace Matched Watchlist Columns</span>
+                  <span>Replace Watchlist</span>
                 </button>
               </div>
             </div>
@@ -437,19 +420,6 @@ export function WatchlistImportWizard({
       {/* TAB 2: CASE LOOKUP MAP (DATABASE SHEET / CSV) */}
       {activeTab === 'casemap' && (
         <div className="p-6 space-y-5">
-          <div className="bg-[#f6f7f9] border border-[#e2e4ea] p-4 space-y-1.5">
-            <div className="text-xs font-bold text-[#111111]">
-              Google Sheet &quot;DATABASE&quot; Connector (Matches Apps Script CFG)
-            </div>
-            <p className="text-xs text-[#555a66]">
-              Configured for <span className="font-mono text-[#111111]">Col H (8) = TM/CPR NUMBER</span>{' '}
-              mapped to <span className="font-mono text-[#111111]">Col C (3) = CASE NUMBER</span> and{' '}
-              <span className="font-mono text-[#111111]">Col D (4) = CLIENT NAME</span>. Paste a shared/published
-              Google Sheet CSV link below or upload/paste an exported CSV.
-            </p>
-          </div>
-
-          {/* Google Sheet Link / ID Sync */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
             <div className="lg:col-span-6">
               <label htmlFor="case-sheet-url" className="block text-xs font-bold text-[#111111] mb-1">
@@ -460,8 +430,8 @@ export function WatchlistImportWizard({
                 type="text"
                 value={sheetUrlOrId}
                 onChange={(e) => setSheetUrlOrId(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv or Sheet ID"
-                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs font-mono text-[#111111]"
               />
             </div>
 
@@ -475,7 +445,7 @@ export function WatchlistImportWizard({
                 value={sheetName}
                 onChange={(e) => setSheetName(e.target.value)}
                 placeholder="DATABASE"
-                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111]"
               />
             </div>
 
@@ -492,11 +462,10 @@ export function WatchlistImportWizard({
             </div>
           </div>
 
-          {/* Column Mapping & File Upload */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end border-t border-b border-[#eceef2] py-3">
             <div className="md:col-span-5">
               <label htmlFor="case-col-preset" className="block text-xs font-bold text-[#111111] mb-1">
-                Column Mapping Preset
+                Column Mapping
               </label>
               <select
                 id="case-col-preset"
@@ -506,12 +475,12 @@ export function WatchlistImportWizard({
                     e.target.value as 'auto' | 'apps_script_database' | 'three_col' | 'custom'
                   )
                 }
-                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs font-semibold text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+                className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs font-semibold text-[#111111]"
               >
-                <option value="auto">Auto-detect (Headers or Apps Script Width)</option>
-                <option value="apps_script_database">Apps Script DATABASE (Col H → Col C &amp; D)</option>
-                <option value="three_col">3-Column CSV (TM No, Case No, Client)</option>
-                <option value="custom">Custom 1-Based Column Numbers</option>
+                <option value="auto">Auto-detect Headers</option>
+                <option value="apps_script_database">Standard Sheet (TM Col 8 · Case Cols 3-4-5)</option>
+                <option value="three_col">3-Column CSV (TM, Case, Client)</option>
+                <option value="custom">Custom Column Numbers</option>
               </select>
             </div>
 
@@ -527,7 +496,7 @@ export function WatchlistImportWizard({
                     min={1}
                     value={keyCol}
                     onChange={(e) => setKeyCol(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono text-[#111111]"
+                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -540,7 +509,7 @@ export function WatchlistImportWizard({
                     min={1}
                     value={caseCol}
                     onChange={(e) => setCaseCol(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono text-[#111111]"
+                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -553,7 +522,7 @@ export function WatchlistImportWizard({
                     min={1}
                     value={clientCol}
                     onChange={(e) => setClientCol(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono text-[#111111]"
+                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono"
                   />
                 </div>
               </>
@@ -579,26 +548,27 @@ export function WatchlistImportWizard({
                 className="h-[36px] px-3.5 border border-[#cbd0da] bg-white hover:border-[#111111] text-xs font-bold text-[#111111] inline-flex items-center gap-1.5"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Upload DATABASE CSV / TSV</span>
+                <span>Upload CSV / TSV</span>
               </button>
               {caseSourceLabel && (
                 <span className="text-xs font-semibold text-[#555a66] self-center">
-                  Loaded: {caseSourceLabel}
+                  {caseSourceLabel}
                 </span>
               )}
             </div>
           </div>
 
           <textarea
-            rows={5}
+            rows={4}
             value={caseRaw}
             onChange={(e) => {
               setCaseRaw(e.target.value);
+              setPreviewPage(1);
               setCaseSourceLabel('Pasted CSV/TSV');
             }}
-            placeholder="Paste exported DATABASE CSV or TSV rows here (or click Fetch Sheet CSV / Upload DATABASE CSV above)…"
-            aria-label="Paste Case Lookup DATABASE CSV"
-            className="w-full bg-[#f8f9fb] border border-[#cbd0da] p-3 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+            placeholder="Paste DATABASE CSV or TSV rows here..."
+            aria-label="Paste Case Lookup CSV"
+            className="w-full bg-[#f8f9fb] border border-[#cbd0da] p-3 text-xs font-mono text-[#111111]"
           />
 
           {caseError && (
@@ -613,10 +583,9 @@ export function WatchlistImportWizard({
                 <div className="flex flex-wrap items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
                   <span className="font-bold">
-                    {parsedCaseMap.entries.length} unique TM mappings ({parsedCaseMap.entries.length - caseDupCount} new · {caseDupCount} existing)
+                    {parsedCaseMap.totalCsvRows} CSV rows → {parsedCaseMap.entries.length} records (
+                    {parsedCaseMap.entries.length - caseDupCount} new · {caseDupCount} existing)
                   </span>
-                  <span aria-hidden="true" className="text-[#9ca3af]">·</span>
-                  <span className="text-[#555a66]">{parsedCaseMap.detectedLayout}</span>
                 </div>
                 <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                   <input
@@ -627,28 +596,64 @@ export function WatchlistImportWizard({
                   />
                   <span className="font-semibold flex items-center gap-1">
                     <RefreshCw className="w-3 h-3" aria-hidden="true" />
-                    Update Case Nos in Review Queue
+                    Update Review Queue
                   </span>
                 </label>
               </div>
 
-              <div className="border border-[#e2e4ea] overflow-x-auto max-h-[220px]">
+              {/* 50-row Pagination */}
+              <div className="flex items-center justify-between text-xs text-[#555a66] bg-[#f8f9fb] border border-[#e2e4ea] px-3 py-1.5 tabular-nums">
+                <span>
+                  Showing {(safePreviewPage - 1) * safePageSize + 1}–
+                  {Math.min(parsedCaseMap.entries.length, safePreviewPage * safePageSize)} of{' '}
+                  {parsedCaseMap.entries.length}
+                </span>
+                <div className="inline-flex items-center border border-[#cbd0da] bg-white">
+                  <button
+                    type="button"
+                    disabled={safePreviewPage <= 1}
+                    onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
+                    className="h-[26px] px-2 text-[11px] font-bold text-[#111111] hover:bg-[#ffee00] disabled:opacity-40 inline-flex items-center gap-0.5 border-r border-[#cbd0da]"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Back</span>
+                  </button>
+                  <span className="px-2 text-[11px] font-mono font-bold text-[#111111]">
+                    {safePreviewPage} / {totalPreviewPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePreviewPage >= totalPreviewPages}
+                    onClick={() => setPreviewPage((p) => Math.min(totalPreviewPages, p + 1))}
+                    className="h-[26px] px-2 text-[11px] font-bold text-[#111111] hover:bg-[#ffee00] disabled:opacity-40 inline-flex items-center gap-0.5 border-l border-[#cbd0da]"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="border border-[#e2e4ea] overflow-x-auto max-h-[260px]">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="sticky top-0 bg-[#111111] text-white text-[11px] uppercase tracking-wider">
                     <tr>
+                      <th className="py-2 px-3">ID</th>
                       <th className="py-2 px-3">TM / CPR Number</th>
                       <th className="py-2 px-3">Case Number</th>
-                      <th className="py-2 px-3">Client Name</th>
+                      <th className="py-2 px-3">Client / App Name</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#eceef2] bg-white">
-                    {parsedCaseMap.entries.slice(0, 30).map((entry) => (
-                      <tr key={entry.tmNumber} className="hover:bg-[#f7f8fa]">
+                    {previewSlice.map((entry, idx) => (
+                      <tr key={`${entry.id || ''}_${entry.tmNumber}_${idx}`} className="hover:bg-[#f7f8fa]">
+                        <td className="py-2 px-3 font-mono text-[#555a66]">{entry.id || '—'}</td>
                         <td className="py-2 px-3 font-mono font-bold text-[#111111] tabular-nums">
-                          {entry.tmNumber}
+                          {entry.tmNumber || '—'}
                         </td>
                         <td className="py-2 px-3 font-semibold text-[#111111]">{entry.caseNo}</td>
-                        <td className="py-2 px-3 text-[#4b505c]">{entry.clientName || '—'}</td>
+                        <td className="py-2 px-3 text-[#4b505c]">
+                          {entry.applicationName || entry.clientName || '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -684,7 +689,7 @@ export function WatchlistImportWizard({
                   }}
                   className="builty-btn h-[38px] pl-4 pr-3 gap-2 text-xs"
                 >
-                  <span>Replace Case Lookup Map ({parsedCaseMap.entries.length})</span>
+                  <span>Replace ({parsedCaseMap.entries.length})</span>
                 </button>
               </div>
             </div>

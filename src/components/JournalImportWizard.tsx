@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardPaste,
   Download,
   FileSpreadsheet,
@@ -24,6 +26,7 @@ type WizardMode = 'file' | 'paste_table' | 'convert_text';
 
 interface JournalImportWizardProps {
   existingRows: JournalCheckRow[];
+  pageSize?: number;
   onImport: (rows: JournalCheckRow[], mode: 'append' | 'replace') => void;
   onClose: () => void;
 }
@@ -32,9 +35,11 @@ const SAMPLE_CSV_URL = '/assets/aistudio/Journal_Pub_909_-_JournalCheck_b78c2532
 
 export function JournalImportWizard({
   existingRows,
+  pageSize = 50,
   onImport,
   onClose,
 }: JournalImportWizardProps) {
+  const safePageSize = Math.max(1, pageSize || 50);
   const [wizardMode, setWizardMode] = useState<WizardMode>('file');
   const [rawInput, setRawInput] = useState('');
   const [sourceLabel, setSourceLabel] = useState<string>('');
@@ -42,6 +47,7 @@ export function JournalImportWizard({
   const [extractEmbeddedPageNo, setExtractEmbeddedPageNo] = useState(true);
   const [loadingSample, setLoadingSample] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [previewPage, setPreviewPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parsedResult = useMemo(() => {
@@ -105,16 +111,24 @@ export function JournalImportWizard({
     };
   }, [parsedResult.rows, existingRows]);
 
+  const totalPages = Math.max(1, Math.ceil(parsedResult.rows.length / safePageSize));
+  const safePage = Math.min(previewPage, totalPages);
+  const previewRows = useMemo(() => {
+    const start = (safePage - 1) * safePageSize;
+    return parsedResult.rows.slice(start, start + safePageSize);
+  }, [parsedResult.rows, safePage, safePageSize]);
+
   const handleFilePicked = async (file: File) => {
     setErrorMsg(null);
     try {
       const text = await file.text();
       setRawInput(text);
+      setPreviewPage(1);
       setSourceLabel(file.name);
       const detected = detectJournalInputFormat(text);
       setWizardMode(detected === 'journal_text' ? 'convert_text' : 'file');
     } catch {
-      setErrorMsg('Unable to read the selected file. Ensure it is a valid UTF-8 CSV, TSV, or TXT file.');
+      setErrorMsg('Unable to read the selected file.');
     }
   };
 
@@ -126,10 +140,11 @@ export function JournalImportWizard({
       if (!res.ok) throw new Error('Sample file not reachable');
       const text = await res.text();
       setRawInput(text);
+      setPreviewPage(1);
       setSourceLabel('Journal_Pub_909_-_JournalCheck.csv');
       setWizardMode('file');
     } catch {
-      setErrorMsg('Could not load the attached Journal 909 CSV asset.');
+      setErrorMsg('Could not load sample CSV.');
     } finally {
       setLoadingSample(false);
     }
@@ -152,27 +167,17 @@ export function JournalImportWizard({
     triggerFileDownload(csv, 'JournalCheck_Converted.csv', 'text/csv;charset=utf-8');
   };
 
-  const previewRows = parsedResult.rows.slice(0, 50);
-
   return (
     <section
       aria-label="JournalCheck Import Wizard"
       className="bg-white border border-[#d4d7e0] shadow-sm"
     >
-      {/* Wizard Top Bar */}
       <div className="px-6 py-4 bg-[#111111] text-white flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#ffee00] text-[#111111] flex items-center justify-center shrink-0">
             <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
           </div>
-          <div>
-            <h3 className="text-sm font-extrabold tracking-tight">
-              JournalCheck Import &amp; ConvertJournal2 Wizard
-            </h3>
-            <p className="text-xs text-[#c7c9d1]">
-              Supports 7-column CSV/TSV (multiline quoted titles) and raw PDF-to-Text Journal conversion
-            </p>
-          </div>
+          <h3 className="text-sm font-extrabold tracking-tight">JournalCheck Import</h3>
         </div>
 
         <button
@@ -185,16 +190,10 @@ export function JournalImportWizard({
         </button>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Expected 7-column schema bar */}
+      <div className="p-6 space-y-5">
         <div className="bg-[#f6f7f9] border border-[#e2e4ea] p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          <div className="space-y-1">
-            <div className="text-xs font-bold text-[#111111]">
-              Required Import Column Schema (7 Columns)
-            </div>
-            <div className="text-xs font-mono text-[#4b505c] break-words">
-              {JOURNAL_IMPORT_COLUMNS.join(' , ')}
-            </div>
+          <div className="text-xs font-mono text-[#4b505c] break-words">
+            {JOURNAL_IMPORT_COLUMNS.join(' , ')}
           </div>
 
           <button
@@ -204,30 +203,25 @@ export function JournalImportWizard({
             className="h-[36px] px-3.5 bg-white border border-[#cbd0da] hover:border-[#111111] text-xs font-bold text-[#111111] inline-flex items-center gap-2 shrink-0 whitespace-nowrap"
           >
             <Layers className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>{loadingSample ? 'Loading CSV…' : 'Load Journal 909 Sample CSV'}</span>
+            <span>{loadingSample ? 'Loading…' : 'Load Sample CSV'}</span>
           </button>
         </div>
 
-        {/* Step 1: Source Mode Tabs */}
+        {/* Source Mode Tabs */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
             type="button"
             data-sfx="filter"
             data-active={wizardMode === 'file'}
             onClick={() => setWizardMode('file')}
-            className={`builty-filter-btn p-3.5 border text-left flex items-start gap-3 ${
+            className={`builty-filter-btn p-3 border text-left flex items-center gap-2.5 ${
               wizardMode === 'file'
                 ? 'bg-[#fffef0] border-[#111111] text-[#111111]'
                 : 'bg-white border-[#e2e4ea] text-[#4b505c] hover:border-[#cbd0da]'
             }`}
           >
-            <FileUp className="w-4 h-4 shrink-0 mt-0.5 text-[#111111]" aria-hidden="true" />
-            <div>
-              <div className="text-xs font-extrabold text-[#111111]">1. Upload CSV / TSV / TXT</div>
-              <div className="text-[11.5px] text-[#555a66] mt-0.5">
-                Auto-detects formatted CSV or raw Journal .txt
-              </div>
-            </div>
+            <FileUp className="w-4 h-4 shrink-0 text-[#111111]" aria-hidden="true" />
+            <span className="text-xs font-extrabold text-[#111111]">1. Upload CSV / TSV / TXT</span>
           </button>
 
           <button
@@ -235,19 +229,14 @@ export function JournalImportWizard({
             data-sfx="filter"
             data-active={wizardMode === 'paste_table'}
             onClick={() => setWizardMode('paste_table')}
-            className={`builty-filter-btn p-3.5 border text-left flex items-start gap-3 ${
+            className={`builty-filter-btn p-3 border text-left flex items-center gap-2.5 ${
               wizardMode === 'paste_table'
                 ? 'bg-[#fffef0] border-[#111111] text-[#111111]'
                 : 'bg-white border-[#e2e4ea] text-[#4b505c] hover:border-[#cbd0da]'
             }`}
           >
-            <ClipboardPaste className="w-4 h-4 shrink-0 mt-0.5 text-[#111111]" aria-hidden="true" />
-            <div>
-              <div className="text-xs font-extrabold text-[#111111]">2. Paste Excel / CSV Rows</div>
-              <div className="text-[11.5px] text-[#555a66] mt-0.5">
-                Handles Excel copy-paste &amp; multiline quoted cells
-              </div>
-            </div>
+            <ClipboardPaste className="w-4 h-4 shrink-0 text-[#111111]" aria-hidden="true" />
+            <span className="text-xs font-extrabold text-[#111111]">2. Paste Table Rows</span>
           </button>
 
           <button
@@ -255,27 +244,20 @@ export function JournalImportWizard({
             data-sfx="filter"
             data-active={wizardMode === 'convert_text'}
             onClick={() => setWizardMode('convert_text')}
-            className={`builty-filter-btn p-3.5 border text-left flex items-start gap-3 ${
+            className={`builty-filter-btn p-3 border text-left flex items-center gap-2.5 ${
               wizardMode === 'convert_text'
                 ? 'bg-[#fffef0] border-[#111111] text-[#111111]'
                 : 'bg-white border-[#e2e4ea] text-[#4b505c] hover:border-[#cbd0da]'
             }`}
           >
-            <FileText className="w-4 h-4 shrink-0 mt-0.5 text-[#111111]" aria-hidden="true" />
-            <div>
-              <div className="text-xs font-extrabold text-[#111111]">
-                3. PDF-to-Text (ConvertJournal2)
-              </div>
-              <div className="text-[11.5px] text-[#555a66] mt-0.5">
-                Direct browser equivalent of VBA ConvertJournal2()
-              </div>
-            </div>
+            <FileText className="w-4 h-4 shrink-0 text-[#111111]" aria-hidden="true" />
+            <span className="text-xs font-extrabold text-[#111111]">3. Convert Raw Text</span>
           </button>
         </div>
 
         {/* Input Zone */}
         {wizardMode === 'file' && (
-          <div className="border-2 border-dashed border-[#cbd0da] bg-[#f8f9fb] p-6 text-center space-y-3">
+          <div className="border-2 border-dashed border-[#cbd0da] bg-[#f8f9fb] p-5 text-center space-y-3">
             <input
               ref={fileInputRef}
               type="file"
@@ -289,10 +271,6 @@ export function JournalImportWizard({
                 }
               }}
             />
-            <p className="text-xs text-[#4b505c]">
-              Select a <span className="font-semibold text-[#111111]">.csv / .tsv</span> spreadsheet export
-              or a UTF-8 <span className="font-semibold text-[#111111]">.txt</span> file from your PDF-to-Text converter.
-            </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
@@ -303,9 +281,7 @@ export function JournalImportWizard({
                 <span>Choose File (.csv, .tsv, .txt)</span>
               </button>
               {sourceLabel && (
-                <span className="text-xs font-semibold text-[#111111]">
-                  Loaded: {sourceLabel}
-                </span>
+                <span className="text-xs font-semibold text-[#111111]">{sourceLabel}</span>
               )}
             </div>
           </div>
@@ -314,13 +290,8 @@ export function JournalImportWizard({
         {(wizardMode === 'paste_table' || wizardMode === 'convert_text') && (
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <label
-                htmlFor="import-wizard-textarea"
-                className="text-xs font-bold text-[#111111]"
-              >
-                {wizardMode === 'convert_text'
-                  ? 'Paste raw PDF-to-Text output (records separated by "Advertised under section 28(1) of Trade Mark Ordinance 2001.")'
-                  : 'Paste CSV or Tab-Separated Excel rows'}
+              <label htmlFor="import-wizard-textarea" className="text-xs font-bold text-[#111111]">
+                {wizardMode === 'convert_text' ? 'Paste raw PDF text' : 'Paste CSV or Excel rows'}
               </label>
               {rawInput && (
                 <button
@@ -331,23 +302,20 @@ export function JournalImportWizard({
                   }}
                   className="text-xs text-[#555a66] hover:text-[#111111] underline"
                 >
-                  Clear Input
+                  Clear
                 </button>
               )}
             </div>
             <textarea
               id="import-wizard-textarea"
-              rows={6}
+              rows={5}
               value={rawInput}
               onChange={(e) => {
                 setRawInput(e.target.value);
+                setPreviewPage(1);
                 setSourceLabel('Pasted text');
               }}
-              placeholder={
-                wizardMode === 'convert_text'
-                  ? 'Advertised under section 28(1) of Trade Mark Ordinance 2001.\nApplication No: 741275\nTitle ZINGO 15\nClass: 1\nName and address of Applicant: Gharbeen Seeds (Pvt.) Ltd...\nAgent’s name And address: A.A & Associates...\nDate of filing: 06/02/2024'
-                  : 'Application No,Title,Class,Applicant Name and Address,Agent Name and Address,Date of Filing,Page No\n438315,"FEEDER",1,"Fakhshad Mahmood...",,"24-Nov-16",'
-              }
+              placeholder="Paste input data here..."
               className="w-full bg-[#f8f9fb] border border-[#cbd0da] p-3 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
             />
           </div>
@@ -359,7 +327,6 @@ export function JournalImportWizard({
           </div>
         )}
 
-        {/* Cleaning / Normalization Options */}
         <div className="flex flex-wrap items-center gap-6 border-t border-b border-[#eceef2] py-3 text-xs text-[#111111]">
           <label className="inline-flex items-center gap-2 cursor-pointer select-none">
             <input
@@ -368,7 +335,7 @@ export function JournalImportWizard({
               onChange={(e) => setNormalizeDates(e.target.checked)}
               className="w-4 h-4 accent-[#111111]"
             />
-            <span className="font-semibold">Normalize Filing Dates to dd-MMM-yy</span>
+            <span className="font-semibold">Normalize Dates (dd-MMM-yy)</span>
           </label>
 
           <label className="inline-flex items-center gap-2 cursor-pointer select-none">
@@ -378,40 +345,55 @@ export function JournalImportWizard({
               onChange={(e) => setExtractEmbeddedPageNo(e.target.checked)}
               className="w-4 h-4 accent-[#111111]"
             />
-            <span className="font-semibold">
-              Extract embedded Journal Page No &amp; strip page header artifacts
-            </span>
+            <span className="font-semibold">Extract Page Numbers</span>
           </label>
         </div>
 
-        {/* Step 2: Live Preview */}
+        {/* Live Preview with 50-row Back/Next */}
         {parsedResult.rows.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 text-xs text-[#111111] tabular-nums">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
                 <span className="font-bold">
-                  {parsedResult.rows.length} record(s) parsed
+                  {parsedResult.rows.length} rows parsed ({parsedResult.elapsedMs} ms)
                 </span>
-                <span aria-hidden="true" className="text-[#9ca3af]">·</span>
-                <span className="text-[#555a66]">
-                  Parser:{' '}
-                  {parsedResult.detectedFormat === 'journal_text'
-                    ? 'ConvertJournal2 Raw Text'
-                    : '7-Column CSV / TSV'}
-                </span>
-                <span aria-hidden="true" className="text-[#9ca3af]">·</span>
-                <span className="text-[#555a66]">{parsedResult.elapsedMs} ms</span>
               </div>
 
-              <button
-                type="button"
-                onClick={handleDownloadConvertedCsv}
-                className="h-[34px] px-3 border border-[#cbd0da] bg-white hover:border-[#111111] text-xs font-semibold text-[#111111] inline-flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Download Formatted CSV</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center border border-[#cbd0da] bg-white">
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
+                    className="h-[30px] px-2.5 text-[11px] font-bold text-[#111111] hover:bg-[#ffee00] disabled:opacity-40 inline-flex items-center gap-1 border-r border-[#cbd0da]"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Back</span>
+                  </button>
+                  <span className="px-2.5 text-[11px] font-mono font-bold text-[#111111]">
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPreviewPage((p) => Math.min(totalPages, p + 1))}
+                    className="h-[30px] px-2.5 text-[11px] font-bold text-[#111111] hover:bg-[#ffee00] disabled:opacity-40 inline-flex items-center gap-1 border-l border-[#cbd0da]"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadConvertedCsv}
+                  className="h-[32px] px-3 border border-[#cbd0da] bg-white hover:border-[#111111] text-xs font-semibold text-[#111111] inline-flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Download CSV</span>
+                </button>
+              </div>
             </div>
 
             <div className="border border-[#e2e4ea] overflow-x-auto max-h-[300px]">
@@ -421,9 +403,9 @@ export function JournalImportWizard({
                     <th className="py-2 px-3">App No</th>
                     <th className="py-2 px-3">Title</th>
                     <th className="py-2 px-3 text-center">Class</th>
-                    <th className="py-2 px-3">Applicant Name and Address</th>
-                    <th className="py-2 px-3">Agent Name and Address</th>
-                    <th className="py-2 px-3">Date of Filing</th>
+                    <th className="py-2 px-3">Applicant</th>
+                    <th className="py-2 px-3">Agent</th>
+                    <th className="py-2 px-3">Filing Date</th>
                     <th className="py-2 px-3 text-center">Page No</th>
                   </tr>
                 </thead>
@@ -456,17 +438,10 @@ export function JournalImportWizard({
                 </tbody>
               </table>
             </div>
-            {parsedResult.rows.length > 50 && (
-              <p className="text-[11.5px] text-[#555a66] tabular-nums">
-                Showing first 50 of {parsedResult.rows.length} parsed rows in preview.
-              </p>
-            )}
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <span className="text-xs text-[#555a66] tabular-nums">
-                Current table: {existingRows.length} row(s) · Append adds{' '}
-                <strong className="text-[#111111]">{dedupeStats.appendUniqueCount} new</strong> (
-                {dedupeStats.appendDupCount} duplicate skipped)
+                Append adds <strong className="text-[#111111]">{dedupeStats.appendUniqueCount} new</strong> ({dedupeStats.appendDupCount} duplicate skipped)
               </span>
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
@@ -482,7 +457,7 @@ export function JournalImportWizard({
                   onClick={() => onImport(parsedResult.rows, 'append')}
                   className="h-[38px] px-4 border border-[#111111] bg-white text-xs font-bold text-[#111111] hover:bg-[#f6f7f9] disabled:opacity-40"
                 >
-                  Append {dedupeStats.appendUniqueCount} New Rows
+                  Append {dedupeStats.appendUniqueCount} New
                 </button>
                 <button
                   type="button"
@@ -490,14 +465,14 @@ export function JournalImportWizard({
                   onClick={() => onImport(parsedResult.rows, 'replace')}
                   className="builty-btn h-[38px] pl-4 pr-3 gap-2 text-xs"
                 >
-                  <span>Replace Table ({dedupeStats.batchUniqueCount} Unique)</span>
+                  <span>Replace ({dedupeStats.batchUniqueCount})</span>
                 </button>
               </div>
             </div>
           </div>
         ) : rawInput.trim() ? (
           <div className="p-4 bg-amber-50 border border-amber-300 text-xs text-amber-900">
-            No valid trademark rows were detected in the current input. Switch input mode above or verify the column headers / section delimiter.
+            No valid rows detected. Switch input mode above or check formatting.
           </div>
         ) : null}
       </div>

@@ -401,12 +401,32 @@ function parseDelimitedMatrix(rawText: string, delimiter: ',' | '\t'): string[][
 
     if (delimiter === ',') {
       if (ch === '"') {
-        if (inQuotes && text[i + 1] === '"') {
-          currentCell += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
+        if (!inQuotes && currentCell === '') {
+          inQuotes = true;
+          continue;
         }
+        if (inQuotes) {
+          if (text[i + 1] === '"') {
+            currentCell += '"';
+            i++;
+            continue;
+          }
+          const next = text[i + 1];
+          if (
+            next === ',' ||
+            next === '\r' ||
+            next === '\n' ||
+            next === undefined
+          ) {
+            inQuotes = false;
+            continue;
+          }
+          // Stray quote inside quoted value — keep literal without breaking row framing
+          currentCell += '"';
+          continue;
+        }
+        // Stray quote inside unquoted value (e.g. 12" pipe) — keep literal
+        currentCell += '"';
         continue;
       }
 
@@ -920,6 +940,7 @@ export interface CaseLookupImportOptions {
   clientCol?: number;     // 1-based (default 6 = CLIENT NAME)
   appNameCol?: number;    // 1-based (default 7 = APPLICATION NAME)
   caseSeparator?: string; // default '-'
+  preserveDuplicateTms?: boolean; // default true when rows have distinct IDs or metadata
 }
 
 export interface CaseLookupImportResult {
@@ -927,6 +948,8 @@ export interface CaseLookupImportResult {
   detectedLayout: string;
   skippedRows: number;
   skippedDuplicates: number;
+  totalCsvRows: number;
+  blankTmRows: number;
 }
 
 export function buildGoogleSheetCsvUrl(sheetUrlOrId: string, sheetName?: string): string {
@@ -947,17 +970,108 @@ export function buildGoogleSheetCsvUrl(sheetUrlOrId: string, sheetName?: string)
   const gidMatch = raw.match(/[?#&]gid=(\d+)/);
   const cleanSheetName = (sheetName || '').trim();
 
+  // Prefer verbatim /export?format=csv when gid is explicitly in the URL so Google Visualization doesn't strip mixed types
+  if (gidMatch && !cleanSheetName) {
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gidMatch[1]}`;
+  }
+
   if (cleanSheetName) {
-    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(
       cleanSheetName
     )}`;
   }
 
   if (gidMatch) {
-    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gidMatch[1]}`;
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gidMatch[1]}`;
   }
 
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+}
+
+export function buildGoogleSheetCsvCandidates(sheetUrlOrId: string, sheetName?: string): string[] {
+  const raw = sheetUrlOrId.trim();
+  if (!raw) return [];
+  if (/[?&](output=csv|format=csv|tqx=out:csv)/i.test(raw)) {
+    return [raw];
+  }
+
+  const idMatch = raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const sheetId = idMatch ? idMatch[1] : /^[a-zA-Z0-9-_]{20,}$/.test(raw) ? raw : '';
+  if (!sheetId) return [raw];
+
+  const gidMatch = raw.match(/[?#&]gid=(\d+)/);
+  const cleanSheetName = (sheetName || '').trim();
+  const candidates: string[] = [];
+
+  if (cleanSheetName) {
+    candidates.push(
+      `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(
+        cleanSheetName
+      )}`
+    );
+  }
+  if (gidMatch) {
+    candidates.push(
+      `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gidMatch[1]}`
+    );
+  }
+  candidates.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`);
+  if (!cleanSheetName) {
+    candidates.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&headers=1`);
+  }
+  return Array.from(new Set(candidates));
+}
+
+export async function fetchGoogleSheetCsvSmart(
+  sheetUrlOrId: string,
+  sheetName?: string
+): Promise<{ text: string; urlUsed: string }> {
+  const candidates = buildGoogleSheetCsvCandidates(sheetUrlOrId, sheetName);
+  if (candidates.length === 0) {
+    throw new Error('EMPTY_URL');
+  }
+
+  let bestText = '';
+  let bestLineCount = -1;
+  let bestUrl = candidates[0];
+  let sawLoginHtml = false;
+  let lastError: Error | null = null;
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        lastError = new Error(`HTTP ${res.status}`);
+        continue;
+      }
+      const text = await res.text();
+      const head = text.trim().slice(0, 200).toLowerCase();
+      if (head.startsWith('<!doctype') || head.startsWith('<html')) {
+        sawLoginHtml = true;
+        continue;
+      }
+      const lineCount = text.split(/\r?\n/).filter((l) => l.trim().length > 0).length;
+      if (lineCount > bestLineCount) {
+        bestText = text;
+        bestLineCount = lineCount;
+        bestUrl = url;
+      }
+      // If gviz returned <= 15 lines and we haven't checked /export?format=csv yet, keep checking fallback candidate
+      if (lineCount > 25 && !url.includes('/gviz/tq')) {
+        break;
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error('FETCH_FAILED');
+    }
+  }
+
+  if (bestLineCount >= 0 && bestText.trim()) {
+    return { text: bestText, urlUsed: bestUrl };
+  }
+  if (sawLoginHtml) {
+    throw new Error('GOOGLE_LOGIN_HTML');
+  }
+  throw lastError || new Error('FETCH_FAILED');
 }
 
 export interface CaseDatabaseAnalysis {
@@ -1064,7 +1178,14 @@ export function parseCaseLookupInput(
 ): CaseLookupImportResult {
   const trimmed = rawText.replace(/^\uFEFF/, '').trim();
   if (!trimmed) {
-    return { entries: [], detectedLayout: 'empty', skippedRows: 0, skippedDuplicates: 0 };
+    return {
+      entries: [],
+      detectedLayout: 'empty',
+      skippedRows: 0,
+      skippedDuplicates: 0,
+      totalCsvRows: 0,
+      blankTmRows: 0,
+    };
   }
 
   const firstLine = trimmed.split(/\r?\n/)[0] || '';
@@ -1074,11 +1195,19 @@ export function parseCaseLookupInput(
 
   const matrix = parseDelimitedMatrix(trimmed, delimiter);
   if (matrix.length === 0) {
-    return { entries: [], detectedLayout: 'empty', skippedRows: 0, skippedDuplicates: 0 };
+    return {
+      entries: [],
+      detectedLayout: 'empty',
+      skippedRows: 0,
+      skippedDuplicates: 0,
+      totalCsvRows: 0,
+      blankTmRows: 0,
+    };
   }
 
   const sep = options.caseSeparator || '-';
   const mode = options.mappingMode || 'auto';
+  const preserveDuplicateTms = options.preserveDuplicateTms ?? true;
 
   let idIdx = -1;
   let keyIdx = Math.max(0, (options.keyCol || 8) - 1);
@@ -1109,17 +1238,34 @@ export function parseCaseLookupInput(
   let startRow = 0;
   let detectedLayout = 'Sheet Col 8 (TM) + Case Cols 3-4-5';
 
-  const headerNorm = matrix[0].map((c) => c.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim());
-  const looksLikeHeader =
-    headerNorm.some(
+  const isHeaderRow = (cells: string[]) => {
+    const norm = cells.map((c) => c.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim());
+    const hasKeyCol = norm.some(
       (h) =>
         h.includes('tm') ||
         h.includes('cpr') ||
         h.includes('case number') ||
         h.includes('client code') ||
+        h.includes('application no') ||
         h === 'type' ||
         h === 'id'
-    ) && !headerNorm.some((h) => /^\d{6}$/.test(h));
+    );
+    const hasSixDigitData = norm.some((h) => /^\d{6}$/.test(h));
+    return hasKeyCol && !hasSixDigitData;
+  };
+
+  let headerRowIdx = -1;
+  const maxHeaderScan = Math.min(10, matrix.length);
+  for (let r = 0; r < maxHeaderScan; r++) {
+    if (isHeaderRow(matrix[r])) {
+      headerRowIdx = r;
+      break;
+    }
+  }
+  const looksLikeHeader = headerRowIdx >= 0;
+  const headerNorm = looksLikeHeader
+    ? matrix[headerRowIdx].map((c) => c.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim())
+    : [];
 
   const assign24ColIndices = () => {
     idIdx = 0;
@@ -1181,18 +1327,18 @@ export function parseCaseLookupInput(
     caseIdx = 1;
     clientIdx = 2;
     appNameIdx = -1;
-    startRow = looksLikeHeader ? 1 : 0;
+    startRow = looksLikeHeader ? headerRowIdx + 1 : 0;
     detectedLayout = '3-Column (TM No, Case No, Client)';
   } else if (mode === 'sheet_col8_345') {
     assign24ColIndices();
-    startRow = looksLikeHeader ? 1 : 0;
-    detectedLayout = '24-Col Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
+    startRow = looksLikeHeader ? headerRowIdx + 1 : 0;
+    detectedLayout = 'Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
   } else if (mode === 'date_start_22col') {
     assign22ColDateStartIndices();
-    startRow = looksLikeHeader ? 1 : 0;
+    startRow = looksLikeHeader ? headerRowIdx + 1 : 0;
     detectedLayout = '22-Col DATE-Start Export (TM Col 7 + Case Cols 2-3-4)';
   } else if (mode === 'custom') {
-    startRow = looksLikeHeader ? 1 : 0;
+    startRow = looksLikeHeader ? headerRowIdx + 1 : 0;
     detectedLayout = `Custom (TM Col ${keyIdx + 1} · Case Cols ${[
       prefixIdx >= 0 ? prefixIdx + 1 : null,
       clientCodeIdx >= 0 ? clientCodeIdx + 1 : null,
@@ -1201,16 +1347,24 @@ export function parseCaseLookupInput(
       .filter(Boolean)
       .join('-')})`;
   } else {
-    // Auto-detect
     if (looksLikeHeader) {
-      startRow = 1;
+      startRow = headerRowIdx + 1;
       const foundId = headerNorm.findIndex((h) => h === 'id' || h === 'record id');
       const foundKey = headerNorm.findIndex(
-        (h) => h.includes('tm cpr') || h.includes('tm no') || h.includes('cpr') || h === 'tm'
+        (h) =>
+          h.includes('tm cpr') ||
+          h.includes('tm no') ||
+          h.includes('tm number') ||
+          h.includes('cpr') ||
+          h === 'tm' ||
+          h.includes('application no') ||
+          h === 'app no'
       );
       const foundPrefix = headerNorm.findIndex((h) => h === 'type' || h === 'prefix');
       const foundClientCode = headerNorm.findIndex((h) => h.includes('client code'));
-      const foundCase = headerNorm.findIndex((h) => h.includes('case number') || h === 'case no' || h === 'case');
+      const foundCase = headerNorm.findIndex(
+        (h) => h.includes('case number') || h === 'case no' || h === 'case'
+      );
       const foundClient = headerNorm.findIndex((h) => h.includes('client name') || h === 'client');
       const foundAppName = headerNorm.findIndex((h) => h.includes('application name') || h === 'title');
       const foundDate = headerNorm.findIndex((h) => h === 'date');
@@ -1256,14 +1410,14 @@ export function parseCaseLookupInput(
         journalDateIdx = foundJournalDate;
         lastModifiedIdx = foundLastModified;
         imageIdx = foundImage;
-        detectedLayout = `Header-matched (${matrix[0].length} cols · TM Col ${keyIdx + 1} · Case ${
+        detectedLayout = `Header-matched (${matrix[headerRowIdx].length} cols · TM Col ${keyIdx + 1} · Case ${
           prefixIdx >= 0 && clientCodeIdx >= 0
             ? `Cols ${prefixIdx + 1}-${clientCodeIdx + 1}-${caseIdx + 1}`
             : `Col ${caseIdx + 1}`
         })`;
-      } else if (matrix[0].length >= 8) {
+      } else if (matrix[headerRowIdx].length >= 8) {
         assign24ColIndices();
-        detectedLayout = '24-Col Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
+        detectedLayout = 'Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
       } else {
         keyIdx = 0;
         prefixIdx = -1;
@@ -1285,7 +1439,7 @@ export function parseCaseLookupInput(
         detectedLayout = '22-Col DATE-Start Export (TM Col 7 + Case Cols 2-3-4)';
       } else if (sampleRow.length >= 8) {
         assign24ColIndices();
-        detectedLayout = '24-Col Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
+        detectedLayout = 'Sheet (Col 8 TM/CPR · Case Cols 3-4-5)';
       } else {
         keyIdx = 0;
         prefixIdx = -1;
@@ -1298,10 +1452,12 @@ export function parseCaseLookupInput(
     }
   }
 
-  const seen = new Set<string>();
+  const seenRowKeys = new Set<string>();
   const entries: CaseEntry[] = [];
   let skippedRows = 0;
   let skippedDuplicates = 0;
+  let blankTmRows = 0;
+  const totalCsvRows = Math.max(0, matrix.length - startRow);
 
   const pick = (cols: string[], idx: number): string | undefined => {
     if (idx < 0 || idx >= cols.length) return undefined;
@@ -1325,19 +1481,34 @@ export function parseCaseLookupInput(
     const clientName = clientIdx >= 0 ? cleanInlineWhitespace(cols[clientIdx] || '') : '';
     const applicationName = appNameIdx >= 0 ? cleanInlineWhitespace(cols[appNameIdx] || '') : '';
 
-    if (!tmNumber || (!formattedCaseNo && !clientName && !applicationName && !idVal)) {
+    // Only skip rows that are completely devoid of identifying fields
+    if (!tmNumber && !formattedCaseNo && !clientName && !applicationName && !idVal) {
       skippedRows++;
       continue;
     }
 
-    if (seen.has(tmNumber)) {
+    if (!tmNumber) {
+      blankTmRows++;
+    }
+
+    const dedupeKey = preserveDuplicateTms
+      ? idVal
+        ? `id:${idVal.toLowerCase()}|tm:${tmNumber.toLowerCase()}`
+        : tmNumber
+        ? `tm:${tmNumber.toLowerCase()}|case:${formattedCaseNo.toLowerCase()}|app:${applicationName.toLowerCase()}`
+        : `row:${i}|case:${formattedCaseNo.toLowerCase()}|app:${applicationName.toLowerCase()}`
+      : tmNumber
+      ? `tm:${tmNumber.toLowerCase()}`
+      : `row:${i}`;
+
+    if (seenRowKeys.has(dedupeKey)) {
       skippedDuplicates++;
       continue;
     }
-    seen.add(tmNumber);
+    seenRowKeys.add(dedupeKey);
 
     entries.push({
-      id: idVal,
+      id: idVal || `ROW-${i + 1}`,
       tmNumber,
       caseNo: formattedCaseNo || 'NOT FOUND',
       clientName,
@@ -1365,7 +1536,22 @@ export function parseCaseLookupInput(
     });
   }
 
-  return { entries, detectedLayout, skippedRows, skippedDuplicates };
+  return {
+    entries,
+    detectedLayout,
+    skippedRows,
+    skippedDuplicates,
+    totalCsvRows,
+    blankTmRows,
+  };
+}
+
+export function getCaseEntryKey(item: CaseEntry, fallbackIndex?: number): string {
+  const idPart = (item.id || '').trim().toLowerCase();
+  const tmPart = item.tmNumber.trim().toLowerCase();
+  if (idPart) return `id:${idPart}|tm:${tmPart}`;
+  if (tmPart) return `tm:${tmPart}`;
+  return `meta:${item.caseNo.trim().toLowerCase()}|${(item.applicationName || '').trim().toLowerCase()}|${fallbackIndex ?? ''}`;
 }
 
 export function mergeDatabaseEntries(
@@ -1373,10 +1559,11 @@ export function mergeDatabaseEntries(
   incoming: CaseEntry[],
   duplicatePolicy: 'skip' | 'update' = 'skip'
 ): { merged: CaseEntry[]; added: number; skippedDuplicates: number; updated: number } {
-  const byTm = new Map<string, CaseEntry>();
-  for (const item of existing) {
-    const key = item.tmNumber.trim();
-    if (key && !byTm.has(key)) byTm.set(key, item);
+  const byKey = new Map<string, CaseEntry>();
+  for (let idx = 0; idx < existing.length; idx++) {
+    const item = existing[idx];
+    const key = getCaseEntryKey(item, idx);
+    if (!byKey.has(key)) byKey.set(key, item);
   }
 
   let added = 0;
@@ -1384,18 +1571,18 @@ export function mergeDatabaseEntries(
   let updated = 0;
   const newOnes: CaseEntry[] = [];
 
-  for (const item of incoming) {
-    const key = item.tmNumber.trim();
-    if (!key) continue;
-    if (byTm.has(key)) {
+  for (let idx = 0; idx < incoming.length; idx++) {
+    const item = incoming[idx];
+    const key = getCaseEntryKey(item, existing.length + idx);
+    if (byKey.has(key)) {
       if (duplicatePolicy === 'update') {
-        byTm.set(key, item);
+        byKey.set(key, item);
         updated++;
       } else {
         skippedDuplicates++;
       }
     } else {
-      byTm.set(key, item);
+      byKey.set(key, item);
       newOnes.push(item);
       added++;
     }
@@ -1410,8 +1597,7 @@ export function mergeDatabaseEntries(
     };
   }
 
-  // When updating, keep existing order updated + prepend newly added entries
-  const existingUpdated = existing.map((e) => byTm.get(e.tmNumber.trim()) || e);
+  const existingUpdated = existing.map((e, idx) => byKey.get(getCaseEntryKey(e, idx)) || e);
   return {
     merged: [...newOnes, ...existingUpdated],
     added,

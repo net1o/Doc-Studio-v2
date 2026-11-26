@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Menu, Play, Volume2, VolumeX, X } from 'lucide-react';
-import { AppTab } from '../types/journal';
+import { AppTab, UniversalSettings } from '../types/journal';
+import { BrandexLogo } from './BrandexLogo';
 
 interface BuiltyHeaderProps {
   activeTab: AppTab;
@@ -15,6 +16,7 @@ interface BuiltyHeaderProps {
   recordsCount: number;
   sfxEnabled: boolean;
   onToggleSfx: () => void;
+  themeSettings?: UniversalSettings;
 }
 
 export function BuiltyHeader({
@@ -30,8 +32,12 @@ export function BuiltyHeader({
   recordsCount,
   sfxEnabled,
   onToggleSfx,
+  themeSettings,
 }: BuiltyHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const logoPrimary = themeSettings?.docPrimaryColor || '#290076';
+  const logoAccent = themeSettings?.docAccentColor || '#f4580b';
 
   const navItems: { id: AppTab; label: string; shortcut: string; count: number | null }[] = [
     { id: 'analyzer', label: 'Dashboard', shortcut: 'Ctrl+1', count: watchlistCount },
@@ -47,32 +53,21 @@ export function BuiltyHeader({
   return (
     <header className="no-print sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e2e4ea]">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-3 xl:gap-5">
-        {/* Zone 1: Brand Mark */}
+        {/* Zone 1: Brandex Logo 01 Primary Branding */}
         <button
           type="button"
           onClick={() => onSelectTab('analyzer')}
-          className="flex items-center gap-2 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
+          className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
         >
-          <svg
-            width="30"
-            height="30"
-            viewBox="0 0 36 36"
-            fill="none"
-            aria-hidden="true"
-            className="shrink-0"
-          >
-            <polygon points="4,30 18,4 32,30" fill="#ffee00" stroke="#111111" strokeWidth="1.5" />
-            <polygon points="11,30 18,16 25,30" fill="#111111" />
-            <rect x="16" y="22" width="4" height="8" fill="#ffee00" />
-          </svg>
-          <div className="flex flex-col leading-tight">
-            <span className="text-[15px] xl:text-[16px] font-extrabold tracking-tight text-[#111111]">
-              Brandex Law Associate
-            </span>
-            <span className="text-[10.5px] font-bold tracking-tight text-[#555a66]">
-              Database &amp; Journal Monitor System
-            </span>
-          </div>
+          <BrandexLogo
+            variant="logo01"
+            size="md"
+            primaryColor={logoPrimary}
+            accentColor={logoAccent}
+          />
+          <span className="hidden sm:inline-block border-l border-[#e2e4ea] pl-2.5 text-[12px] font-extrabold tracking-tight text-[#111111]">
+            Law Associate
+          </span>
         </button>
 
         {/* Zone 2: Single-Line Navigation Links */}
@@ -101,11 +96,6 @@ export function BuiltyHeader({
                   <span>{item.label}</span>
                   {displayCount !== null && (
                     <span
-                      title={
-                        item.id === 'backup'
-                          ? `Active view items: ${displayCount}`
-                          : `${item.label} items: ${displayCount}`
-                      }
                       className={`px-1.5 py-0.5 text-[10px] font-extrabold leading-none transition-colors ${
                         active
                           ? 'bg-[#111111] text-[#ffee00]'
@@ -129,7 +119,7 @@ export function BuiltyHeader({
           })}
         </nav>
 
-        {/* Zone 3: Sound Toggle + Primary Slanted Builty CTA + Mobile Trigger */}
+        {/* Zone 3: Sound Toggle + Primary Slanted CTA + Mobile Trigger */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"

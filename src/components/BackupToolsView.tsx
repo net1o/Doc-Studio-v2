@@ -46,32 +46,24 @@ export function BackupToolsView({
   return (
     <div className="space-y-6">
       <div className="bg-white border border-[#e2e4ea] p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
-            Backup, Export &amp; Diagnostics
-          </h2>
-          <p className="text-xs text-[#555a66] mt-1">
-            Export JournalCheck, Review, and Records datasets as CSV or JSON, or verify Case Lookup keys.
-          </p>
-        </div>
+        <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
+          Backup &amp; Export
+        </h2>
         <button
           type="button"
           onClick={onResetSampleData}
           className="h-[38px] px-4 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-2 self-start sm:self-auto whitespace-nowrap"
         >
           <RotateCcw className="w-3.5 h-3.5 text-[#111111]" aria-hidden="true" />
-          <span>Reset Sample Journal 909 Data</span>
+          <span>Reset Sample Data</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* JournalCheck Export */}
         <div className="bg-white border border-[#e2e4ea] p-5 space-y-4">
           <div>
             <h3 className="text-base font-extrabold text-[#111111]">JournalCheck</h3>
-            <p className="text-xs text-[#555a66] mt-1 tabular-nums">
-              {journalRows.length} rows ready for backup
-            </p>
+            <p className="text-xs text-[#555a66] mt-1 tabular-nums">{journalRows.length} rows</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -100,9 +92,7 @@ export function BackupToolsView({
             </button>
             <button
               type="button"
-              onClick={() =>
-                exportDataset('JournalCheck', [], [], journalRows, 'json')
-              }
+              onClick={() => exportDataset('JournalCheck', [], [], journalRows, 'json')}
               className="flex-1 py-2 border border-[#cbd0da] bg-[#f8f9fb] text-[#111111] text-xs font-bold hover:border-[#111111] hover:bg-white"
             >
               JSON
@@ -110,13 +100,10 @@ export function BackupToolsView({
           </div>
         </div>
 
-        {/* Review Export */}
         <div className="bg-white border border-[#e2e4ea] p-5 space-y-4">
           <div>
             <h3 className="text-base font-extrabold text-[#111111]">Review Queue</h3>
-            <p className="text-xs text-[#555a66] mt-1 tabular-nums">
-              {reviewRows.length} matched rows ready for backup
-            </p>
+            <p className="text-xs text-[#555a66] mt-1 tabular-nums">{reviewRows.length} rows</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -157,13 +144,10 @@ export function BackupToolsView({
           </div>
         </div>
 
-        {/* Records Export */}
         <div className="bg-white border border-[#e2e4ea] p-5 space-y-4">
           <div>
             <h3 className="text-base font-extrabold text-[#111111]">Records Ledger</h3>
-            <p className="text-xs text-[#555a66] mt-1 tabular-nums">
-              {records.length} generated records ready for backup
-            </p>
+            <p className="text-xs text-[#555a66] mt-1 tabular-nums">{records.length} records</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -203,12 +187,12 @@ export function BackupToolsView({
         </div>
       </div>
 
-      {/* Test Case Lookup Tool */}
+      {/* Test Case Lookup */}
       <div className="bg-white border border-[#e2e4ea] p-6 space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-base font-extrabold text-[#111111]">Test Case Lookup</h3>
+          <h3 className="text-base font-extrabold text-[#111111]">Case Lookup Check</h3>
           <span className="text-xs text-[#111111] bg-[#ffee00] px-2 py-0.5 font-extrabold tabular-nums">
-            {lookupKeys.length} indexed keys
+            {lookupKeys.length} keys
           </span>
         </div>
 
@@ -222,8 +206,8 @@ export function BackupToolsView({
               type="text"
               value={lookupInput}
               onChange={(e) => setLookupInput(e.target.value)}
-              placeholder="Enter 6-digit TM number (e.g. 548291)"
-              className="w-full bg-[#f8f9fb] border border-[#cbd0da] pl-9 pr-3 py-2 text-xs text-[#111111] font-mono focus:bg-white focus:outline-none focus:border-[#111111]"
+              placeholder="Enter 6-digit TM number…"
+              className="w-full bg-[#f8f9fb] border border-[#cbd0da] pl-9 pr-3 py-2 text-xs text-[#111111] font-mono"
             />
           </div>
           {lookupResult && (

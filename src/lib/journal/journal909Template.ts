@@ -2,6 +2,7 @@ import {
   GeneratedJournalDoc,
   PaperSizeConfig,
   PaperSizePreset,
+  UniversalSettings,
 } from '../../types/journal';
 
 function esc(value: string): string {
@@ -34,7 +35,7 @@ export const STANDARD_PAPER_SIZES: StandardPaperDefinition[] = [
     label: 'A4',
     widthIn: 8.27,
     heightIn: 11.69,
-    dimensionsLabel: '210 × 297 mm (8.27 × 11.69 in)',
+    dimensionsLabel: '210 × 297 mm',
   },
   {
     id: 'letter',
@@ -48,14 +49,14 @@ export const STANDARD_PAPER_SIZES: StandardPaperDefinition[] = [
     label: 'A5',
     widthIn: 5.83,
     heightIn: 8.27,
-    dimensionsLabel: '148 × 210 mm (5.83 × 8.27 in)',
+    dimensionsLabel: '148 × 210 mm',
   },
   {
     id: 'a3',
     label: 'A3',
     widthIn: 11.69,
     heightIn: 16.54,
-    dimensionsLabel: '297 × 420 mm (11.69 × 16.54 in)',
+    dimensionsLabel: '297 × 420 mm',
   },
   {
     id: 'tabloid',
@@ -137,7 +138,8 @@ export function resolvePaperDimensionsIn(paperSize?: PaperSizeConfig): ResolvedP
 
 export function buildJournal909Html(
   doc: GeneratedJournalDoc,
-  paperSize?: PaperSizeConfig
+  paperSize?: PaperSizeConfig,
+  universalSettings?: UniversalSettings
 ): string {
   const safeJournalNo = esc(doc.journalNo || '909');
   const safeJournalDate = esc(doc.journalDate || '26-Nov-2026');
@@ -147,14 +149,37 @@ export function buildJournal909Html(
   const safeClass = esc(doc.classNo);
   const safeExtraValue = esc(doc.extraValue);
   const safeExtraLabel = esc(doc.extraLabel);
+  const safeNote = esc(
+    doc.noteText || 'NOTE: DEMAND NOTE WILL BE ISSUED AFTER 2 MONTHS FROM THE DATE OF PUBLICATION'
+  );
+
+  const themePrimary = universalSettings?.docPrimaryColor || '#290076';
+  const themeSecondary = universalSettings?.docSecondaryColor || '#4e1cb8';
+  const themeAccent = universalSettings?.docAccentColor || '#f4580b';
+  const colorMode = doc.imageColorMode || universalSettings?.imageColorMode || 'theme';
 
   const dims = resolvePaperDimensionsIn(paperSize);
   const contentPad = dims.compactLayout
     ? '0.42in 0.42in 0.34in 0.42in'
     : '0.62in 0.56in 0.48in 0.56in';
 
+  const extraRowsHtml = (doc.extraRows || [])
+    .map(
+      (r) => `
+          <tr>
+            <td class="label-cell">${esc(r.label || 'DETAIL')}</td>
+            <td class="value-cell" colspan="3" contenteditable="true">${esc(r.value)}</td>
+          </tr>`
+    )
+    .join('');
+
+  const imgStyle = `max-width:100%;max-height:${dims.maxImageHeightIn}in;object-fit:contain;${
+    colorMode === 'grayscale' ? 'filter:grayscale(100%) contrast(1.12);' : ''
+  }`;
   const imageHtml = doc.imageDataUrl
-    ? `<img src="${doc.imageDataUrl}" alt="${safeTitle || 'Trademark artwork'}" style="max-width:100%;max-height:${dims.maxImageHeightIn}in;object-fit:contain;" />`
+    ? colorMode === 'theme'
+      ? `<div style="position:relative;display:inline-flex;align-items:center;justify-content:center;"><img src="${doc.imageDataUrl}" alt="${safeTitle || 'Trademark artwork'}" style="${imgStyle}" /><div style="position:absolute;inset:0;background:${themePrimary};mix-blend-mode:color;opacity:0.85;pointer-events:none;"></div></div>`
+      : `<img src="${doc.imageDataUrl}" alt="${safeTitle || 'Trademark artwork'}" style="${imgStyle}" />`
     : '';
 
   return `<!DOCTYPE html>
@@ -162,15 +187,15 @@ export function buildJournal909Html(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Journal ${safeJournalNo} - ${safeTitle || esc(doc.applicationNo)} (${esc(dims.label)})</title>
+  <title>Journal ${safeJournalNo} - ${safeTitle || esc(doc.applicationNo)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Exo+2:wght@400;500;600;700&family=Orbitron:wght@600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --theme: #290076;
-      --theme-light: #4e1cb8;
-      --heading: #f4580b;
+      --theme: ${themePrimary};
+      --theme-light: ${themeSecondary};
+      --heading: ${themeAccent};
       --silver-dark: #a6a6a6;
       --silver-mid: #d4d4d4;
       --font-display: "Orbitron", sans-serif;
@@ -222,12 +247,6 @@ export function buildJournal909Html(
     .note-bar { background: var(--theme); color: #ffffff; text-align: center; font-family: var(--font-tech); font-size: 9pt; font-weight: 600; letter-spacing: 0.8px; padding: 6px 10px; text-transform: uppercase; }
     .brandex-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0.12in 0 0.1in 0; }
     .brandex-line { width: 0.9in; height: 1.5px; background: var(--theme); }
-    .brandex-logo { text-align: center; line-height: 1; }
-    .brandex-sub { font-family: var(--font-tech); font-size: 8pt; font-weight: 600; letter-spacing: 3px; color: var(--theme); margin-bottom: 2px; position: relative; display: inline-block; }
-    .brandex-sub .reg { font-family: var(--font-body); font-size: 8.5pt; position: absolute; right: -28px; top: -2px; }
-    .brandex-wordmark { font-family: Georgia, "Times New Roman", serif; font-size: 25pt; font-weight: 500; color: var(--theme); display: flex; align-items: center; justify-content: center; gap: 1px; }
-    .brandex-r-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--heading); color: #ffffff; font-family: var(--font-display); font-size: 12pt; font-weight: 700; margin: 0 2px; position: relative; }
-    .brandex-r-badge::after { content: ""; position: absolute; width: 10px; height: 2.5px; background: var(--heading); right: -4px; bottom: 2px; transform: rotate(35deg); }
     .contact-row { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-body); font-size: 7.2pt; color: #111111; padding: 0 0.05in; }
     .contact-item { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-right: 1.5px solid var(--theme); }
     .contact-item:first-child { padding-left: 0; max-width: 2.25in; }
@@ -240,34 +259,34 @@ export function buildJournal909Html(
 <body>
   <div class="page">
     <svg class="frame-svg" viewBox="0 0 850 1400" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="18,18 98,18 18,98" fill="#4e1cb8" />
-      <polygon points="18,108 108,18 134,18 18,134" fill="#290076" />
-      <polygon points="776,18 832,18 832,74" fill="#290076" />
+      <polygon points="18,18 98,18 18,98" fill="${themeSecondary}" />
+      <polygon points="18,108 108,18 134,18 18,134" fill="${themePrimary}" />
+      <polygon points="776,18 832,18 832,74" fill="${themePrimary}" />
       <polygon points="750,18 766,18 832,84 832,100" fill="#b8b8b8" />
-      <polygon points="18,1326 18,1382 74,1382" fill="#290076" />
+      <polygon points="18,1326 18,1382 74,1382" fill="${themePrimary}" />
       <polygon points="18,1300 18,1316 84,1382 100,1382" fill="#b8b8b8" />
-      <polygon points="752,1382 832,1382 832,1302" fill="#4e1cb8" />
-      <polygon points="726,1382 742,1382 832,1292 832,1276" fill="#290076" />
+      <polygon points="752,1382 832,1382 832,1302" fill="${themeSecondary}" />
+      <polygon points="726,1382 742,1382 832,1292 832,1276" fill="${themePrimary}" />
       <line x1="138" y1="22" x2="742" y2="22" stroke="#b8b8b8" stroke-width="2" />
-      <line x1="120" y1="32" x2="764" y2="32" stroke="#290076" stroke-width="4" />
-      <line x1="86" y1="1368" x2="730" y2="1368" stroke="#290076" stroke-width="4" />
+      <line x1="120" y1="32" x2="764" y2="32" stroke="${themePrimary}" stroke-width="4" />
+      <line x1="86" y1="1368" x2="730" y2="1368" stroke="${themePrimary}" stroke-width="4" />
       <line x1="108" y1="1378" x2="712" y2="1378" stroke="#b8b8b8" stroke-width="2" />
-      <line x1="20" y1="145" x2="20" y2="495" stroke="#290076" stroke-width="3" />
-      <line x1="20" y1="530" x2="20" y2="660" stroke="#4e1cb8" stroke-width="5" />
-      <line x1="20" y1="680" x2="20" y2="715" stroke="#290076" stroke-width="5" />
+      <line x1="20" y1="145" x2="20" y2="495" stroke="${themePrimary}" stroke-width="3" />
+      <line x1="20" y1="530" x2="20" y2="660" stroke="${themeSecondary}" stroke-width="5" />
+      <line x1="20" y1="680" x2="20" y2="715" stroke="${themePrimary}" stroke-width="5" />
       <line x1="20" y1="735" x2="20" y2="1285" stroke="#b8b8b8" stroke-width="2" />
-      <line x1="28" y1="125" x2="28" y2="1305" stroke="#290076" stroke-width="2" />
+      <line x1="28" y1="125" x2="28" y2="1305" stroke="${themePrimary}" stroke-width="2" />
       <line x1="830" y1="115" x2="830" y2="500" stroke="#b8b8b8" stroke-width="2" />
-      <line x1="830" y1="530" x2="830" y2="660" stroke="#4e1cb8" stroke-width="5" />
-      <line x1="830" y1="680" x2="830" y2="715" stroke="#290076" stroke-width="5" />
-      <line x1="830" y1="735" x2="830" y2="1265" stroke="#290076" stroke-width="3" />
-      <line x1="822" y1="95" x2="822" y2="1285" stroke="#290076" stroke-width="2" />
+      <line x1="830" y1="530" x2="830" y2="660" stroke="${themeSecondary}" stroke-width="5" />
+      <line x1="830" y1="680" x2="830" y2="715" stroke="${themePrimary}" stroke-width="5" />
+      <line x1="830" y1="735" x2="830" y2="1265" stroke="${themePrimary}" stroke-width="3" />
+      <line x1="822" y1="95" x2="822" y2="1285" stroke="${themePrimary}" stroke-width="2" />
     </svg>
     <div class="content">
       <div class="top-header">
         <div class="brand-left">
           <svg class="pub-tag" viewBox="0 0 120 165" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22,2 L118,2 L118,162 L60,130 L2,162 L2,22 Z" fill="#290076" />
+            <path d="M22,2 L118,2 L118,162 L60,130 L2,162 L2,22 Z" fill="${themePrimary}" />
             <path d="M6,154 L60,124 L114,154" fill="none" stroke="#ffffff" stroke-width="1.5" />
             <circle cx="60" cy="14" r="5" fill="#ffffff" />
             <text x="60" y="75" text-anchor="middle" fill="#ffffff" font-family="Orbitron, sans-serif" font-size="27" font-weight="700">${safeJournalNo}</text>
@@ -318,50 +337,53 @@ export function buildJournal909Html(
             <td class="value-cell" contenteditable="true">${safeClass}</td>
             <td class="label-cell">${safeExtraLabel}</td>
             <td class="value-cell" contenteditable="true">${safeExtraValue}</td>
-          </tr>
+          </tr>${extraRowsHtml}
         </table>
       </div>
       <div class="image-header">
         <div class="image-line"></div>
         <div class="slashes">
-          <span style="background: #4e1cb8;"></span>
+          <span style="background: ${themeSecondary};"></span>
           <span style="background: #b8b8b8;"></span>
-          <span style="background: #290076;"></span>
+          <span style="background: ${themePrimary};"></span>
         </div>
         <h2 class="image-title">IMAGE</h2>
         <div class="slashes">
-          <span style="background: #290076;"></span>
-          <span style="background: #4e1cb8;"></span>
+          <span style="background: ${themePrimary};"></span>
+          <span style="background: ${themeSecondary};"></span>
           <span style="background: #b8b8b8;"></span>
         </div>
         <div class="image-line"></div>
       </div>
       <div class="image-area" contenteditable="true">${imageHtml}</div>
       <div class="footer">
-        <div class="note-bar">NOTE: DEMAND NOTE WILL BE ISSUED AFTER 2 MONTHS FROM THE DATE OF PUBLICATION</div>
+        <div class="note-bar">${safeNote}</div>
         <div class="brandex-row">
           <div class="brandex-line"></div>
-          <div class="brandex-logo">
-            <div class="brandex-sub">GET LEGAL <span class="reg">&reg;</span></div>
-            <div class="brandex-wordmark">b<span class="brandex-r-badge">R</span>andex</div>
-          </div>
+          <svg height="46" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <text x="110" y="16" text-anchor="middle" fill="${themePrimary}" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" letter-spacing="4.5">GET LEGAL</text>
+            <text x="14" y="59" fill="${themePrimary}" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="500">b</text>
+            <circle cx="60" cy="46" r="17.5" fill="${themeAccent}" />
+            <text x="60" y="54" text-anchor="middle" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-size="23" font-weight="600">R</text>
+            <text x="81" y="59" fill="${themePrimary}" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="500" letter-spacing="-1">ndex</text>
+          </svg>
           <div class="brandex-line"></div>
         </div>
         <div class="contact-row">
           <div class="contact-item">
-            <svg class="contact-icon" viewBox="0 0 24 24" fill="#290076" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+            <svg class="contact-icon" viewBox="0 0 24 24" fill="${themePrimary}" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
             <div class="contact-text"><span class="contact-label">Address:</span>DROP AT ABDULLAH CENTRE, JINNAH COLONY BEHIND PTCL EXCHANGE, TARLAI, ISLAMABAD</div>
           </div>
           <div class="contact-item">
-            <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="#290076" stroke-width="1.8" xmlns="http://www.w3.org/2000/svg"><path d="M12 2a10 10 0 0 0-8.66 15l-1.1 4 4.1-1.08A10 10 0 1 0 12 2z"/><path d="M9.5 8.5c.3-.6.7-.6 1-.6h.5c.2 0 .5.1.6.5l.7 1.6c.1.3 0 .5-.2.7l-.5.6c.6 1 1.5 1.9 2.5 2.5l.6-.5c.2-.2.4-.3.7-.2l1.6.7c.4.1.5.4.5.6v.5c0 .3 0 .7-.6 1-.5.3-1.4.4-2.5 0-1.6-.6-3.7-2.6-4.4-4.3-.4-1.1-.3-2 .1-2.6z" fill="#290076" stroke="none"/></svg>
+            <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="${themePrimary}" stroke-width="1.8" xmlns="http://www.w3.org/2000/svg"><path d="M12 2a10 10 0 0 0-8.66 15l-1.1 4 4.1-1.08A10 10 0 1 0 12 2z"/><path d="M9.5 8.5c.3-.6.7-.6 1-.6h.5c.2 0 .5.1.6.5l.7 1.6c.1.3 0 .5-.2.7l-.5.6c.6 1 1.5 1.9 2.5 2.5l.6-.5c.2-.2.4-.3.7-.2l1.6.7c.4.1.5.4.5.6v.5c0 .3 0 .7-.6 1-.5.3-1.4.4-2.5 0-1.6-.6-3.7-2.6-4.4-4.3-.4-1.1-.3-2 .1-2.6z" fill="${themePrimary}" stroke="none"/></svg>
             <div class="contact-text"><span class="contact-label">Whatsapp:</span>+92 336 0015004</div>
           </div>
           <div class="contact-item">
-            <svg class="contact-icon" viewBox="0 0 24 24" fill="#290076" xmlns="http://www.w3.org/2000/svg"><path d="M2 5h20v14H2V5zm2 2v.4l8 5.2 8-5.2V7H4zm16 10V9.7l-8 5.2-8-5.2V17h16z"/></svg>
+            <svg class="contact-icon" viewBox="0 0 24 24" fill="${themePrimary}" xmlns="http://www.w3.org/2000/svg"><path d="M2 5h20v14H2V5zm2 2v.4l8 5.2 8-5.2V7H4zm16 10V9.7l-8 5.2-8-5.2V17h16z"/></svg>
             <div class="contact-text"><span class="contact-label">Email:</span>info@brandex.pk</div>
           </div>
           <div class="contact-item">
-            <svg class="contact-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10.5" fill="#290076"/><path d="M13.5 19v-6h2l.3-2.3h-2.3V9.3c0-.7.2-1.1 1.2-1.1h1.2V6.1c-.2 0-.9-.1-1.8-.1-1.8 0-3 1.1-3 3.1v1.6H9v2.3h2.1v6h2.4z" fill="#ffffff"/></svg>
+            <svg class="contact-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10.5" fill="${themePrimary}"/><path d="M13.5 19v-6h2l.3-2.3h-2.3V9.3c0-.7.2-1.1 1.2-1.1h1.2V6.1c-.2 0-.9-.1-1.8-.1-1.8 0-3 1.1-3 3.1v1.6H9v2.3h2.1v6h2.4z" fill="#ffffff"/></svg>
             <div class="contact-text"><span class="contact-label">Facebook:</span>https://www.facebook.com/<br/>Brandex.pk/</div>
           </div>
         </div>
@@ -374,30 +396,40 @@ export function buildJournal909Html(
 
 export function buildJournal909WordDoc(
   doc: GeneratedJournalDoc,
-  paperSize?: PaperSizeConfig
+  paperSize?: PaperSizeConfig,
+  universalSettings?: UniversalSettings
 ): string {
   const dims = resolvePaperDimensionsIn(paperSize);
+  const themePrimary = universalSettings?.docPrimaryColor || '#290076';
+  const themeAccent = universalSettings?.docAccentColor || '#f4580b';
   const imageTag = doc.imageDataUrl
     ? `<div style="text-align:center;margin:24px 0;"><img src="${doc.imageDataUrl}" style="max-width:460px;max-height:420px;" /></div>`
     : '<p style="text-align:center;color:#777;">[Artwork Space]</p>';
 
+  const extraRowsWord = (doc.extraRows || [])
+    .map(
+      (r) =>
+        `<tr><td class="lbl">${esc(r.label || 'DETAIL')}</td><td colspan="3">${esc(r.value)}</td></tr>`
+    )
+    .join('');
+
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8" /><title>Journal ${esc(doc.journalNo)} - ${esc(doc.title)} (${esc(dims.label)})</title>
+<head><meta charset="utf-8" /><title>Journal ${esc(doc.journalNo)} - ${esc(doc.title)}</title>
 <style>
   @page Section1 { size: ${dims.widthIn}in ${dims.heightIn}in; margin: 0.5in; }
   div.Section1 { page: Section1; }
   body { font-family: Arial, sans-serif; color: #111; }
-  h1 { color: #f4580b; font-size: 20pt; margin-bottom: 4pt; }
-  h2 { color: #290076; font-size: 13pt; margin-top: 14pt; }
-  table { width: 100%; border-collapse: collapse; border: 2px solid #290076; }
-  td { border: 1px solid #290076; padding: 6pt 8pt; font-size: 10.5pt; }
+  h1 { color: ${themeAccent}; font-size: 20pt; margin-bottom: 4pt; }
+  h2 { color: ${themePrimary}; font-size: 13pt; margin-top: 14pt; }
+  table { width: 100%; border-collapse: collapse; border: 2px solid ${themePrimary}; }
+  td { border: 1px solid ${themePrimary}; padding: 6pt 8pt; font-size: 10.5pt; }
   td.lbl { background: #e5e5e5; font-weight: bold; width: 18%; }
 </style>
 </head>
 <body>
   <div class="Section1">
     <h1>JOURNAL ${esc(doc.journalNo)} — ${esc(doc.journalDate)}</h1>
-    <p><strong>Paper Size:</strong> ${esc(dims.label)} · <strong>Publishing Details:</strong> ${esc(doc.publishingDetails)}</p>
+    <p><strong>Publishing Details:</strong> ${esc(doc.publishingDetails)}</p>
     <h2>APPLICATION DETAILS</h2>
     <table>
       <tr>
@@ -406,15 +438,16 @@ export function buildJournal909WordDoc(
       </tr>
       <tr>
         <td class="lbl">CLASS</td><td>${esc(doc.classNo)}</td>
-        <td class="lbl">${esc(doc.extraLabel || 'PAGE / CASE')}</td><td>${esc(doc.extraValue)}</td>
+        <td class="lbl">${esc(doc.extraLabel || 'PAGE NO')}</td><td>${esc(doc.extraValue)}</td>
       </tr>
+      ${extraRowsWord}
     </table>
     <h2>IMAGE</h2>
     ${imageTag}
-    <p style="background:#290076;color:#fff;padding:6pt;text-align:center;font-size:9pt;">
-      NOTE: DEMAND NOTE WILL BE ISSUED AFTER 2 MONTHS FROM THE DATE OF PUBLICATION
+    <p style="background:${themePrimary};color:#fff;padding:6pt;text-align:center;font-size:9pt;">
+      ${esc(doc.noteText || 'NOTE: DEMAND NOTE WILL BE ISSUED AFTER 2 MONTHS FROM THE DATE OF PUBLICATION')}
     </p>
-    <p style="text-align:center;font-size:9pt;color:#290076;">GET LEGAL — bRandex | +92 336 0015004 | info@brandex.pk</p>
+    <p style="text-align:center;font-size:9pt;color:${themePrimary};">GET LEGAL — bRandEx | +92 336 0015004 | info@brandex.pk</p>
   </div>
 </body>
 </html>`;

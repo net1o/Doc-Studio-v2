@@ -4,6 +4,7 @@ import {
   JournalConfig,
   RecordRow,
   ReviewRow,
+  UniversalSettings,
 } from '../../types/journal';
 
 import {
@@ -16,6 +17,18 @@ import {
 const STORAGE_KEY = 'journal_monitor_docgen_v2_1';
 const WATCHLIST_MIGRATION_KEY = 'journal_monitor_watchlist_seed_v1';
 const DB_SEED_MIGRATION_KEY = 'journal_monitor_db_seed_v3';
+
+export const DEFAULT_UNIVERSAL_SETTINGS: UniversalSettings = {
+  tablePageSize: 50,
+  enableInlineEdit: true,
+  themePreset: 'brandex_violet',
+  docPrimaryColor: '#290076',
+  docSecondaryColor: '#4e1cb8',
+  docAccentColor: '#f4580b',
+  uiAccentColor: '#ffee00',
+  uiDarkColor: '#111111',
+  imageColorMode: 'theme',
+};
 
 export interface JournalMonitorState {
   config: JournalConfig;
@@ -206,6 +219,7 @@ function makeSeedState(): JournalMonitorState {
       appNameCol: 7,
       caseSeparator: '-',
     },
+    universalSettings: { ...DEFAULT_UNIVERSAL_SETTINGS },
   };
 
   const journalRows: JournalCheckRow[] = [
@@ -376,7 +390,7 @@ function makeSeedState(): JournalMonitorState {
       matchedTerm: '548291',
       matchType: 'TM',
       decision: 'ISSUE - OPPOSE',
-      remarks: 'Serial PB-001 · Journal 909 Legal 8.5x14',
+      remarks: `Serial ${'PB-001'} · Journal 909`,
       docId: 'gdoc_seed_1',
       pdfReady: true,
       createdAt: '2026-11-26T09:30:00.000Z',
@@ -465,6 +479,27 @@ export function loadJournalState(): JournalMonitorState {
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       window.localStorage.setItem(DB_SEED_MIGRATION_KEY, '1');
+    }
+
+    if (!next.config.universalSettings) {
+      next = {
+        ...next,
+        config: {
+          ...next.config,
+          universalSettings: { ...DEFAULT_UNIVERSAL_SETTINGS },
+        },
+      };
+    } else {
+      next = {
+        ...next,
+        config: {
+          ...next.config,
+          universalSettings: {
+            ...DEFAULT_UNIVERSAL_SETTINGS,
+            ...next.config.universalSettings,
+          },
+        },
+      };
     }
 
     return next;

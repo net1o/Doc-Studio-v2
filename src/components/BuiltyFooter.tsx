@@ -1,55 +1,67 @@
 import { ArrowUp, ArrowRight, Mail, MapPin, Phone } from 'lucide-react';
-import { AppTab } from '../types/journal';
+import { AppTab, UniversalSettings } from '../types/journal';
+import { BrandexLogo } from './BrandexLogo';
 
 interface BuiltyFooterProps {
   onSelectTab: (tab: AppTab) => void;
   onScrollTop: () => void;
+  themeSettings?: UniversalSettings;
 }
 
-export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
+export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: BuiltyFooterProps) {
+  const logoPrimary = themeSettings?.docPrimaryColor || '#290076';
+  const logoAccent = themeSettings?.docAccentColor || '#f4580b';
+  const uiAccent = themeSettings?.uiAccentColor || '#ffee00';
+
   return (
     <footer className="no-print mt-12">
-      {/* Builty Consultation Strip */}
+      {/* Consultation Strip with Logo 01 */}
       <div className="bg-white border-t border-b border-[#e2e4ea]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true">
-              <polygon points="4,30 18,4 32,30" fill="#ffee00" stroke="#111111" strokeWidth="1.5" />
-              <polygon points="11,30 18,16 25,30" fill="#111111" />
-            </svg>
+            <BrandexLogo
+              variant="logo01"
+              size="sm"
+              primaryColor={logoPrimary}
+              accentColor={logoAccent}
+            />
             <div>
               <p className="text-sm font-extrabold text-[#111111]">Brandex Law Associate</p>
-              <p className="text-xs text-[#555a66]">
-                Database &amp; Journal Monitor System · Trademark watchlist &amp; Legal 8.5×14 automation
-              </p>
+              <p className="text-xs text-[#555a66]">Journal Monitor &amp; Document System</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={() => onSelectTab('generator')}
-            className="builty-btn h-[42px] pl-5 pr-2.5 gap-3 text-xs whitespace-nowrap"
+            className="builty-btn h-[40px] pl-5 pr-2.5 gap-3 text-xs whitespace-nowrap"
           >
-            <span>Open 909 Doc Generator</span>
-            <span className="builty-btn-icon-tab w-7 h-7">
+            <span>Open Document Generator</span>
+            <span className="builty-btn-icon-tab w-7 h-6">
               <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </button>
         </div>
       </div>
 
-      {/* Main Corporate Footer */}
+      {/* Main Corporate Footer with Logo 20 Horizontal Lockup */}
       <div className="bg-[#111111] text-white">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="space-y-2.5">
-            <h3 className="text-base font-bold text-white">Information</h3>
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-9 grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="space-y-3">
+            <BrandexLogo
+              variant="logo20"
+              size="md"
+              primaryColor="#ffffff"
+              accentColor={uiAccent}
+              onDark
+            />
             <p className="text-xs text-[#9c9ca6] leading-relaxed max-w-sm">
-              Brandex Law Associate — Database &amp; Journal Monitor System uniting monthly Trademark Journal scanning, 24-column Google Sheet case synchronization, and Legal 8.5×14 print generation.
+              Brandex Law Associate · Journal Monitor &amp; Case Records Workspace.
             </p>
           </div>
 
           <div className="space-y-2.5">
-            <h3 className="text-base font-bold text-white">Office &amp; Dispatch</h3>
+            <h3 className="text-base font-bold text-white">Office</h3>
             <ul className="space-y-2 text-xs text-[#c7c7d1]">
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#ffee00] shrink-0 mt-0.5" aria-hidden="true" />
@@ -67,13 +79,13 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
           </div>
 
           <div className="space-y-2.5">
-            <h3 className="text-base font-bold text-white">Quick Workspace</h3>
+            <h3 className="text-base font-bold text-white">Workspace</h3>
             <div className="grid grid-cols-2 gap-2 text-xs text-[#c7c7d1]">
               <button type="button" onClick={() => onSelectTab('analyzer')} className="text-left hover:text-[#ffee00]">
-                Dashboard &amp; Watchlist
+                Dashboard
               </button>
               <button type="button" onClick={() => onSelectTab('journalcheck')} className="text-left hover:text-[#ffee00]">
-                JournalCheck Input
+                JournalCheck
               </button>
               <button type="button" onClick={() => onSelectTab('review')} className="text-left hover:text-[#ffee00]">
                 Review Queue
@@ -85,7 +97,7 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
                 Records &amp; Report
               </button>
               <button type="button" onClick={() => onSelectTab('settings')} className="text-left hover:text-[#ffee00]">
-                Settings (CFG)
+                Settings
               </button>
             </div>
           </div>
@@ -93,7 +105,7 @@ export function BuiltyFooter({ onSelectTab, onScrollTop }: BuiltyFooterProps) {
 
         <div className="border-t border-[#1d1d22]">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4 text-xs text-[#8e8e98]">
-            <span>Brandex Law Associate · Database &amp; Journal Monitor System · Legal 8.5×14 Edition</span>
+            <span>Brandex Law Associate</span>
             <button
               type="button"
               onClick={onScrollTop}

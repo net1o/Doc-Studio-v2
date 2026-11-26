@@ -74,6 +74,34 @@ export interface PaperSizeConfig {
   customUnit: PaperUnit;
 }
 
+export type DocumentThemePreset =
+  | 'brandex_violet'
+  | 'builty_yellow'
+  | 'navy_gold'
+  | 'emerald_amber'
+  | 'crimson_slate'
+  | 'custom';
+
+export type ImageColorMode = 'original' | 'theme' | 'grayscale';
+
+export interface UniversalSettings {
+  tablePageSize: number;
+  enableInlineEdit: boolean;
+  themePreset: DocumentThemePreset;
+  docPrimaryColor: string;
+  docSecondaryColor: string;
+  docAccentColor: string;
+  uiAccentColor: string;
+  uiDarkColor: string;
+  imageColorMode: ImageColorMode;
+}
+
+export interface DocExtraDetailRow {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export interface JournalConfig {
   journalNo: string;
   journalDate: string;
@@ -85,6 +113,7 @@ export interface JournalConfig {
   caseEntries: CaseEntry[];
   caseSheetConfig?: CaseSheetConfig;
   paperSize?: PaperSizeConfig;
+  universalSettings?: UniversalSettings;
 }
 
 export interface JournalCheckRow {
@@ -159,6 +188,9 @@ export interface GeneratedJournalDoc {
   trademarkField: string;
   extraLabel: string;
   extraValue: string;
+  extraRows?: DocExtraDetailRow[];
+  noteText?: string;
+  imageColorMode?: ImageColorMode;
   imageDataUrl: string;
   pdfGenerated: boolean;
   createdAt: string;

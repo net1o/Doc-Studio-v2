@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppTab,
   CaseEntry,
@@ -9,6 +9,7 @@ import {
   RecordRow,
   ReviewRow,
   ReviewStatus,
+  UniversalSettings,
 } from './types/journal';
 import {
   computeReviewStats,
@@ -19,6 +20,7 @@ import {
   triggerFileDownload,
 } from './lib/journal/engine';
 import {
+  DEFAULT_UNIVERSAL_SETTINGS,
   JournalMonitorState,
   loadJournalState,
   resetJournalState,
@@ -105,7 +107,7 @@ function buildRecordFromDoc(row: ReviewRow, doc: GeneratedJournalDoc, nowIso: st
     matchedTerm: row.matchedTerm,
     matchType: row.matchType,
     decision: row.decision,
-    remarks: `Serial ${doc.serialNo} · Journal ${doc.journalNo} Legal 8.5x14`,
+    remarks: `Serial ${doc.serialNo} · Journal ${doc.journalNo}`,
     docId: doc.id,
     pdfReady: doc.pdfGenerated,
     createdAt: nowIso,
@@ -123,6 +125,14 @@ export default function App() {
   const [toast, setToast] = useState<{ kind: 'info' | 'error'; message: string } | null>(null);
   const [sfxEnabled, setSfxEnabledState] = useState<boolean>(() => isSfxEnabled());
   const toastTimerRef = useRef<number | null>(null);
+
+  const universalSettings: UniversalSettings = useMemo(
+    () => ({
+      ...DEFAULT_UNIVERSAL_SETTINGS,
+      ...(state.config.universalSettings || {}),
+    }),
+    [state.config.universalSettings]
+  );
 
   const showToast = (message: string, kind: 'info' | 'error' = 'info') => {
     setToast({ message, kind });
@@ -207,11 +217,17 @@ export default function App() {
     setState((prev) => ({ ...prev, journalRows: nextRows }));
   };
 
+  const handleDeleteAllJournalRows = () => {
+    const count = state.journalRows.length;
+    setState((prev) => ({ ...prev, journalRows: [] }));
+    showToast(`Deleted all ${count} JournalCheck rows.`);
+  };
+
   const handleNormalizeDates = () => {
     const { rows, changed, failed } = normalizeJournalCheckDates(state.journalRows);
     setState((prev) => ({ ...prev, journalRows: rows }));
     showToast(
-      `Date normalization complete: ${changed} updated to dd-MMM-yy${failed > 0 ? `, ${failed} unrecognized` : ''}.`
+      `Dates normalized: ${changed} updated${failed > 0 ? `, ${failed} unrecognized` : ''}.`
     );
   };
 
@@ -229,7 +245,7 @@ export default function App() {
       }));
       setActiveTab('review');
       showToast(
-        `Scan complete (${totalScanned} rows): ${newRows.length} new matches added to Review${
+        `Scan complete (${totalScanned} rows): ${newRows.length} matches added${
           skippedDuplicate > 0 ? `, ${skippedDuplicate} duplicates skipped` : ''
         }.`
       );
@@ -237,7 +253,7 @@ export default function App() {
       setActiveTab('review');
       showToast(
         `Scan complete (${totalScanned} rows): 0 new matches${
-          skippedDuplicate > 0 ? ` (${skippedDuplicate} already in Review)` : ''
+          skippedDuplicate > 0 ? ` (${skippedDuplicate} already queued)` : ''
         }.`
       );
     }
@@ -248,6 +264,25 @@ export default function App() {
       ...prev,
       reviewRows: prev.reviewRows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
     }));
+  };
+
+  const handleDeleteAllReviewRows = () => {
+    const count = state.reviewRows.length;
+    setState((prev) => ({ ...prev, reviewRows: [] }));
+    showToast(`Deleted all ${count} Review rows.`);
+  };
+
+  const handleUpdateRecord = (id: string, patch: Partial<RecordRow>) => {
+    setState((prev) => ({
+      ...prev,
+      records: prev.records.map((rec) => (rec.id === id ? { ...rec, ...patch } : rec)),
+    }));
+  };
+
+  const handleDeleteAllRecords = () => {
+    const count = state.records.length;
+    setState((prev) => ({ ...prev, records: [] }));
+    showToast(`Deleted all ${count} records.`);
   };
 
   const handleBulkApplyStatusByAppNo = (
@@ -272,7 +307,7 @@ export default function App() {
     }));
 
     showToast(
-      `Applied status "${status}" to ${updatedCount} row(s) matching App No ${applicationNo}.`
+      `Applied "${status}" to ${updatedCount} row(s) matching ${applicationNo}.`
     );
   };
 
@@ -300,7 +335,7 @@ export default function App() {
       (r) => r.status === 'MAILMERGE' && !r.generatedDocId
     );
     if (readyRows.length === 0) {
-      showToast('No Review rows with status MAILMERGE waiting for generation.', 'error');
+      showToast('No Review rows with MAILMERGE status ready.', 'error');
       return;
     }
 
@@ -341,7 +376,7 @@ export default function App() {
 
     setSelectedDocId(createdDocs[0].id);
     setActiveTab('generator');
-    showToast(`Generated ${createdDocs.length} Journal 909 Legal (8.5×14) document(s).`);
+    showToast(`Generated ${createdDocs.length} Journal ${state.config.journalNo || '909'} document(s).`);
   };
 
   const handleOpenDocInGenerator = (row: ReviewRow) => {
@@ -381,7 +416,7 @@ export default function App() {
 
     setSelectedDocId(doc.id);
     setActiveTab('generator');
-    showToast(`Merged ${row.title || row.applicationNo} into Journal 909 (${serialNo}).`);
+    showToast(`Created document for ${row.title || row.applicationNo} (${serialNo}).`);
   };
 
   const handleCreateBlankDoc = () => {
@@ -421,7 +456,7 @@ export default function App() {
     }));
     setSelectedDocId(blankDoc.id);
     setActiveTab('generator');
-    showToast(`Created blank Journal 909 sheet (${serialNo}).`);
+    showToast(`Created blank document (${serialNo}).`);
   };
 
   const handleUpdateGeneratedDoc = (id: string, patch: Partial<GeneratedJournalDoc>) => {
@@ -454,7 +489,7 @@ export default function App() {
       setSelectedDocId(docId);
       setActiveTab('generator');
     } else {
-      showToast('Document snapshot was not found in local store.', 'error');
+      showToast('Document snapshot not found.', 'error');
     }
   };
 
@@ -463,7 +498,7 @@ export default function App() {
     setState(fresh);
     setSelectedDocId(fresh.generatedDocs[0]?.id || null);
     setActiveTab('analyzer');
-    showToast('Workspace reset to default Journal 909 sample data.');
+    showToast('Reset to sample data.');
   };
 
   const handleClearWatchlist = () => {
@@ -476,7 +511,7 @@ export default function App() {
         tmNumbers: [],
       },
     }));
-    showToast(`Watchlist cleared (${clearedTotal} criteria removed).`);
+    showToast(`Watchlist cleared (${clearedTotal} removed).`);
   };
 
   const handleExportReport = () => {
@@ -526,8 +561,8 @@ export default function App() {
       rowsSource
     );
     const jNo = (state.config.journalNo || '909').replace(/[^a-zA-Z0-9_-]+/g, '_');
-    triggerFileDownload(csv, `Journal_${jNo}_Monitoring_Report.csv`, 'text/csv;charset=utf-8');
-    showToast(`Exported Journal ${state.config.journalNo || '909'} monitoring report (${rowsSource.length} rows).`);
+    triggerFileDownload(csv, `Journal_${jNo}_Report.csv`, 'text/csv;charset=utf-8');
+    showToast(`Exported report (${rowsSource.length} rows).`);
   };
 
   const watchlistCount = state.config.keywords.length + state.config.tmNumbers.length;
@@ -567,8 +602,16 @@ export default function App() {
     state.records.length,
   ]);
 
+  const themeVars = {
+    '--builty-yellow': universalSettings.uiAccentColor,
+    '--builty-dark': universalSettings.uiDarkColor,
+    '--j909-theme': universalSettings.docPrimaryColor,
+    '--j909-theme-light': universalSettings.docSecondaryColor,
+    '--j909-heading': universalSettings.docAccentColor,
+  } as CSSProperties;
+
   return (
-    <div className="min-h-screen bg-[#f6f7f9] text-[#111111] flex flex-col">
+    <div style={themeVars} className="min-h-screen bg-[#f6f7f9] text-[#111111] flex flex-col">
       <BuiltyHeader
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -582,6 +625,7 @@ export default function App() {
         recordsCount={state.records.length}
         sfxEnabled={sfxEnabled}
         onToggleSfx={handleToggleSfx}
+        themeSettings={universalSettings}
       />
 
       <BuiltyHeroBanner
@@ -589,6 +633,7 @@ export default function App() {
         journalDate={state.config.journalDate}
         activeTab={activeTab}
         onOpenGenerator={() => setActiveTab('generator')}
+        themeSettings={universalSettings}
       />
 
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 print:p-0 print:m-0 print:max-w-none">
@@ -618,6 +663,8 @@ export default function App() {
             stats={currentStats}
             allTimeStats={allTimeStats}
             journalRowCount={state.journalRows.length}
+            pageSize={universalSettings.tablePageSize}
+            defaultEditMode={universalSettings.enableInlineEdit}
             onUpdateConfig={handleUpdateConfig}
             onRunScan={handleRunScan}
             onGoToTab={setActiveTab}
@@ -625,7 +672,7 @@ export default function App() {
               const { rows, updatedCount } = refreshReviewCaseNumbers(state.reviewRows, entries);
               if (updatedCount > 0) {
                 setState((prev) => ({ ...prev, reviewRows: rows }));
-                showToast(`Updated Case No on ${updatedCount} Review Queue row(s).`);
+                showToast(`Updated Case No on ${updatedCount} Review row(s).`);
               }
             }}
             onNotify={(msg: string) => showToast(msg)}
@@ -635,9 +682,12 @@ export default function App() {
         {activeTab === 'journalcheck' && (
           <JournalCheckView
             rows={state.journalRows}
+            pageSize={universalSettings.tablePageSize}
+            defaultEditMode={universalSettings.enableInlineEdit}
             onChangeRows={handleUpdateJournalRows}
             onNormalizeDates={handleNormalizeDates}
             onRunScan={handleRunScan}
+            onDeleteAllRows={handleDeleteAllJournalRows}
             onNotify={(msg: string) => showToast(msg)}
           />
         )}
@@ -645,11 +695,14 @@ export default function App() {
         {activeTab === 'review' && (
           <ReviewQueueView
             rows={state.reviewRows}
+            pageSize={universalSettings.tablePageSize}
+            defaultEditMode={universalSettings.enableInlineEdit}
             onUpdateRow={handleUpdateReviewRow}
             onBulkApplyStatusByAppNo={handleBulkApplyStatusByAppNo}
             onMarkIssuesMailmerge={handleMarkIssuesMailmerge}
             onGenerateDocsFromMailmerge={handleGenerateDocsFromMailmerge}
             onOpenDocInGenerator={handleOpenDocInGenerator}
+            onDeleteAllRows={handleDeleteAllReviewRows}
           />
         )}
 
@@ -658,6 +711,7 @@ export default function App() {
             docs={state.generatedDocs}
             selectedDocId={selectedDocId}
             paperSize={state.config.paperSize}
+            universalSettings={universalSettings}
             activeTab={activeTab}
             watchlistCount={watchlistCount}
             onSelectTab={setActiveTab}
@@ -676,14 +730,16 @@ export default function App() {
         {activeTab === 'database' && (
           <DatabaseView
             config={state.config}
+            pageSize={universalSettings.tablePageSize}
+            defaultEditMode={universalSettings.enableInlineEdit}
             onUpdateConfig={handleUpdateConfig}
             onRefreshReviewCases={(entries: CaseEntry[]) => {
               const { rows, updatedCount } = refreshReviewCaseNumbers(state.reviewRows, entries);
               if (updatedCount > 0) {
                 setState((prev) => ({ ...prev, reviewRows: rows }));
-                showToast(`Updated Case No on ${updatedCount} Review Queue row(s).`);
+                showToast(`Updated Case No on ${updatedCount} Review row(s).`);
               } else {
-                showToast('All Review Queue rows already match current Database records.');
+                showToast('Review Queue already matches Database.');
               }
             }}
             onNotify={(msg: string) => showToast(msg)}
@@ -696,7 +752,11 @@ export default function App() {
             currentJournalNo={state.config.journalNo || '909'}
             currentStats={currentStats}
             allTimeStats={allTimeStats}
+            pageSize={universalSettings.tablePageSize}
+            defaultEditMode={universalSettings.enableInlineEdit}
             onOpenGeneratedDoc={handleOpenGeneratedDocById}
+            onUpdateRecord={handleUpdateRecord}
+            onDeleteAllRecords={handleDeleteAllRecords}
           />
         )}
 
@@ -724,6 +784,7 @@ export default function App() {
       <BuiltyFooter
         onSelectTab={setActiveTab}
         onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        themeSettings={universalSettings}
       />
     </div>
   );
