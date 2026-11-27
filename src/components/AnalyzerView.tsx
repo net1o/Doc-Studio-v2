@@ -883,13 +883,7 @@ export function AnalyzerView({
                       className="flex-1 min-w-0 bg-[#fffef0] border border-[#cbd0da] px-1.5 py-0.5 font-mono text-xs"
                     />
                   ) : (
-                    <span
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) => handleRenameKeyword(kw, e.currentTarget.innerText)}
-                      className="font-mono font-medium truncate outline-none focus:bg-[#fffef0] focus:px-1"
-                      title={kw}
-                    >
+                    <span className="font-mono font-medium truncate" title={kw}>
                       {kw}
                     </span>
                   )}
@@ -1012,12 +1006,7 @@ export function AnalyzerView({
                       className="flex-1 min-w-0 bg-[#fffef0] border border-[#cbd0da] px-1.5 py-0.5 font-mono text-xs tabular-nums"
                     />
                   ) : (
-                    <span
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) => handleRenameTm(tm, e.currentTarget.innerText)}
-                      className="font-mono font-medium tabular-nums outline-none focus:bg-[#fffef0] focus:px-1"
-                    >
+                    <span className="font-mono font-medium tabular-nums">
                       {tm}
                     </span>
                   )}
@@ -1186,29 +1175,11 @@ export function AnalyzerView({
                         className="min-w-0 truncate"
                         title={`${c.tmNumber} · ${c.caseNo} — ${c.applicationName || c.clientName}`}
                       >
-                        <span
-                          contentEditable
-                          suppressContentEditableWarning
-                          onBlur={(e) =>
-                            handleUpdateCaseEntry(entryKey, {
-                              tmNumber: e.currentTarget.innerText.trim(),
-                            })
-                          }
-                          className="font-mono font-bold text-[#111111] tabular-nums outline-none focus:bg-[#fffef0]"
-                        >
+                        <span className="font-mono font-bold text-[#111111] tabular-nums">
                           {c.tmNumber || '—'}
                         </span>
                         <span className="text-[#9ca3af]"> · </span>
-                        <span
-                          contentEditable
-                          suppressContentEditableWarning
-                          onBlur={(e) =>
-                            handleUpdateCaseEntry(entryKey, {
-                              caseNo: e.currentTarget.innerText.trim(),
-                            })
-                          }
-                          className="text-[#111111] font-semibold outline-none focus:bg-[#fffef0]"
-                        >
+                        <span className="text-[#111111] font-semibold">
                           {c.caseNo}
                         </span>
                         {(c.applicationName || c.clientName) && (

@@ -5,6 +5,7 @@ import {
   Edit3,
   Eye,
   FileCode2,
+  FileDown,
   ImagePlus,
   Palette,
   Plus,
@@ -31,6 +32,7 @@ import {
   STANDARD_PAPER_SIZES,
 } from '../lib/journal/journal909Template';
 import { triggerFileDownload } from '../lib/journal/engine';
+import { generateJournalDocPdf } from '../lib/journal/pdfGenerator';
 import { BrandexLogo } from './BrandexLogo';
 import { BrandexButtonIcon, type BrandexButtonIconName } from './BrandexButtonIcon';
 
@@ -69,6 +71,8 @@ export function Journal909GeneratorView({
 }: Journal909GeneratorViewProps) {
   const [zoom, setZoom] = useState<'fit' | '75' | '100'>('75');
   const [previewInputMode, setPreviewInputMode] = useState<boolean>(false);
+  const [journalFilter, setJournalFilter] = useState<string>('ALL');
+  const [makingPdf, setMakingPdf] = useState<boolean>(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [pdfPreviewZoom, setPdfPreviewZoom] = useState<'fit' | '75' | '100'>('75');
@@ -93,7 +97,28 @@ export function Journal909GeneratorView({
     return () => window.removeEventListener('keydown', onKey);
   }, [confirmClearOpen, pdfPreviewOpen]);
 
-  const activeDoc = docs.find((d) => d.id === selectedDocId) || docs[0] || null;
+  const journalGroups = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of docs) {
+      const jn = (d.journalNo || '909').trim() || '909';
+      map.set(jn, (map.get(jn) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([journalNo, count]) => ({ journalNo, count }))
+      .sort((a, b) => b.journalNo.localeCompare(a.journalNo, undefined, { numeric: true }));
+  }, [docs]);
+
+  const filteredDocs = useMemo(() => {
+    if (journalFilter === 'ALL') return docs;
+    return docs.filter((d) => ((d.journalNo || '909').trim() || '909') === journalFilter);
+  }, [docs, journalFilter]);
+
+  const activeDoc =
+    filteredDocs.find((d) => d.id === selectedDocId) ||
+    filteredDocs[0] ||
+    docs.find((d) => d.id === selectedDocId) ||
+    docs[0] ||
+    null;
   const activePaper = paperSize || DEFAULT_PAPER_SIZE;
   const resolvedDims = useMemo(() => resolvePaperDimensionsIn(activePaper), [activePaper]);
 
@@ -147,6 +172,17 @@ export function Journal909GeneratorView({
     if (!activeDoc) return;
     onMarkPdfGenerated(activeDoc.id);
     window.print();
+  };
+
+  const handleMakeDirectPdf = async () => {
+    if (!activeDoc || makingPdf) return;
+    setMakingPdf(true);
+    try {
+      await generateJournalDocPdf(activeDoc, activePaper, universalSettings);
+      onMarkPdfGenerated(activeDoc.id);
+    } finally {
+      setMakingPdf(false);
+    }
   };
 
   const handleAppendDetailRow = () => {
@@ -213,12 +249,11 @@ export function Journal909GeneratorView({
   const pageCssVars = {
     '--j909-page-w': `${resolvedDims.widthIn}in`,
     '--j909-page-h': `${resolvedDims.heightIn}in`,
+    '--j909-scale': String(resolvedDims.scaleFactor),
     '--j909-theme': themePrimary,
     '--j909-theme-light': themeSecondary,
     '--j909-heading': themeAccent,
-    '--j909-content-pad': resolvedDims.compactLayout
-      ? '0.42in 0.42in 0.34in 0.42in'
-      : '0.62in 0.56in 0.48in 0.56in',
+    '--j909-content-pad': '0.62in 0.56in 0.48in 0.56in',
   } as CSSProperties;
 
   return (
@@ -320,10 +355,55 @@ export function Journal909GeneratorView({
           </div>
         </div>
 
-        {/* Document Picker */}
-        <div>
-          <label htmlFor="j909-doc-select" className="block text-xs font-bold text-[#374151] mb-1.5">
-            Active Document ({docs.length})
+        {/* Separate Records by Journal No + Active Document Picker */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#374151]">Filter by Journal No</span>
+            <span className="text-[11px] font-mono font-bold text-[#555a66] tabular-nums">
+              {filteredDocs.length} / {docs.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              data-sfx="filter"
+              onClick={() => {
+                setJournalFilter('ALL');
+                if (docs[0]) onSelectDoc(docs[0].id);
+              }}
+              className={`px-2 py-1 border text-[11px] font-bold tabular-nums ${
+                journalFilter === 'ALL'
+                  ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                  : 'border-[#cbd0da] bg-[#f8f9fb] text-[#555a66] hover:text-[#111111]'
+              }`}
+            >
+              All ({docs.length})
+            </button>
+            {journalGroups.map((jg) => (
+              <button
+                key={jg.journalNo}
+                type="button"
+                data-sfx="filter"
+                onClick={() => {
+                  setJournalFilter(jg.journalNo);
+                  const firstMatch = docs.find(
+                    (d) => ((d.journalNo || '909').trim() || '909') === jg.journalNo
+                  );
+                  if (firstMatch) onSelectDoc(firstMatch.id);
+                }}
+                className={`px-2 py-1 border text-[11px] font-bold tabular-nums ${
+                  journalFilter === jg.journalNo
+                    ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                    : 'border-[#cbd0da] bg-white text-[#111111] hover:border-[#111111]'
+                }`}
+              >
+                Jrn {jg.journalNo} ({jg.count})
+              </button>
+            ))}
+          </div>
+
+          <label htmlFor="j909-doc-select" className="block text-xs font-bold text-[#374151] pt-1">
+            Active Document ({filteredDocs.length})
           </label>
           <select
             id="j909-doc-select"
@@ -331,23 +411,59 @@ export function Journal909GeneratorView({
             onChange={(e) => onSelectDoc(e.target.value)}
             className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs font-semibold text-[#111111] focus:bg-white focus:border-[#111111]"
           >
-            {docs.map((d) => (
+            {filteredDocs.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.serialNo} · {d.title || 'Untitled'} ({d.applicationNo || 'No App#'})
+                [Jrn {d.journalNo || '909'}] {d.serialNo} · {d.title || 'Untitled'} ({d.applicationNo || 'No App#'})
               </option>
             ))}
           </select>
         </div>
 
-        {/* Paper Size & Custom Dimensions */}
+        {/* Paper Size & Auto-Adjust Fit */}
         <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3.5 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <label htmlFor="j909-paper-preset" className="text-xs font-extrabold text-[#111111]">
-              Paper Size
+              Paper Size (Auto-Fit {Math.round(resolvedDims.scaleFactor * 100)}%)
             </label>
             <span className="text-[11px] font-mono font-bold text-[#555a66] tabular-nums">
               {resolvedDims.widthIn}&quot; × {resolvedDims.heightIn}&quot;
             </span>
+          </div>
+
+          {/* 1-Click Legal / Indian Legal / A4 Switcher */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {(
+              [
+                { id: 'legal', label: 'Legal' },
+                { id: 'indian_legal', label: 'Indian Legal' },
+                { id: 'a4', label: 'A4' },
+              ] as const
+            ).map((quick) => {
+              const active = activePaper.preset === quick.id;
+              return (
+                <button
+                  key={quick.id}
+                  type="button"
+                  data-sfx="filter"
+                  onClick={() => {
+                    const found = STANDARD_PAPER_SIZES.find((p) => p.id === quick.id);
+                    updatePaper({
+                      preset: quick.id,
+                      customWidth: found ? found.widthIn : activePaper.customWidth,
+                      customHeight: found ? found.heightIn : activePaper.customHeight,
+                      customUnit: 'in',
+                    });
+                  }}
+                  className={`h-[30px] border text-[11px] font-extrabold ${
+                    active
+                      ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                      : 'border-[#cbd0da] bg-white text-[#555a66] hover:text-[#111111]'
+                  }`}
+                >
+                  {quick.label}
+                </button>
+              );
+            })}
           </div>
 
           <select
@@ -398,6 +514,16 @@ export function Journal909GeneratorView({
               ))}
             </div>
           </div>
+
+          <label className="flex items-center justify-between gap-2 pt-1 border-t border-[#e2e4ea] cursor-pointer text-[11px] font-bold text-[#111111]">
+            <span>Auto-Adjust Print Margins (No Clipping)</span>
+            <input
+              type="checkbox"
+              checked={activePaper.autoAdjustPrint !== false}
+              onChange={(e) => updatePaper({ autoAdjustPrint: e.target.checked })}
+              className="w-4 h-4 accent-[#111111]"
+            />
+          </label>
 
           {activePaper.preset === 'custom' && (
             <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#e2e4ea]">
@@ -467,16 +593,15 @@ export function Journal909GeneratorView({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handlePrintPdf}
+              disabled={makingPdf}
+              onClick={handleMakeDirectPdf}
               className="builty-btn flex-1 justify-between h-[42px] pl-3.5 pr-2 text-xs"
             >
-              <span className="truncate">Print / PDF ({resolvedDims.label})</span>
+              <span className="truncate">
+                {makingPdf ? 'Building PDF…' : `Make PDF (${resolvedDims.presetName})`}
+              </span>
               <span className="builty-btn-icon-tab w-7 h-7 shrink-0">
-                <BrandexButtonIcon
-                  name="generator"
-                  size={20}
-                  colorMode={universalSettings?.imageColorMode}
-                />
+                <FileDown className="w-4 h-4" aria-hidden="true" />
               </span>
             </button>
 
@@ -755,6 +880,16 @@ export function Journal909GeneratorView({
             </span>
             <button
               type="button"
+              disabled={makingPdf}
+              onClick={handleMakeDirectPdf}
+              title="Download PDF"
+              className="h-[32px] px-3 bg-[#111111] hover:bg-[#2a2f3a] text-[#ffee00] text-[11.5px] font-extrabold inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <FileDown className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{makingPdf ? 'Making PDF…' : 'Make PDF'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handlePrintPdf}
               title="Print Document"
               className="h-[32px] px-3 bg-[#ffee00] hover:bg-[#e6d600] text-[#111111] text-[11.5px] font-extrabold inline-flex items-center gap-1.5"
@@ -768,6 +903,7 @@ export function Journal909GeneratorView({
         <div className="overflow-x-auto flex justify-center bg-[#e9ebf0] border border-[#d4d7e0] p-4 sm:p-6 min-h-[760px] print:overflow-visible print:block print:bg-white print:border-0 print:p-0 print:min-h-0">
           <div className={`j909-print-wrapper ${scaleClass}`} style={pageCssVars}>
             <div className="j909-page" style={pageCssVars}>
+              <div className="j909-scaler">
               {/* Outer Frame & Corner Borders SVG colored by Theme */}
               <svg
                 className="j909-frame-svg"
@@ -1306,6 +1442,7 @@ export function Journal909GeneratorView({
                   </div>
                 </div>
               </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1401,6 +1538,16 @@ export function Journal909GeneratorView({
                 >
                   <FileCode2 className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>HTML</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={makingPdf}
+                  onClick={handleMakeDirectPdf}
+                  className="h-[34px] px-3 bg-[#1d2028] border border-[#ffee00] hover:bg-[#2a2f3a] text-[#ffee00] text-xs font-extrabold inline-flex items-center gap-1.5"
+                >
+                  <FileDown className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Make PDF</span>
                 </button>
 
                 <button

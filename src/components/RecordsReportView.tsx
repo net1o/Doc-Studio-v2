@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { FileText } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import { JournalStats, RecordRow, UniversalSettings } from '../types/journal';
 import { BrandexButtonIcon } from './BrandexButtonIcon';
+import { exportRowsToCsv, triggerFileDownload } from '../lib/journal/engine';
 import {
   DeleteAllConfirmModal,
   TableControlsBar,
@@ -156,21 +157,27 @@ export function RecordsReportView({
         />
       );
     }
-    return (
-      <span
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={(e) => {
-          const next = e.currentTarget.innerText.trim();
-          if (next !== val.trim()) {
-            onUpdateRecord(rec.id, { [field]: next === '—' ? '' : next });
-          }
-        }}
-        className={`outline-none focus:bg-[#fffef0] focus:px-1 ${className}`}
-      >
-        {val || '—'}
-      </span>
+    return <span className={className}>{val || '—'}</span>;
+  };
+
+  const handleExportRecordsCsv = () => {
+    const csv = exportRowsToCsv(
+      ['Journal No', 'Journal Date', 'App No', 'Case No', 'Title', 'Class', 'Matched Term', 'Decision', 'Remarks', 'PDF Ready'],
+      sorted.map((r) => [
+        r.journalNo,
+        r.journalDate,
+        r.applicationNo,
+        r.caseNo,
+        r.title,
+        r.classNo,
+        r.matchedTerm,
+        r.decision,
+        r.remarks,
+        r.pdfReady ? 'YES' : 'NO',
+      ])
     );
+    const suffix = journalFilter !== 'ALL' ? `_Journal_${journalFilter}` : '';
+    triggerFileDownload(csv, `Records_Ledger${suffix}.csv`, 'text/csv;charset=utf-8');
   };
 
   const decisionTotal = Math.max(1, allTimeStats.total);
@@ -354,6 +361,73 @@ export function RecordsReportView({
             );
           })}
         </div>
+
+        {/* Live SVG Chart: Journal-by-Journal Comparison */}
+        {journalSummaryList.length > 0 && (
+          <div className="pt-4 border-t border-[#eceef2] space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span className="font-extrabold uppercase tracking-wider text-[#111111]">
+                Journal Activity Chart
+              </span>
+              <div className="flex items-center gap-3 font-semibold text-[#555a66]">
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 bg-[#111111] inline-block" /> Matches
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 bg-[#eab308] inline-block" /> Issue / Oppose
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 bg-[#16a34a] inline-block" /> Docs Ready
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {journalSummaryList.slice(0, 6).map((j) => {
+                const maxVal = Math.max(
+                  1,
+                  ...journalSummaryList.map((item) => Math.max(item.matches, item.docs, item.issue, 1))
+                );
+                const mW = Math.round((j.matches / maxVal) * 100);
+                const iW = Math.round((j.issue / maxVal) * 100);
+                const dW = Math.round((j.docs / maxVal) * 100);
+                return (
+                  <button
+                    key={`chart_${j.journalNo}`}
+                    type="button"
+                    onClick={() => {
+                      setJournalFilter(j.journalNo);
+                      setCurrentPage(1);
+                    }}
+                    className={`text-left p-2.5 border transition-colors ${
+                      journalFilter === j.journalNo
+                        ? 'border-[#111111] bg-[#fffef0]'
+                        : 'border-[#e2e4ea] bg-[#f8f9fb] hover:border-[#111111]'
+                    }`}
+                  >
+                    <div className="flex justify-between text-xs font-extrabold text-[#111111] mb-1.5 tabular-nums">
+                      <span className="font-mono">Journal {j.journalNo}</span>
+                      <span className="text-[11px] font-mono text-[#555a66]">
+                        {j.matches} / {j.issue} / {j.docs}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="h-1.5 bg-[#e2e4ea]">
+                        <div className="h-full bg-[#111111]" style={{ width: `${mW}%` }} />
+                      </div>
+                      <div className="h-1.5 bg-[#e2e4ea]">
+                        <div className="h-full bg-[#eab308]" style={{ width: `${iW}%` }} />
+                      </div>
+                      <div className="h-1.5 bg-[#e2e4ea]">
+                        <div className="h-full bg-[#16a34a]" style={{ width: `${dW}%` }} />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Records Ledger */}
@@ -393,8 +467,17 @@ export function RecordsReportView({
                   setCurrentPage(1);
                 }}
                 placeholder="Filter Journal, App No, Case No, or Title…"
-                className="w-full sm:w-72 bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+                className="w-full sm:w-64 bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
               />
+              <button
+                type="button"
+                onClick={handleExportRecordsCsv}
+                disabled={sorted.length === 0}
+                className="h-[34px] px-3 border border-[#cbd0da] bg-white hover:border-[#111111] text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap disabled:opacity-40"
+              >
+                <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Export {journalFilter !== 'ALL' ? `Jrn ${journalFilter}` : 'CSV'}</span>
+              </button>
             </div>
           </div>
 

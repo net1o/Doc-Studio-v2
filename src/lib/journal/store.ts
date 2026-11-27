@@ -17,10 +17,11 @@ import {
 const STORAGE_KEY = 'journal_monitor_docgen_v2_1';
 const WATCHLIST_MIGRATION_KEY = 'journal_monitor_watchlist_seed_v1';
 const DB_SEED_MIGRATION_KEY = 'journal_monitor_db_seed_v3';
+const EDIT_OFF_MIGRATION_KEY = 'journal_monitor_edit_off_v1';
 
 export const DEFAULT_UNIVERSAL_SETTINGS: UniversalSettings = {
   tablePageSize: 50,
-  enableInlineEdit: true,
+  enableInlineEdit: false,
   themePreset: 'brandex_violet',
   docPrimaryColor: '#290076',
   docSecondaryColor: '#4e1cb8',
@@ -415,6 +416,7 @@ export function loadJournalState(): JournalMonitorState {
       const seed = makeSeedState();
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
       window.localStorage.setItem(WATCHLIST_MIGRATION_KEY, '1');
+      window.localStorage.setItem(EDIT_OFF_MIGRATION_KEY, '1');
       return seed;
     }
     const parsed = JSON.parse(raw) as JournalMonitorState;
@@ -502,6 +504,22 @@ export function loadJournalState(): JournalMonitorState {
       };
     }
 
+    if (window.localStorage.getItem(EDIT_OFF_MIGRATION_KEY) !== '1') {
+      next = {
+        ...next,
+        config: {
+          ...next.config,
+          universalSettings: {
+            ...DEFAULT_UNIVERSAL_SETTINGS,
+            ...(next.config.universalSettings || {}),
+            enableInlineEdit: false,
+          },
+        },
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(EDIT_OFF_MIGRATION_KEY, '1');
+    }
+
     return next;
   } catch {
     return makeSeedState();
@@ -524,6 +542,7 @@ export function resetJournalState(): JournalMonitorState {
     try {
       window.localStorage.setItem(WATCHLIST_MIGRATION_KEY, '1');
       window.localStorage.setItem(DB_SEED_MIGRATION_KEY, '1');
+      window.localStorage.setItem(EDIT_OFF_MIGRATION_KEY, '1');
     } catch {
       // Non-blocking
     }

@@ -38,6 +38,7 @@ export interface CaseEntry {
   journalDate?: string;
   lastModified?: string;
   imageUrl?: string;
+  sheetRowIndex?: number;
 }
 
 export interface CaseSheetConfig {
@@ -55,6 +56,7 @@ export interface CaseSheetConfig {
 
 export type PaperSizePreset =
   | 'legal'
+  | 'indian_legal'
   | 'letter'
   | 'a4'
   | 'a5'
@@ -72,6 +74,7 @@ export interface PaperSizeConfig {
   customWidth: number;
   customHeight: number;
   customUnit: PaperUnit;
+  autoAdjustPrint?: boolean;
 }
 
 export type DocumentThemePreset =

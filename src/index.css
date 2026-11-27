@@ -157,14 +157,25 @@ button:active:not(:disabled) {
   background: #ffffff;
   color: #111111;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
   font-family: var(--j909-font-body);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
   box-sizing: border-box;
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
   transition: width 200ms ease, height 200ms ease;
+}
+
+.j909-scaler {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8.5in;
+  height: 14in;
+  transform: translate(-50%, -50%) scale(var(--j909-scale, 1));
+  transform-origin: center center;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
 }
 
 .j909-page * {

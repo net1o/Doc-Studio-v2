@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { CheckSquare, CopyCheck, FilePlus2, FileText } from 'lucide-react';
+import { CheckSquare, CopyCheck, Download, FilePlus2, FileText } from 'lucide-react';
 import { ReviewDecision, ReviewRow, ReviewStatus, UniversalSettings } from '../types/journal';
 import { BrandexButtonIcon } from './BrandexButtonIcon';
+import { exportRowsToCsv, triggerFileDownload } from '../lib/journal/engine';
 import {
   DeleteAllConfirmModal,
   TableControlsBar,
@@ -143,21 +144,28 @@ export function ReviewQueueView({
         />
       );
     }
-    return (
-      <span
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={(e) => {
-          const next = e.currentTarget.innerText.trim();
-          if (next !== val.trim()) {
-            onUpdateRow(row.id, { [field]: next === '—' ? '' : next });
-          }
-        }}
-        className={`outline-none focus:bg-[#fffef0] focus:px-1 ${className}`}
-      >
-        {val || '—'}
-      </span>
+    return <span className={className}>{val || '—'}</span>;
+  };
+
+  const handleExportReviewCsv = () => {
+    const csv = exportRowsToCsv(
+      ['Journal No', 'App No', 'Case No', 'Title', 'Class', 'Applicant', 'Matched', 'Match Type', 'Page', 'Decision', 'Status'],
+      sorted.map((r) => [
+        r.journalNo,
+        r.applicationNo,
+        r.caseNo,
+        r.title,
+        r.classNo,
+        r.applicant,
+        r.matchedTerm,
+        r.matchType,
+        r.pageNo,
+        r.decision,
+        r.status,
+      ])
     );
+    const suffix = journalFilter !== 'ALL' ? `_Journal_${journalFilter}` : '';
+    triggerFileDownload(csv, `Review_Queue${suffix}.csv`, 'text/csv;charset=utf-8');
   };
 
   const activeFilterCount =
@@ -193,6 +201,16 @@ export function ReviewQueueView({
 
           <button
             type="button"
+            onClick={handleExportReviewCsv}
+            disabled={sorted.length === 0}
+            className="h-[38px] px-3 border border-[#cbd0da] bg-white hover:border-[#111111] text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap disabled:opacity-40"
+          >
+            <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Export {journalFilter !== 'ALL' ? `Jrn ${journalFilter}` : 'CSV'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={onGenerateDocsFromMailmerge}
             disabled={mailmergeReadyCount === 0}
             className="builty-btn h-[38px] pl-3 pr-2 gap-2 text-xs whitespace-nowrap"
@@ -211,6 +229,48 @@ export function ReviewQueueView({
       </div>
 
       <div className="bg-white border border-[#e2e4ea] overflow-hidden">
+        {/* Per-Journal Separation Strip */}
+        {journalOptions.length > 0 && (
+          <div className="px-4 py-2.5 bg-[#f8f9fb] border-b border-[#e2e4ea] flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#555a66] mr-1">
+              Journal No:
+            </span>
+            <button
+              type="button"
+              data-sfx="filter"
+              onClick={() => {
+                setJournalFilter('ALL');
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1 border text-[11px] font-bold tabular-nums ${
+                journalFilter === 'ALL'
+                  ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                  : 'border-[#cbd0da] bg-white text-[#555a66] hover:text-[#111111]'
+              }`}
+            >
+              All ({rows.length})
+            </button>
+            {journalOptions.map((opt) => (
+              <button
+                key={opt.journalNo}
+                type="button"
+                data-sfx="filter"
+                onClick={() => {
+                  setJournalFilter(opt.journalNo);
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 border text-[11px] font-bold font-mono tabular-nums ${
+                  journalFilter === opt.journalNo
+                    ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                    : 'border-[#cbd0da] bg-white text-[#555a66] hover:text-[#111111]'
+                }`}
+              >
+                Journal {opt.journalNo} ({opt.count})
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Filter Strip */}
         <div className="p-3.5 border-b border-[#e2e4ea] flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[260px]">

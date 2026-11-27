@@ -1533,6 +1533,7 @@ export function parseCaseLookupInput(
       journalDate: pick(cols, journalDateIdx),
       lastModified: pick(cols, lastModifiedIdx),
       imageUrl: pick(cols, imageIdx),
+      sheetRowIndex: i + 1,
     });
   }
 
@@ -1648,4 +1649,86 @@ export function triggerFileDownload(content: string, filename: string, mimeType:
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Strict sanitizer for TM/CPR NUMBER: digits (0-9) and hyphen (-) ONLY */
+export function sanitizeTmCprValue(raw: string): string {
+  return String(raw || '').replace(/[^0-9-]/g, '');
+}
+
+/** Convert DD-MMM-YY or any loose date string into YYYY-MM-DD for HTML <input type="date"> */
+export function toHtmlDateInputValue(rawDate?: string): string {
+  const dt = parseLooseDate(rawDate || '');
+  if (!dt) return '';
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Convert HTML <input type="date"> value (YYYY-MM-DD) into DD-MMM-YY */
+export function fromHtmlDateInputValue(htmlDate: string): string {
+  const m = String(htmlDate || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return htmlDate;
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(dt.getTime())) return htmlDate;
+  return formatDdMmmYy(dt);
+}
+
+export const CANONICAL_STAGES = ['STAGE 1', 'STAGE 2', 'STAGE 3', 'STAGE 4'] as const;
+
+export const NICE_CLASS_NUMBERS = Array.from({ length: 45 }, (_, idx) => String(idx + 1));
+
+/**
+ * Derive Stage options (STAGE 1..4 + any custom statuses from data) and a Stage -> SubStatus[]
+ * dictionary purely from the live CaseEntry records so dropdowns always reflect real data.
+ */
+export function deriveStageAndSubStatusCatalog(entries: CaseEntry[]): {
+  stages: string[];
+  subStatusesByStage: Record<string, string[]>;
+  allSubStatuses: string[];
+} {
+  const stageSet = new Set<string>(CANONICAL_STAGES);
+  const subMap = new Map<string, Set<string>>();
+  const allSubSet = new Set<string>();
+
+  for (const s of CANONICAL_STAGES) {
+    subMap.set(s, new Set<string>());
+  }
+
+  for (const entry of entries) {
+    const rawStatus = cleanInlineWhitespace(entry.status || '').toUpperCase();
+    const rawSub = cleanInlineWhitespace(entry.subStatus || '').toUpperCase();
+
+    if (rawStatus) {
+      stageSet.add(rawStatus);
+      if (!subMap.has(rawStatus)) subMap.set(rawStatus, new Set<string>());
+    }
+    if (rawSub) {
+      allSubSet.add(rawSub);
+      if (rawStatus) {
+        subMap.get(rawStatus)!.add(rawSub);
+      }
+    }
+  }
+
+  const orderedStages = Array.from(stageSet).sort((a, b) => {
+    const idxA = CANONICAL_STAGES.indexOf(a as typeof CANONICAL_STAGES[number]);
+    const idxB = CANONICAL_STAGES.indexOf(b as typeof CANONICAL_STAGES[number]);
+    if (idxA >= 0 && idxB >= 0) return idxA - idxB;
+    if (idxA >= 0) return -1;
+    if (idxB >= 0) return 1;
+    return a.localeCompare(b);
+  });
+
+  const subStatusesByStage: Record<string, string[]> = {};
+  for (const [st, subs] of subMap.entries()) {
+    subStatusesByStage[st] = Array.from(subs).sort((a, b) => a.localeCompare(b));
+  }
+
+  return {
+    stages: orderedStages,
+    subStatusesByStage,
+    allSubStatuses: Array.from(allSubSet).sort((a, b) => a.localeCompare(b)),
+  };
 }

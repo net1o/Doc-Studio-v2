@@ -35,6 +35,13 @@ export const STANDARD_PAPER_SIZES: StandardPaperDefinition[] = [
     dimensionsLabel: '8.5 × 14 in',
   },
   {
+    id: 'indian_legal',
+    label: 'Indian Legal',
+    widthIn: 8.46,
+    heightIn: 13.58,
+    dimensionsLabel: '215 × 345 mm',
+  },
+  {
     id: 'a4',
     label: 'A4',
     widthIn: 8.27,
@@ -84,6 +91,7 @@ export const DEFAULT_PAPER_SIZE: PaperSizeConfig = {
   customWidth: 8.5,
   customHeight: 14,
   customUnit: 'in',
+  autoAdjustPrint: true,
 };
 
 export interface ResolvedPaperDimensions {
@@ -94,6 +102,8 @@ export interface ResolvedPaperDimensions {
   orientation: 'portrait' | 'landscape';
   compactLayout: boolean;
   maxImageHeightIn: number;
+  scaleFactor: number;
+  autoAdjustPrint: boolean;
 }
 
 export function resolvePaperDimensionsIn(paperSize?: PaperSizeConfig): ResolvedPaperDimensions {
@@ -126,8 +136,13 @@ export function resolvePaperDimensionsIn(paperSize?: PaperSizeConfig): ResolvedP
       ? `Custom ${Math.round((isLandscape ? Math.max(cfg.customWidth, cfg.customHeight) : Math.min(cfg.customWidth, cfg.customHeight)) || 216)}×${Math.round((isLandscape ? Math.min(cfg.customWidth, cfg.customHeight) : Math.max(cfg.customWidth, cfg.customHeight)) || 356)} mm`
       : `${presetName} ${widthIn}×${heightIn} in${isLandscape ? ' Landscape' : ''}`;
 
+  const autoAdjustPrint = cfg.autoAdjustPrint !== false;
+  const safetyMargin = autoAdjustPrint ? 0.96 : 1;
+  const rawScale = Math.min(widthIn / 8.5, heightIn / 14) * safetyMargin;
+  const scaleFactor = Number(Math.max(0.35, rawScale).toFixed(4));
+
   const compactLayout = heightIn < 11.2 || widthIn < 7.5;
-  const maxImageHeightIn = Math.max(1.2, Number((heightIn - 7.8).toFixed(2)));
+  const maxImageHeightIn = 5.4;
 
   return {
     widthIn: Number(widthIn.toFixed(2)),
@@ -137,6 +152,8 @@ export function resolvePaperDimensionsIn(paperSize?: PaperSizeConfig): ResolvedP
     orientation: cfg.orientation || 'portrait',
     compactLayout,
     maxImageHeightIn,
+    scaleFactor,
+    autoAdjustPrint,
   };
 }
 
@@ -163,9 +180,7 @@ export function buildJournal909Html(
   const colorMode = doc.imageColorMode || universalSettings?.imageColorMode || 'theme';
 
   const dims = resolvePaperDimensionsIn(paperSize);
-  const contentPad = dims.compactLayout
-    ? '0.42in 0.42in 0.34in 0.42in'
-    : '0.62in 0.56in 0.48in 0.56in';
+  const contentPad = '0.62in 0.56in 0.48in 0.56in';
 
   const extraRowsHtml = (doc.extraRows || [])
     .map(
@@ -209,41 +224,42 @@ export function buildJournal909Html(
     @page { size: ${dims.widthIn}in ${dims.heightIn}in; margin: 0; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     html, body { margin: 0; padding: 0; background: #e5e5e5; font-family: var(--font-body); }
-    .page { position: relative; width: ${dims.widthIn}in; height: ${dims.heightIn}in; margin: 0 auto; background: #ffffff; overflow: hidden; display: flex; flex-direction: column; }
+    .page { position: relative; width: ${dims.widthIn}in; height: ${dims.heightIn}in; margin: 0 auto; background: #ffffff; overflow: hidden; }
+    .scaler { position: absolute; top: 50%; left: 50%; width: 8.5in; height: 14in; transform: translate(-50%, -50%) scale(${dims.scaleFactor}); transform-origin: center center; display: flex; flex-direction: column; background: #ffffff; }
     @media screen { .page { margin: 20px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.25); } }
     @media print { body { background: #ffffff; } .page { margin: 0; box-shadow: none; } }
     .frame-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
     .content { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; padding: ${contentPad}; }
     .top-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.18in; }
     .brand-left { display: flex; align-items: center; gap: 0.22in; padding-left: 0.08in; }
-    .pub-tag { width: ${dims.compactLayout ? '0.92in' : '1.18in'}; height: ${dims.compactLayout ? '1.3in' : '1.65in'}; flex-shrink: 0; }
+    .pub-tag { width: 1.18in; height: 1.65in; flex-shrink: 0; }
     .journal-info { border-left: 2px solid var(--theme); padding-left: 0.18in; padding-top: 0.02in; }
-    .journal-title { margin: 0; font-family: var(--font-display); font-size: ${dims.compactLayout ? '16pt' : '20pt'}; font-weight: 800; letter-spacing: 1px; color: var(--heading); line-height: 1.15; }
-    .journal-date { margin: 5px 0 11px 0; font-family: var(--font-tech); font-size: ${dims.compactLayout ? '11.5pt' : '13.5pt'}; font-weight: 700; letter-spacing: 2px; color: var(--theme); }
+    .journal-title { margin: 0; font-family: var(--font-display); font-size: 20pt; font-weight: 800; letter-spacing: 1px; color: var(--heading); line-height: 1.15; }
+    .journal-date { margin: 5px 0 11px 0; font-family: var(--font-tech); font-size: 13.5pt; font-weight: 700; letter-spacing: 2px; color: var(--theme); }
     .accent-bar-wrap { display: flex; align-items: center; gap: 6px; }
-    .accent-bar { height: 6px; width: ${dims.compactLayout ? '1.5in' : '2.2in'}; background: linear-gradient(90deg, var(--theme-light) 0%, var(--theme-light) 34%, var(--theme) 34%, var(--theme) 100%); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+    .accent-bar { height: 6px; width: 2.2in; background: linear-gradient(90deg, var(--theme-light) 0%, var(--theme-light) 34%, var(--theme) 34%, var(--theme) 100%); clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
     .slashes { display: inline-flex; gap: 4px; align-items: center; }
     .slashes span { display: inline-block; width: 6px; height: 12px; transform: skewX(-32deg); }
     .slashes-silver span:nth-child(1) { background: var(--theme); }
     .slashes-silver span:nth-child(2) { background: var(--silver-dark); }
     .slashes-silver span:nth-child(3) { background: var(--silver-mid); }
-    .pub-details-wrap { width: ${dims.compactLayout ? '2.15in' : '2.65in'}; display: flex; flex-direction: column; align-items: stretch; margin-top: 0.08in; }
+    .pub-details-wrap { width: 2.65in; display: flex; flex-direction: column; align-items: stretch; margin-top: 0.08in; }
     .banner-row { display: flex; align-items: center; gap: 5px; }
     .banner-slashes { display: flex; gap: 4px; }
     .banner-slashes span { display: block; width: 9px; height: 28px; background: var(--theme); transform: skewX(-30deg); }
     .banner-slashes span.light { background: var(--theme-light); }
     .banner-box { flex: 1; height: 28px; background: var(--theme); color: var(--heading); font-family: var(--font-tech); font-size: 11pt; font-weight: 700; letter-spacing: 1.2px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%); padding-left: 12px; }
     .pub-details-input { margin-top: 8px; min-height: 0.72in; border: 2px solid var(--theme); padding: 6px 8px; font-family: var(--font-body); font-size: 9.5pt; color: #111; outline: none; }
-    .app-section { margin-top: ${dims.compactLayout ? '0.18in' : '0.28in'}; }
+    .app-section { margin-top: 0.28in; }
     .app-header { display: flex; align-items: center; gap: 8px; margin-bottom: 0.14in; }
     .app-banner { display: flex; align-items: center; gap: 5px; }
     .app-banner-box { height: 30px; background: var(--theme); color: var(--heading); font-family: var(--font-tech); font-size: 12pt; font-weight: 700; letter-spacing: 1.2px; display: flex; align-items: center; padding: 0 28px 0 22px; text-transform: uppercase; clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%); }
     .app-line { flex: 1; height: 2px; background: var(--theme); }
     .details-table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 2px solid var(--theme); }
-    .details-table td { border: 1.5px solid var(--theme); height: ${dims.compactLayout ? '0.36in' : '0.44in'}; padding: 4px 10px; font-family: var(--font-body); font-size: 11pt; vertical-align: middle; }
+    .details-table td { border: 1.5px solid var(--theme); height: 0.44in; padding: 4px 10px; font-family: var(--font-body); font-size: 11pt; vertical-align: middle; }
     .details-table td.label-cell { background: linear-gradient(90deg, #bdbdbd 0%, #efefef 52%, #bdbdbd 100%); color: #000000; font-family: var(--font-tech); font-size: 11.5pt; font-weight: 700; text-align: center; letter-spacing: 0.8px; }
     .details-table td.value-cell { background: #ffffff; color: #111111; outline: none; }
-    .image-header { margin-top: ${dims.compactLayout ? '0.18in' : '0.28in'}; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .image-header { margin-top: 0.28in; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .image-line { flex: 1; max-width: 1.8in; height: 2px; background: var(--theme); }
     .image-title { margin: 0; padding: 0 12px; font-family: var(--font-display); font-size: 15.5pt; font-weight: 800; letter-spacing: 2px; color: var(--heading); text-transform: uppercase; }
     .image-area { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 0.16in 0; min-height: 1.4in; }
@@ -263,6 +279,7 @@ export function buildJournal909Html(
 </head>
 <body>
   <div class="page">
+    <div class="scaler">
     <svg class="frame-svg" viewBox="0 0 850 1400" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
       <polygon points="18,18 98,18 18,98" fill="${themeSecondary}" />
       <polygon points="18,108 108,18 134,18 18,134" fill="${themePrimary}" />
@@ -387,6 +404,7 @@ export function buildJournal909Html(
           </div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </body>

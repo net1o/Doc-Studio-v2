@@ -1,35 +1,59 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { User } from 'firebase/auth';
 import {
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  CloudUpload,
   Database,
   Download,
   FileSpreadsheet,
+  FolderSearch,
   Globe,
   Plus,
+  RefreshCw,
   Search,
   ShieldPlus,
   Trash2,
+  X,
 } from 'lucide-react';
 import { CaseEntry, CaseSheetConfig, JournalConfig, UniversalSettings } from '../types/journal';
 import { BrandexButtonIcon } from './BrandexButtonIcon';
+import { GoogleSignInButton } from './GoogleSignInButton';
 import {
   analyzeCaseEntries,
+  CANONICAL_STAGES,
   checkDuplicate,
+  deriveStageAndSubStatusCatalog,
   exportRowsToCsv,
   fetchGoogleSheetCsvSmart,
   formatCompositeCaseNo,
   formatDdMmmYy,
+  fromHtmlDateInputValue,
   getCaseEntryKey,
   mergeDatabaseEntries,
   mergeUniqueTmNumbers,
+  NICE_CLASS_NUMBERS,
   parseCaseLookupInput,
   parseLooseDate,
+  sanitizeTmCprValue,
+  toHtmlDateInputValue,
   triggerFileDownload,
 } from '../lib/journal/engine';
+import {
+  getGoogleAccessToken,
+  getSpreadsheetMetadata,
+  GoogleDriveSpreadsheetItem,
+  GoogleSheetTabInfo,
+  initGoogleAuthListener,
+  listUserSpreadsheets,
+  readGoogleSheetViaApi,
+  signInWithGoogleWorkspace,
+  signOutGoogleWorkspace,
+  writeCaseEntriesToGoogleSheet,
+} from '../lib/google/googleSheetsClient';
 import {
   DEFAULT_APPS_SCRIPT_CASE_SHEET_ID,
   DEFAULT_APPS_SCRIPT_CASE_SHEET_NAME,
@@ -51,9 +75,9 @@ interface DatabaseViewProps {
 }
 
 const SAMPLE_DATABASE_CSV = `"ID","DATE","TYPE","CLIENT CODE","CASE NUMBER","CLIENT NAME","APPLICATION NAME","TM/CPR NUMBER","CLASS","STATUS","SUB STATUS","CASE TYPE","AGENT","OFF NOTE","NOTES","TM5","TM6","TM11","TM16","TM56","JOURNAL NUMBER","JOURNAL DATE","LAST MODIFIED","IMAGE"
-"REC-2379","26-Oct-26  ","X","ASSIGHN","SULMAN","","ASSIGHN TO SULMAN LIST","835736","-","STAGE 2","ASSIGNED","TM","SULEMAN","","","FALSE","FALSE","FALSE","FALSE","FALSE","","","",""
-"REC-2403","26-Oct-26  ","X","ASSIGHN","SULMAN","","ASSIGHN TO SULMAN LIST","868677","-","STAGE 2","ASSIGNED","TM","SULEMAN","","","FALSE","FALSE","FALSE","FALSE","FALSE","","","",""
-"REC-2395","26-Oct-26  ","X","ASSIGHN","SULMAN","","ASSIGHN TO SULMAN LIST","871539","-","STAGE 2","ASSIGNED","TM","SULEMAN","","","FALSE","FALSE","FALSE","FALSE","FALSE","","","",""`;
+"REC-2379","26-Oct-26","X","ASSIGHN","SULMAN","","ASSIGHN TO SULMAN LIST","835736","-","STAGE 2","ASSIGNED","TM","SULEMAN","","","FALSE","FALSE","FALSE","FALSE","FALSE","","","",""
+"REC-2403","26-Oct-26","X","ASSIGHN","SULMAN","","ASSIGHN TO SULMAN LIST","868677","-","STAGE 2","ASSIGNED","TM","SULEMAN","","","FALSE","FALSE","FALSE","FALSE","FALSE","","","",""
+"REC-2395","26-Oct-26","X","ASSIGHN","SULMAN","","ASSIGHN TO SULMAN LIST","871539","-","STAGE 2","ASSIGNED","TM","SULEMAN","","","FALSE","FALSE","FALSE","FALSE","FALSE","","","",""`;
 
 type SortKey =
   | 'id'
@@ -78,6 +102,24 @@ function parseRecIdNumeric(id?: string): number {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+function getStageBadgeClass(status?: string): string {
+  const s = (status || '').trim().toUpperCase();
+  if (s === 'STAGE 1') return 'bg-slate-100 text-slate-800 border-slate-300';
+  if (s === 'STAGE 2') return 'bg-amber-50 text-amber-900 border-amber-300';
+  if (s === 'STAGE 3') return 'bg-sky-50 text-sky-900 border-sky-300';
+  if (s === 'STAGE 4') return 'bg-emerald-50 text-emerald-900 border-emerald-300';
+  return 'bg-[#f8f9fb] text-[#111111] border-[#cbd0da]';
+}
+
+function getStageBarColor(status: string): string {
+  const s = status.trim().toUpperCase();
+  if (s === 'STAGE 1') return '#4b5563';
+  if (s === 'STAGE 2') return '#eab308';
+  if (s === 'STAGE 3') return '#0284c7';
+  if (s === 'STAGE 4') return '#16a34a';
+  return '#111111';
+}
+
 export function DatabaseView({
   config,
   pageSize = 50,
@@ -97,6 +139,7 @@ export function DatabaseView({
   const [searchQuery, setSearchQuery] = useState('');
   const [codeCaseFilter, setCodeCaseFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [journalFilter, setJournalFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [sortFilterOpen, setSortFilterOpen] = useState(false);
@@ -105,6 +148,23 @@ export function DatabaseView({
   const [importPreviewPage, setImportPreviewPage] = useState(1);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const [confirmDialog, setConfirmDialog] = useState<null | 'delete_all' | 'delete_selected'>(null);
+
+  // Bulk Stage + Sub Status state
+  const [bulkStage, setBulkStage] = useState<string>('STAGE 2');
+  const [bulkSubStatus, setBulkSubStatus] = useState<string>('');
+
+  // Google Workspace Auth & Sheets Sync State
+  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [hasAccessToken, setHasAccessToken] = useState<boolean>(() => Boolean(getGoogleAccessToken()));
+  const [authLoading, setAuthLoading] = useState(false);
+  const [drivePickerOpen, setDrivePickerOpen] = useState(false);
+  const [driveSpreadsheets, setDriveSpreadsheets] = useState<GoogleDriveSpreadsheetItem[]>([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [availableTabs, setAvailableTabs] = useState<GoogleSheetTabInfo[]>([]);
+  const [connectedSheetTitle, setConnectedSheetTitle] = useState<string>('');
+  const [pushingSheet, setPushingSheet] = useState(false);
+  const [confirmPushOpen, setConfirmPushOpen] = useState(false);
+  const [liveSyncSeconds, setLiveSyncSeconds] = useState<0 | 30 | 60>(0);
 
   // Add Single Case Record fields
   const [newId, setNewId] = useState('');
@@ -132,7 +192,7 @@ export function DatabaseView({
   const [newLastModified, setNewLastModified] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
 
-  // Importer State
+  // Importer / Sheet Config State
   const [sheetUrlOrId, setSheetUrlOrId] = useState(
     sheetCfg?.sheetUrlOrId || DEFAULT_APPS_SCRIPT_CASE_SHEET_ID
   );
@@ -158,18 +218,96 @@ export function DatabaseView({
   const [refreshReviewOnImport, setRefreshReviewOnImport] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const unsub = initGoogleAuthListener((user, token) => {
+      setGoogleUser(user);
+      setHasAccessToken(Boolean(token));
+    });
+    return unsub;
+  }, []);
+
   const dbAnalysis = useMemo(
     () => analyzeCaseEntries(config.caseEntries, config.tmNumbers),
     [config.caseEntries, config.tmNumbers]
   );
 
-  const statusOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const c of config.caseEntries) {
-      if (c.status?.trim()) set.add(c.status.trim());
+  const stageCatalog = useMemo(
+    () => deriveStageAndSubStatusCatalog(config.caseEntries),
+    [config.caseEntries]
+  );
+
+  // Extended live chart metrics (Stage 1-4, Sub-Statuses, Nice Classes, Watchlist Overlap)
+  const liveChartStats = useMemo(() => {
+    const stageCounts = new Map<string, number>();
+    for (const s of CANONICAL_STAGES) {
+      stageCounts.set(s, 0);
     }
-    return Array.from(set).sort();
+    const subCounts = new Map<string, number>();
+    const classCounts = new Map<string, number>();
+
+    for (const c of config.caseEntries) {
+      const st = (c.status || '').trim().toUpperCase() || 'UNASSIGNED';
+      stageCounts.set(st, (stageCounts.get(st) || 0) + 1);
+
+      const sub = (c.subStatus || '').trim().toUpperCase();
+      if (sub) subCounts.set(sub, (subCounts.get(sub) || 0) + 1);
+
+      const cls = (c.classNo || '').trim();
+      if (cls && cls !== '-') {
+        classCounts.set(cls, (classCounts.get(cls) || 0) + 1);
+      }
+    }
+
+    const stages = Array.from(stageCounts.entries()).map(([label, count]) => ({ label, count }));
+    const topSubStatuses = Array.from(subCounts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+    const topClasses = Array.from(classCounts.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    return { stages, topSubStatuses, topClasses };
   }, [config.caseEntries]);
+
+  const journalOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of config.caseEntries) {
+      const jn = (c.journalNumber || '').trim();
+      if (jn) counts.set(jn, (counts.get(jn) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([journalNumber, count]) => ({ journalNumber, count }))
+      .sort((a, b) => b.journalNumber.localeCompare(a.journalNumber, undefined, { numeric: true }));
+  }, [config.caseEntries]);
+
+  const statusOptions = useMemo(() => {
+    const set = new Set<string>(stageCatalog.stages);
+    for (const c of config.caseEntries) {
+      if (c.status?.trim()) set.add(c.status.trim().toUpperCase());
+    }
+    return Array.from(set);
+  }, [stageCatalog.stages, config.caseEntries]);
+
+  const getSubStatusOptionsForStage = useCallback(
+    (stage: string, currentVal?: string) => {
+      const key = (stage || '').trim().toUpperCase();
+      const stageSpecific = stageCatalog.subStatusesByStage[key] || [];
+      const set = new Set<string>(stageSpecific);
+      for (const s of stageCatalog.allSubStatuses) {
+        set.add(s);
+      }
+      if (currentVal && currentVal.trim()) {
+        set.add(currentVal.trim().toUpperCase());
+      }
+      return {
+        stageSpecific,
+        all: Array.from(set),
+      };
+    },
+    [stageCatalog]
+  );
 
   const parsedImport = useMemo(
     () =>
@@ -215,7 +353,15 @@ export function DatabaseView({
     const q = searchQuery.trim().toLowerCase();
     const ccQ = codeCaseFilter.trim().toLowerCase();
     return config.caseEntries.filter((c) => {
-      if (statusFilter !== 'ALL' && (c.status || '').trim() !== statusFilter) return false;
+      if (
+        statusFilter !== 'ALL' &&
+        (c.status || '').trim().toUpperCase() !== statusFilter.toUpperCase()
+      ) {
+        return false;
+      }
+      if (journalFilter !== 'ALL' && (c.journalNumber || '').trim() !== journalFilter) {
+        return false;
+      }
       if (ccQ) {
         const matchesClientCodeOrCase =
           (c.clientCode || '').toLowerCase().includes(ccQ) ||
@@ -239,7 +385,7 @@ export function DatabaseView({
         (c.journalNumber || '').toLowerCase().includes(q)
       );
     });
-  }, [config.caseEntries, searchQuery, codeCaseFilter, statusFilter]);
+  }, [config.caseEntries, searchQuery, codeCaseFilter, statusFilter, journalFilter]);
 
   const sortedEntries = useMemo(() => {
     const copy = [...filteredEntries];
@@ -287,7 +433,9 @@ export function DatabaseView({
 
   const allVisibleSelected =
     visibleEntries.length > 0 &&
-    visibleEntries.every((c, idx) => selectedKeys.has(getCaseEntryKey(c, idx)));
+    visibleEntries.every((c, idx) =>
+      selectedKeys.has(getCaseEntryKey(c, (safePage - 1) * safePageSize + idx))
+    );
 
   const handleToggleSort = (col: SortKey) => {
     if (sortBy === col) {
@@ -299,13 +447,18 @@ export function DatabaseView({
     setCurrentPage(1);
   };
 
-  const handleUpdateEntryByKey = (
-    targetKey: string,
-    patch: Partial<CaseEntry>
-  ) => {
+  const handleUpdateEntryByKey = (targetKey: string, patch: Partial<CaseEntry>) => {
     const nextEntries = config.caseEntries.map((entry, idx) => {
       if (getCaseEntryKey(entry, idx) !== targetKey) return entry;
-      const updated = { ...entry, ...patch };
+      const sanitizedPatch: Partial<CaseEntry> = { ...patch };
+      if ('tmNumber' in sanitizedPatch && sanitizedPatch.tmNumber !== undefined) {
+        sanitizedPatch.tmNumber = sanitizeTmCprValue(sanitizedPatch.tmNumber);
+      }
+      const updated: CaseEntry = {
+        ...entry,
+        ...sanitizedPatch,
+        lastModified: formatDdMmmYy(new Date()),
+      };
       if ('prefix' in patch || 'clientCode' in patch || 'rawCaseNo' in patch) {
         const recomputed = formatCompositeCaseNo(
           updated.prefix,
@@ -318,6 +471,25 @@ export function DatabaseView({
       return updated;
     });
     onUpdateConfig({ ...config, caseEntries: nextEntries });
+  };
+
+  const handleBulkApplyStage = () => {
+    if (selectedKeys.size === 0) return;
+    const todayStr = formatDdMmmYy(new Date());
+    const nextEntries = config.caseEntries.map((entry, idx) => {
+      const k = getCaseEntryKey(entry, idx);
+      if (!selectedKeys.has(k)) return entry;
+      return {
+        ...entry,
+        status: bulkStage || entry.status,
+        subStatus: bulkSubStatus || entry.subStatus,
+        lastModified: todayStr,
+      };
+    });
+    onUpdateConfig({ ...config, caseEntries: nextEntries });
+    onNotify(
+      `Updated Stage${bulkSubStatus ? ' & Sub-Status' : ''} for ${selectedKeys.size} selected record(s).`
+    );
   };
 
   const handleToggleSelectRow = (rowKey: string) => {
@@ -333,9 +505,13 @@ export function DatabaseView({
     setSelectedKeys((prev) => {
       const next = new Set(prev);
       if (allVisibleSelected) {
-        visibleEntries.forEach((c, idx) => next.delete(getCaseEntryKey(c, idx)));
+        visibleEntries.forEach((c, idx) =>
+          next.delete(getCaseEntryKey(c, (safePage - 1) * safePageSize + idx))
+        );
       } else {
-        visibleEntries.forEach((c, idx) => next.add(getCaseEntryKey(c, idx)));
+        visibleEntries.forEach((c, idx) =>
+          next.add(getCaseEntryKey(c, (safePage - 1) * safePageSize + idx))
+        );
       }
       return next;
     });
@@ -384,7 +560,7 @@ export function DatabaseView({
 
   const handleAddSingleRecord = (e: React.FormEvent) => {
     e.preventDefault();
-    const tm = newTm.trim();
+    const tm = sanitizeTmCprValue(newTm).trim();
     const composite =
       formatCompositeCaseNo(newPrefix, newClientCode, newRawCaseNo, separator) || 'NOT FOUND';
     if (!tm && !newClientName.trim() && !newAppName.trim()) {
@@ -467,42 +643,279 @@ export function DatabaseView({
     onNotify(`Added ${resolvedId} (${tm || composite}).`);
   };
 
-  const handleFetchGoogleSheet = async (autoApply = false) => {
-    if (!sheetUrlOrId.trim()) {
-      setImportError('Enter a Google Sheet URL, Sheet ID, or Published CSV link.');
+  // Google Sign-In & Drive Picker
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    setImportError(null);
+    try {
+      const { user, accessToken } = await signInWithGoogleWorkspace();
+      setGoogleUser(user);
+      setHasAccessToken(Boolean(accessToken));
+      onNotify(`Connected Google account (${user.email || 'Authorized'}).`);
+      if (accessToken && sheetUrlOrId.trim()) {
+        try {
+          const meta = await getSpreadsheetMetadata(sheetUrlOrId);
+          setAvailableTabs(meta.sheets);
+          setConnectedSheetTitle(meta.title);
+        } catch {
+          // ignore initial metadata lookup error
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Google Sign-In cancelled or blocked.';
+      setImportError(msg);
+      onNotify(msg);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleSignOut = async () => {
+    await signOutGoogleWorkspace();
+    setGoogleUser(null);
+    setHasAccessToken(false);
+    setLiveSyncSeconds(0);
+    onNotify('Disconnected Google Sheets account.');
+  };
+
+  const handleOpenDrivePicker = async () => {
+    if (!hasAccessToken) {
+      onNotify('Sign in with Google first to browse your Drive spreadsheets.');
       return;
     }
-
-    setFetchingSheet(true);
-    setImportError(null);
-    if (!autoApply) setShowImporter(true);
-
+    setDrivePickerOpen(true);
+    setDriveLoading(true);
     try {
-      const { text } = await fetchGoogleSheetCsvSmart(sheetUrlOrId, sheetName);
+      const files = await listUserSpreadsheets();
+      setDriveSpreadsheets(files);
+    } catch (err) {
+      onNotify(err instanceof Error ? err.message : 'Failed to list Drive spreadsheets.');
+    } finally {
+      setDriveLoading(false);
+    }
+  };
 
-      if (autoApply) {
-        const parsed = parseCaseLookupInput(text, {
-          mappingMode,
-          keyCol,
-          prefixCol,
-          clientCodeCol,
-          caseCol,
-          clientCol,
-          appNameCol,
-          caseSeparator: separator,
-          preserveDuplicateTms: true,
-        });
-        if (parsed.entries.length === 0) {
-          setShowImporter(true);
-          setRawImport(text);
-          setImportPreviewPage(1);
-          setImportError('Sheet fetched, but no matching rows were detected. Adjust mapping below.');
+  const handleSelectDriveSpreadsheet = async (item: GoogleDriveSpreadsheetItem) => {
+    setSheetUrlOrId(item.id);
+    setConnectedSheetTitle(item.name);
+    setDrivePickerOpen(false);
+    try {
+      const meta = await getSpreadsheetMetadata(item.id);
+      setAvailableTabs(meta.sheets);
+      if (meta.sheets.length > 0) {
+        const preferred =
+          meta.sheets.find((t) => t.title.toUpperCase() === 'DATABASE') || meta.sheets[0];
+        setSheetName(preferred.title);
+      }
+      onNotify(`Selected "${item.name}". Click Sync Google Sheet to pull records.`);
+    } catch (err) {
+      onNotify(err instanceof Error ? err.message : 'Selected sheet, ready to sync.');
+    }
+  };
+
+  const handleFetchGoogleSheet = useCallback(
+    async (autoApply = false, silent = false) => {
+      if (!sheetUrlOrId.trim()) {
+        if (!silent) setImportError('Enter a Google Sheet URL, Sheet ID, or Published CSV link.');
+        return;
+      }
+
+      setFetchingSheet(true);
+      if (!silent) setImportError(null);
+      if (!autoApply && !silent) setShowImporter(true);
+
+      try {
+        // Prefer Google Sheets API v4 when authenticated with OAuth token
+        if (hasAccessToken && getGoogleAccessToken()) {
+          const apiRes = await readGoogleSheetViaApi(sheetUrlOrId, sheetName, {
+            mappingMode,
+            keyCol,
+            prefixCol,
+            clientCodeCol,
+            caseCol,
+            clientCol,
+            appNameCol,
+            caseSeparator: separator,
+            preserveDuplicateTms: true,
+          });
+          setAvailableTabs(apiRes.availableTabs);
+          setConnectedSheetTitle(apiRes.spreadsheetTitle);
+          setSheetName(apiRes.sheetTitle);
+
+          if (autoApply) {
+            const merged = mergeDatabaseEntries(config.caseEntries, apiRes.entries, 'update');
+            const nextSheetCfg: CaseSheetConfig = {
+              sheetUrlOrId: sheetUrlOrId.trim(),
+              sheetName: apiRes.sheetTitle,
+              keyCol,
+              prefixCol,
+              clientCodeCol,
+              caseCol,
+              clientCol,
+              appNameCol,
+              caseSeparator: separator,
+              lastSyncedAt: new Date().toISOString(),
+            };
+            onUpdateConfig({
+              ...config,
+              caseEntries: merged.merged,
+              caseSheetConfig: nextSheetCfg,
+            });
+            onRefreshReviewCases(merged.merged);
+            if (!silent) {
+              setShowAnalysis(true);
+              setCurrentPage(1);
+              onNotify(
+                `Google Sheets API synced (${apiRes.spreadsheetTitle} · ${apiRes.sheetTitle}): ${apiRes.entries.length} rows (${merged.added} new, ${merged.updated} updated).`
+              );
+            }
+          } else {
+            const csvText = exportRowsToCsv(
+              [
+                'ID', 'DATE', 'TYPE', 'CLIENT CODE', 'CASE NUMBER', 'CLIENT NAME',
+                'APPLICATION NAME', 'TM/CPR NUMBER', 'CLASS', 'STATUS', 'SUB STATUS',
+                'CASE TYPE', 'AGENT', 'OFF NOTE', 'NOTES', 'TM5', 'TM6', 'TM11',
+                'TM16', 'TM56', 'JOURNAL NUMBER', 'JOURNAL DATE', 'LAST MODIFIED', 'IMAGE',
+              ],
+              apiRes.entries.map((c) => [
+                c.id || '', c.date || '', c.prefix || '', c.clientCode || '',
+                c.rawCaseNo || '', c.clientName, c.applicationName || '', c.tmNumber,
+                c.classNo || '', c.status || '', c.subStatus || '', c.caseType || '',
+                c.agent || '', c.offNote || '', c.notes || '', c.tm5 || 'FALSE',
+                c.tm6 || 'FALSE', c.tm11 || 'FALSE', c.tm16 || 'FALSE', c.tm56 || 'FALSE',
+                c.journalNumber || '', c.journalDate || '', c.lastModified || '', c.imageUrl || '',
+              ])
+            );
+            setRawImport(csvText);
+            setImportPreviewPage(1);
+            setSourceLabel(`Google API (${apiRes.spreadsheetTitle} · ${apiRes.sheetTitle})`);
+          }
           return;
         }
-        const merged = mergeDatabaseEntries(config.caseEntries, parsed.entries, 'update');
-        const nextSheetCfg: CaseSheetConfig = {
+
+        // Public CSV fallback when user hasn't signed into Google OAuth
+        const { text } = await fetchGoogleSheetCsvSmart(sheetUrlOrId, sheetName);
+
+        if (autoApply) {
+          const parsed = parseCaseLookupInput(text, {
+            mappingMode,
+            keyCol,
+            prefixCol,
+            clientCodeCol,
+            caseCol,
+            clientCol,
+            appNameCol,
+            caseSeparator: separator,
+            preserveDuplicateTms: true,
+          });
+          if (parsed.entries.length === 0) {
+            if (!silent) {
+              setShowImporter(true);
+              setRawImport(text);
+              setImportPreviewPage(1);
+              setImportError('Sheet fetched, but no matching rows were detected. Adjust mapping below.');
+            }
+            return;
+          }
+          const merged = mergeDatabaseEntries(config.caseEntries, parsed.entries, 'update');
+          const nextSheetCfg: CaseSheetConfig = {
+            sheetUrlOrId: sheetUrlOrId.trim(),
+            sheetName: sheetName.trim(),
+            keyCol,
+            prefixCol,
+            clientCodeCol,
+            caseCol,
+            clientCol,
+            appNameCol,
+            caseSeparator: separator,
+            lastSyncedAt: new Date().toISOString(),
+          };
+          onUpdateConfig({
+            ...config,
+            caseEntries: merged.merged,
+            caseSheetConfig: nextSheetCfg,
+          });
+          onRefreshReviewCases(merged.merged);
+          if (!silent) {
+            setShowAnalysis(true);
+            setCurrentPage(1);
+            onNotify(
+              `Synced (${sheetName || 'DATABASE'}): ${parsed.totalCsvRows} CSV rows → ${parsed.entries.length} indexed (${merged.added} new, ${merged.updated} updated).`
+            );
+          }
+        } else {
+          setRawImport(text);
+          setImportPreviewPage(1);
+          setSourceLabel(`Google Sheet (${sheetName || 'DATABASE'})`);
+        }
+      } catch (err) {
+        if (!silent) {
+          setShowImporter(true);
+          const msg = err instanceof Error ? err.message : '';
+          if (msg === 'NEEDS_GOOGLE_AUTH') {
+            setHasAccessToken(false);
+            setImportError('Google session expired. Click Sign in with Google to reconnect.');
+          } else if (msg === 'GOOGLE_LOGIN_HTML') {
+            setImportError(
+              'Sheet is private. Click "Sign in with Google" above to read/write private sheets securely, or paste CSV rows below.'
+            );
+          } else {
+            setImportError(
+              msg || 'Unable to fetch Google Sheet CSV directly. Sign in with Google or paste CSV rows below.'
+            );
+          }
+        }
+      } finally {
+        setFetchingSheet(false);
+      }
+    },
+    [
+      sheetUrlOrId,
+      sheetName,
+      hasAccessToken,
+      mappingMode,
+      keyCol,
+      prefixCol,
+      clientCodeCol,
+      caseCol,
+      clientCol,
+      appNameCol,
+      separator,
+      config,
+      onUpdateConfig,
+      onRefreshReviewCases,
+      onNotify,
+    ]
+  );
+
+  // Live Auto-Sync Interval (pauses safely when user enters Edit Mode)
+  useEffect(() => {
+    if (liveSyncSeconds <= 0 || editMode) return;
+    const timer = window.setInterval(() => {
+      handleFetchGoogleSheet(true, true);
+    }, liveSyncSeconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [liveSyncSeconds, editMode, handleFetchGoogleSheet]);
+
+  const handleConfirmPushToGoogleSheet = async () => {
+    if (!hasAccessToken || !getGoogleAccessToken()) {
+      setConfirmPushOpen(false);
+      onNotify('Sign in with Google first to update your Google Sheet.');
+      return;
+    }
+    setPushingSheet(true);
+    try {
+      const result = await writeCaseEntriesToGoogleSheet(
+        sheetUrlOrId,
+        sheetName,
+        config.caseEntries
+      );
+      setConnectedSheetTitle(result.spreadsheetTitle);
+      onUpdateConfig({
+        ...config,
+        caseSheetConfig: {
           sheetUrlOrId: sheetUrlOrId.trim(),
-          sheetName: sheetName.trim(),
+          sheetName: result.sheetTitle,
           keyCol,
           prefixCol,
           clientCodeCol,
@@ -511,39 +924,20 @@ export function DatabaseView({
           appNameCol,
           caseSeparator: separator,
           lastSyncedAt: new Date().toISOString(),
-        };
-        onUpdateConfig({
-          ...config,
-          caseEntries: merged.merged,
-          caseSheetConfig: nextSheetCfg,
-        });
-        onRefreshReviewCases(merged.merged);
-        setShowAnalysis(true);
-        setCurrentPage(1);
-        onNotify(
-          `Synced (${sheetName || 'DATABASE'}): ${parsed.totalCsvRows} CSV rows read → ${parsed.entries.length} indexed (${merged.added} new, ${merged.updated} updated${
-            parsed.blankTmRows > 0 ? `, ${parsed.blankTmRows} without TM No preserved` : ''
-          }).`
-        );
-      } else {
-        setRawImport(text);
-        setImportPreviewPage(1);
-        setSourceLabel(`Google Sheet (${sheetName || 'DATABASE'})`);
-      }
+        },
+      });
+      setConfirmPushOpen(false);
+      onNotify(
+        `Updated Google Sheet "${result.spreadsheetTitle}" (${result.sheetTitle}) with ${result.updatedRows} record(s).`
+      );
     } catch (err) {
-      setShowImporter(true);
-      const msg = err instanceof Error ? err.message : '';
-      if (msg === 'GOOGLE_LOGIN_HTML') {
-        setImportError(
-          'Sheet is private. Set sharing to "Anyone with the link -> Viewer" or paste exported CSV rows below.'
-        );
-      } else {
-        setImportError(
-          'Unable to fetch Google Sheet CSV directly. Paste or upload your CSV rows below.'
-        );
+      const msg = err instanceof Error ? err.message : 'Failed to update Google Sheet.';
+      if (msg === 'NEEDS_GOOGLE_AUTH') {
+        setHasAccessToken(false);
       }
+      onNotify(msg);
     } finally {
-      setFetchingSheet(false);
+      setPushingSheet(false);
     }
   };
 
@@ -609,59 +1003,22 @@ export function DatabaseView({
   const handleExportCsv = () => {
     const csv = exportRowsToCsv(
       [
-        'ID',
-        'DATE',
-        'TYPE',
-        'CLIENT CODE',
-        'CASE NUMBER',
-        'CLIENT NAME',
-        'APPLICATION NAME',
-        'TM/CPR NUMBER',
-        'CLASS',
-        'STATUS',
-        'SUB STATUS',
-        'CASE TYPE',
-        'AGENT',
-        'OFF NOTE',
-        'NOTES',
-        'TM5',
-        'TM6',
-        'TM11',
-        'TM16',
-        'TM56',
-        'JOURNAL NUMBER',
-        'JOURNAL DATE',
-        'LAST MODIFIED',
-        'IMAGE',
+        'ID', 'DATE', 'TYPE', 'CLIENT CODE', 'CASE NUMBER', 'CLIENT NAME',
+        'APPLICATION NAME', 'TM/CPR NUMBER', 'CLASS', 'STATUS', 'SUB STATUS',
+        'CASE TYPE', 'AGENT', 'OFF NOTE', 'NOTES', 'TM5', 'TM6', 'TM11',
+        'TM16', 'TM56', 'JOURNAL NUMBER', 'JOURNAL DATE', 'LAST MODIFIED', 'IMAGE',
       ],
       sortedEntries.map((c) => [
-        c.id || '',
-        c.date || '',
-        c.prefix || '',
-        c.clientCode || '',
-        c.rawCaseNo || '',
-        c.clientName,
-        c.applicationName || '',
-        c.tmNumber,
-        c.classNo || '',
-        c.status || '',
-        c.subStatus || '',
-        c.caseType || '',
-        c.agent || '',
-        c.offNote || '',
-        c.notes || '',
-        c.tm5 || '',
-        c.tm6 || '',
-        c.tm11 || '',
-        c.tm16 || '',
-        c.tm56 || '',
-        c.journalNumber || '',
-        c.journalDate || '',
-        c.lastModified || '',
-        c.imageUrl || '',
+        c.id || '', c.date || '', c.prefix || '', c.clientCode || '',
+        c.rawCaseNo || '', c.clientName, c.applicationName || '', c.tmNumber,
+        c.classNo || '', c.status || '', c.subStatus || '', c.caseType || '',
+        c.agent || '', c.offNote || '', c.notes || '', c.tm5 || '',
+        c.tm6 || '', c.tm11 || '', c.tm16 || '', c.tm56 || '',
+        c.journalNumber || '', c.journalDate || '', c.lastModified || '', c.imageUrl || '',
       ])
     );
-    triggerFileDownload(csv, `Cases_Database.csv`, 'text/csv;charset=utf-8');
+    const suffix = journalFilter !== 'ALL' ? `_Journal_${journalFilter}` : '';
+    triggerFileDownload(csv, `Cases_Database${suffix}.csv`, 'text/csv;charset=utf-8');
   };
 
   const previewNewCaseNo = formatCompositeCaseNo(newPrefix, newClientCode, newRawCaseNo, separator);
@@ -686,203 +1043,477 @@ export function DatabaseView({
   const activeFilterCount =
     (searchQuery.trim() ? 1 : 0) +
     (codeCaseFilter.trim() ? 1 : 0) +
-    (statusFilter !== 'ALL' ? 1 : 0);
+    (statusFilter !== 'ALL' ? 1 : 0) +
+    (journalFilter !== 'ALL' ? 1 : 0);
+
+  const addSubCatalog = getSubStatusOptionsForStage(newStatus, newSubStatus);
+  const bulkSubCatalog = getSubStatusOptionsForStage(bulkStage, bulkSubStatus);
+
+  // SVG Donut Watchlist Coverage calculations
+  const totalUniqueTms = Math.max(1, dbAnalysis.uniqueTmCount);
+  const coveragePct = Math.round((dbAnalysis.matchedWatchlistCount / totalUniqueTms) * 100);
+  const donutCircumference = 2 * Math.PI * 30;
+  const donutDash = (coveragePct / 100) * donutCircumference;
 
   return (
     <div className="space-y-6">
       {/* Header Toolbar */}
-      <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <BrandexButtonIcon
-            name="database"
-            size={34}
-            colorMode={themeSettings?.imageColorMode}
-          />
-          <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
-            Cases Database
-          </h2>
-          <span className="bg-[#ffee00] text-[#111111] px-2.5 py-0.5 text-xs font-extrabold tabular-nums">
-            {config.caseEntries.length} Records
-          </span>
-          <span className="bg-[#f6f7f9] border border-[#cbd0da] text-[#111111] px-2 py-0.5 text-[11px] font-bold">
-            {sheetName || 'DATABASE'}
-          </span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={fetchingSheet}
-            onClick={() => handleFetchGoogleSheet(true)}
-            className="builty-btn h-[38px] pl-3 pr-3 gap-2 text-xs whitespace-nowrap"
-          >
+      <div className="bg-white border border-[#e2e4ea] p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2.5">
             <BrandexButtonIcon
-              name="databaseMapping"
-              variant="square"
-              size={20}
+              name="database"
+              size={34}
               colorMode={themeSettings?.imageColorMode}
             />
-            <span>{fetchingSheet ? 'Syncing…' : 'Sync Google Sheet'}</span>
-          </button>
+            <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
+              Cases Database
+            </h2>
+            <span className="bg-[#ffee00] text-[#111111] px-2.5 py-0.5 text-xs font-extrabold tabular-nums">
+              {config.caseEntries.length} Records
+            </span>
+            <span className="bg-[#f6f7f9] border border-[#cbd0da] text-[#111111] px-2 py-0.5 text-[11px] font-bold">
+              {connectedSheetTitle ? `${connectedSheetTitle} · ` : ''}
+              {sheetName || 'DATABASE'}
+            </span>
+            {liveSyncSeconds > 0 && (
+              <span className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-2 py-0.5 text-[11px] font-bold inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                Live {liveSyncSeconds}s
+              </span>
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setShowImporter((prev) => !prev)}
-            className="h-[38px] px-3.5 border border-[#111111] bg-white hover:bg-[#fffef0] text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <Database className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>{showImporter ? 'Hide Importer' : 'Import CSV'}</span>
-          </button>
-
-          <button
-            type="button"
-            data-sfx="filter"
-            data-active={showAnalysis}
-            onClick={() => setShowAnalysis((prev) => !prev)}
-            className={`builty-filter-btn h-[38px] px-2.5 border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
-              showAnalysis
-                ? 'border-[#111111] bg-[#fffef0] text-[#111111]'
-                : 'border-[#cbd0da] bg-[#f8f9fb] text-[#555a66] hover:text-[#111111]'
-            }`}
-          >
-            <BrandexButtonIcon
-              name="analysis"
-              variant="square"
-              size={18}
-              colorMode={themeSettings?.imageColorMode}
+          <div className="flex flex-wrap items-center gap-2">
+            <GoogleSignInButton
+              user={googleUser}
+              hasAccessToken={hasAccessToken}
+              loading={authLoading}
+              onSignIn={handleGoogleSignIn}
+              onSignOut={handleGoogleSignOut}
+              compact
             />
-            <span>Analysis</span>
-          </button>
 
-          <button
-            type="button"
-            onClick={() => onRefreshReviewCases(config.caseEntries)}
-            className="h-[38px] px-2.5 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <BrandexButtonIcon
-              name="refresh"
-              variant="square"
-              size={18}
-              colorMode={themeSettings?.imageColorMode}
-            />
-            <span>Refresh Cases</span>
-          </button>
+            {googleUser && hasAccessToken && (
+              <button
+                type="button"
+                onClick={handleOpenDrivePicker}
+                className="h-[36px] px-3 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <FolderSearch className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Drive Sheets</span>
+              </button>
+            )}
 
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            className="h-[38px] px-3 border border-[#cbd0da] bg-white hover:border-[#111111] text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <Download className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Export CSV</span>
-          </button>
-
-          {selectedKeys.size > 0 && (
             <button
               type="button"
-              onClick={() => setConfirmDialog('delete_selected')}
-              className="h-[38px] px-3 border border-red-600 bg-red-600 hover:bg-red-700 text-xs font-bold text-white inline-flex items-center gap-1.5 whitespace-nowrap"
+              disabled={fetchingSheet}
+              onClick={() => handleFetchGoogleSheet(true)}
+              className="builty-btn h-[36px] pl-3 pr-3 gap-2 text-xs whitespace-nowrap"
             >
-              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Delete Selected ({selectedKeys.size})</span>
+              <BrandexButtonIcon
+                name="databaseMapping"
+                variant="square"
+                size={18}
+                colorMode={themeSettings?.imageColorMode}
+              />
+              <span>{fetchingSheet ? 'Syncing…' : 'Pull Sheet'}</span>
             </button>
+
+            <button
+              type="button"
+              disabled={pushingSheet || config.caseEntries.length === 0}
+              onClick={() => {
+                if (!hasAccessToken) {
+                  handleGoogleSignIn();
+                } else {
+                  setConfirmPushOpen(true);
+                }
+              }}
+              className="h-[36px] px-3 border border-[#111111] bg-[#111111] text-[#ffee00] hover:bg-[#222222] disabled:opacity-40 text-xs font-extrabold inline-flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <CloudUpload className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{pushingSheet ? 'Pushing…' : 'Push to Sheet'}</span>
+            </button>
+
+            <select
+              aria-label="Live Google Sheet auto-sync interval"
+              value={liveSyncSeconds}
+              onChange={(e) => setLiveSyncSeconds(Number(e.target.value) as 0 | 30 | 60)}
+              className="h-[36px] px-2 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111]"
+            >
+              <option value={0}>Live Sync: Off</option>
+              <option value={30}>Live Sync: 30s</option>
+              <option value={60}>Live Sync: 60s</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Secondary Actions Row */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#eceef2]">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowImporter((prev) => !prev)}
+              className="h-[34px] px-3 border border-[#111111] bg-white hover:bg-[#fffef0] text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <Database className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{showImporter ? 'Hide Sheet / CSV Setup' : 'Sheet Setup / Import CSV'}</span>
+            </button>
+
+            <button
+              type="button"
+              data-sfx="filter"
+              data-active={showAnalysis}
+              onClick={() => setShowAnalysis((prev) => !prev)}
+              className={`builty-filter-btn h-[34px] px-2.5 border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
+                showAnalysis
+                  ? 'border-[#111111] bg-[#fffef0] text-[#111111]'
+                  : 'border-[#cbd0da] bg-[#f8f9fb] text-[#555a66] hover:text-[#111111]'
+              }`}
+            >
+              <BrandexButtonIcon
+                name="analysis"
+                variant="square"
+                size={18}
+                colorMode={themeSettings?.imageColorMode}
+              />
+              <span>Live Charts &amp; Stats</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onRefreshReviewCases(config.caseEntries)}
+              className="h-[34px] px-2.5 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Refresh Cases</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="h-[34px] px-3 border border-[#cbd0da] bg-white hover:border-[#111111] text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Export {journalFilter !== 'ALL' ? `Jrn ${journalFilter}` : 'CSV'}</span>
+            </button>
+          </div>
+
+          {selectedKeys.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 bg-[#fffef0] border border-[#111111] px-2.5 py-1">
+              <span className="text-[11px] font-extrabold text-[#111111] tabular-nums">
+                {selectedKeys.size} Selected:
+              </span>
+              <select
+                aria-label="Bulk stage select"
+                value={bulkStage}
+                onChange={(e) => {
+                  setBulkStage(e.target.value);
+                  setBulkSubStatus('');
+                }}
+                className="bg-white border border-[#cbd0da] px-2 py-1 text-[11px] font-bold text-[#111111]"
+              >
+                {statusOptions.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Bulk sub status select"
+                value={bulkSubStatus}
+                onChange={(e) => setBulkSubStatus(e.target.value)}
+                className="bg-white border border-[#cbd0da] px-2 py-1 text-[11px] font-semibold text-[#111111]"
+              >
+                <option value="">Keep / Select Sub Status…</option>
+                {bulkSubCatalog.all.map((sub) => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleBulkApplyStage}
+                className="h-[26px] px-2.5 bg-[#ffee00] hover:bg-[#e6d600] text-[#111111] text-[11px] font-extrabold"
+              >
+                Apply Stage
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDialog('delete_selected')}
+                className="h-[26px] px-2.5 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold inline-flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" aria-hidden="true" />
+                <span>Delete</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Database Analysis Card */}
+      {/* Live Charts & Graphs Card */}
       {showAnalysis && (
         <section
-          aria-label="Cases Database Analysis"
-          className="bg-white border border-[#e2e4ea] p-5 space-y-4"
+          aria-label="Cases Database Live Charts and Summary"
+          className="bg-white border border-[#e2e4ea] p-5 space-y-5"
         >
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eceef2] pb-3">
             <div>
-              <h3 className="text-sm font-extrabold text-[#111111]">Summary</h3>
+              <h3 className="text-sm font-extrabold text-[#111111]">
+                Live Database Analytics &amp; Charts
+              </h3>
               <p className="text-xs text-[#555a66]">
-                Latest Date: <span className="font-mono font-bold text-[#111111]">{dbAnalysis.latestDate || '—'}</span>
+                Latest Record Date:{' '}
+                <span className="font-mono font-bold text-[#111111]">
+                  {dbAnalysis.latestDate || '—'}
+                </span>
                 {sheetCfg?.lastSyncedAt && (
-                  <> · Synced {new Date(sheetCfg.lastSyncedAt).toLocaleString()}</>
+                  <> · Sheet Synced {new Date(sheetCfg.lastSyncedAt).toLocaleString()}</>
                 )}
               </p>
             </div>
 
-            {dbAnalysis.missingFromWatchlistTms.length > 0 && (
-              <button
-                type="button"
-                onClick={handleSyncMissingTmsToWatchlist}
-                className="h-[34px] px-3 bg-[#ffee00] hover:bg-[#e6d600] text-[#111111] text-xs font-extrabold inline-flex items-center gap-1.5"
-              >
-                <ShieldPlus className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Add {dbAnalysis.missingFromWatchlistTms.length} Unwatched TMs</span>
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {statusFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className="h-[32px] px-2.5 border border-[#111111] bg-[#ffee00] text-[#111111] text-xs font-extrabold inline-flex items-center gap-1"
+                >
+                  <span>Stage Filter: {statusFilter}</span>
+                  <X className="w-3 h-3" aria-hidden="true" />
+                </button>
+              )}
+
+              {dbAnalysis.missingFromWatchlistTms.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSyncMissingTmsToWatchlist}
+                  className="h-[32px] px-3 bg-[#ffee00] hover:bg-[#e6d600] text-[#111111] text-xs font-extrabold inline-flex items-center gap-1.5"
+                >
+                  <ShieldPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Add {dbAnalysis.missingFromWatchlistTms.length} Unwatched TMs</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs tabular-nums">
-            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3">
-              <div className="text-[#555a66] font-semibold">Total Cases</div>
-              <div className="text-lg font-extrabold text-[#111111] mt-0.5">
-                {dbAnalysis.totalRecords}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* Chart 1: Cases by Stage 1-4 (Clickable Filter Bars) */}
+            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-4 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-extrabold text-[#111111] uppercase tracking-wider">
+                  Stages (Click to Filter)
+                </span>
+                <span className="font-mono font-bold text-[#555a66] tabular-nums">
+                  {dbAnalysis.totalRecords} total
+                </span>
               </div>
-              <div className="text-[11px] text-[#555a66]">{dbAnalysis.uniqueTmCount} unique TMs</div>
+              <div className="space-y-2">
+                {liveChartStats.stages.map((st) => {
+                  const pct =
+                    dbAnalysis.totalRecords > 0
+                      ? Math.round((st.count / dbAnalysis.totalRecords) * 100)
+                      : 0;
+                  const active = statusFilter.toUpperCase() === st.label.toUpperCase();
+                  return (
+                    <button
+                      key={st.label}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(active ? 'ALL' : st.label);
+                        setCurrentPage(1);
+                      }}
+                      className={`w-full text-left p-1 transition-colors ${
+                        active ? 'bg-[#fffef0] ring-1 ring-[#111111]' : 'hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex justify-between text-[11px] font-bold text-[#111111] tabular-nums mb-0.5">
+                        <span className="truncate">{st.label}</span>
+                        <span className="font-mono">
+                          {st.count} ({pct}%)
+                        </span>
+                      </div>
+                      <div className="h-2 bg-[#e2e4ea] overflow-hidden">
+                        <div
+                          className="h-full transition-all duration-300"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: getStageBarColor(st.label),
+                          }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3">
-              <div className="text-[#555a66] font-semibold">Watchlist Overlap</div>
-              <div className="text-lg font-extrabold text-[#111111] mt-0.5">
-                {dbAnalysis.matchedWatchlistCount}
+            {/* Chart 2: Top Sub-Statuses */}
+            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-4 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-extrabold text-[#111111] uppercase tracking-wider">
+                  Top Sub-Statuses
+                </span>
+                <span className="font-mono font-bold text-[#555a66] tabular-nums">
+                  {stageCatalog.allSubStatuses.length} active
+                </span>
               </div>
-              <div className="text-[11px] text-[#555a66]">
-                {dbAnalysis.missingFromWatchlistTms.length} unwatched
+              <div className="space-y-1.5">
+                {liveChartStats.topSubStatuses.length === 0 ? (
+                  <p className="text-xs text-[#555a66] py-6 text-center">No sub-status data yet.</p>
+                ) : (
+                  liveChartStats.topSubStatuses.map((sub) => {
+                    const maxSub = Math.max(1, liveChartStats.topSubStatuses[0]?.count || 1);
+                    const widthPct = Math.round((sub.count / maxSub) * 100);
+                    return (
+                      <div key={sub.label} className="space-y-0.5">
+                        <div className="flex justify-between text-[11px] font-semibold text-[#111111] tabular-nums">
+                          <span className="truncate max-w-[160px]" title={sub.label}>
+                            {sub.label}
+                          </span>
+                          <span className="font-mono font-bold">{sub.count}</span>
+                        </div>
+                        <div className="h-1.5 bg-[#e2e4ea]">
+                          <div
+                            className="h-full bg-[#111111] transition-all duration-300"
+                            style={{ width: `${widthPct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
-            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3">
-              <div className="text-[#555a66] font-semibold">Top Statuses</div>
-              <div className="mt-1 space-y-0.5">
-                {dbAnalysis.topStatuses.slice(0, 3).map((s) => (
-                  <div key={s.label} className="flex justify-between font-semibold text-[#111111]">
-                    <span className="truncate">{s.label}</span>
-                    <span className="font-mono">{s.count}</span>
+            {/* Chart 3: Watchlist Donut + TM Flags SVG */}
+            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-4 flex flex-col justify-between gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-[#111111] uppercase tracking-wider">
+                  Watchlist &amp; TM Flags
+                </span>
+                <span className="text-[11px] font-mono font-bold text-[#555a66]">
+                  {dbAnalysis.uniqueTmCount} TMs
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <svg width="76" height="76" viewBox="0 0 76 76" className="shrink-0" aria-label="Watchlist coverage chart">
+                  <circle cx="38" cy="38" r="30" fill="none" stroke="#e2e4ea" strokeWidth="8" />
+                  <circle
+                    cx="38"
+                    cy="38"
+                    r="30"
+                    fill="none"
+                    stroke="#111111"
+                    strokeWidth="8"
+                    strokeDasharray={`${donutDash} ${donutCircumference}`}
+                    strokeDashoffset="0"
+                    transform="rotate(-90 38 38)"
+                  />
+                  <text
+                    x="38"
+                    y="42"
+                    textAnchor="middle"
+                    fontSize="13"
+                    fontWeight="800"
+                    fill="#111111"
+                  >
+                    {coveragePct}%
+                  </text>
+                </svg>
+
+                <div className="text-[11px] space-y-1 tabular-nums">
+                  <div className="font-bold text-[#111111]">
+                    Watched: <span className="font-mono">{dbAnalysis.matchedWatchlistCount}</span>
                   </div>
-                ))}
-                {dbAnalysis.topStatuses.length === 0 && <span className="text-[#555a66]">—</span>}
-              </div>
-            </div>
-
-            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3">
-              <div className="text-[#555a66] font-semibold">Top Agents</div>
-              <div className="mt-1 space-y-0.5">
-                {dbAnalysis.topAgents.slice(0, 2).map((a) => (
-                  <div key={a.label} className="flex justify-between font-semibold text-[#111111]">
-                    <span className="truncate">{a.label}</span>
-                    <span className="font-mono">{a.count}</span>
+                  <div className="text-[#555a66]">
+                    Unwatched:{' '}
+                    <span className="font-mono font-bold text-[#111111]">
+                      {dbAnalysis.missingFromWatchlistTms.length}
+                    </span>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              {/* TM5..56 Vertical Bar Mini Chart */}
+              <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-[#e2e4ea] text-center tabular-nums">
+                {[
+                  { label: 'TM5', val: dbAnalysis.tmFlagCounts.tm5 },
+                  { label: 'TM6', val: dbAnalysis.tmFlagCounts.tm6 },
+                  { label: 'TM11', val: dbAnalysis.tmFlagCounts.tm11 },
+                  { label: 'TM16', val: dbAnalysis.tmFlagCounts.tm16 },
+                  { label: 'TM56', val: dbAnalysis.tmFlagCounts.tm56 },
+                ].map((f) => {
+                  const maxF = Math.max(
+                    1,
+                    dbAnalysis.tmFlagCounts.tm5,
+                    dbAnalysis.tmFlagCounts.tm6,
+                    dbAnalysis.tmFlagCounts.tm11,
+                    dbAnalysis.tmFlagCounts.tm16,
+                    dbAnalysis.tmFlagCounts.tm56
+                  );
+                  const barH = Math.max(4, Math.round((f.val / maxF) * 24));
+                  return (
+                    <div key={f.label} className="flex flex-col items-center">
+                      <div className="h-[26px] w-full flex items-end justify-center">
+                        <div
+                          className="w-4 bg-[#ffee00] border border-[#111111]"
+                          style={{ height: `${barH}px` }}
+                        />
+                      </div>
+                      <span className="text-[9.5px] font-mono font-bold text-[#111111] mt-0.5">
+                        {f.val}
+                      </span>
+                      <span className="text-[9px] font-bold text-[#555a66]">{f.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3">
-              <div className="text-[#555a66] font-semibold">TM Flags</div>
-              <div className="mt-1 text-[11px] font-mono text-[#111111] space-y-0.5">
-                <div>
-                  TM5: {dbAnalysis.tmFlagCounts.tm5} · TM6: {dbAnalysis.tmFlagCounts.tm6} · TM11:{' '}
-                  {dbAnalysis.tmFlagCounts.tm11}
-                </div>
-                <div>
-                  TM16: {dbAnalysis.tmFlagCounts.tm16} · TM56: {dbAnalysis.tmFlagCounts.tm56}
-                </div>
+            {/* Chart 4: Top Nice Classes (1-45) */}
+            <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-4 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-extrabold text-[#111111] uppercase tracking-wider">
+                  Top Classes (1–45)
+                </span>
+                <span className="font-mono font-bold text-[#555a66]">
+                  {dbAnalysis.topAgents[0]?.label || '—'}
+                </span>
               </div>
+              {liveChartStats.topClasses.length === 0 ? (
+                <p className="text-xs text-[#555a66] py-6 text-center">No Nice Class data yet.</p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2 pt-1 tabular-nums">
+                  {liveChartStats.topClasses.map((cl) => (
+                    <div
+                      key={cl.label}
+                      className="bg-white border border-[#e2e4ea] px-2 py-1.5 text-center"
+                    >
+                      <div className="text-[10px] font-bold text-[#555a66]">CLS {cl.label}</div>
+                      <div className="text-xs font-mono font-extrabold text-[#111111]">
+                        {cl.count}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
       )}
 
-      {/* Expandable Database Importer */}
+      {/* Expandable Database Importer & Sheet Setup */}
       {showImporter && (
         <section
-          aria-label="Database Importer"
+          aria-label="Google Sheet Connection and CSV Importer"
           className="bg-white border border-[#d4d7e0] shadow-sm"
         >
           <div className="px-6 py-4 bg-[#111111] text-white flex flex-wrap items-center justify-between gap-3">
@@ -893,7 +1524,7 @@ export function DatabaseView({
                 size={24}
                 colorMode={themeSettings?.imageColorMode}
               />
-              <h3 className="text-sm font-extrabold">Import Database Sheet / CSV</h3>
+              <h3 className="text-sm font-extrabold">Google Sheets Sync &amp; CSV Importer</h3>
             </div>
             <button
               type="button"
@@ -927,13 +1558,28 @@ export function DatabaseView({
                 <label htmlFor="db-sheet-name" className="block text-xs font-bold text-[#111111] mb-1">
                   Sheet Tab Name
                 </label>
-                <input
-                  id="db-sheet-name"
-                  type="text"
-                  value={sheetName}
-                  onChange={(e) => setSheetName(e.target.value)}
-                  className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
-                />
+                {availableTabs.length > 0 ? (
+                  <select
+                    id="db-sheet-name"
+                    value={sheetName}
+                    onChange={(e) => setSheetName(e.target.value)}
+                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs font-bold text-[#111111]"
+                  >
+                    {availableTabs.map((t) => (
+                      <option key={t.sheetId} value={t.title}>
+                        {t.title}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="db-sheet-name"
+                    type="text"
+                    value={sheetName}
+                    onChange={(e) => setSheetName(e.target.value)}
+                    className="w-full bg-[#f8f9fb] border border-[#cbd0da] px-3 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+                  />
+                )}
               </div>
               <div className="lg:col-span-3">
                 <button
@@ -943,7 +1589,7 @@ export function DatabaseView({
                   className="builty-btn h-[36px] w-full pl-4 pr-3 gap-2 text-xs"
                 >
                   <Globe className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>{fetchingSheet ? 'Fetching…' : 'Preview Sheet CSV'}</span>
+                  <span>{fetchingSheet ? 'Fetching…' : 'Preview Sheet Rows'}</span>
                 </button>
               </div>
             </div>
@@ -1207,7 +1853,7 @@ export function DatabaseView({
         className="bg-white border border-[#e2e4ea] p-5 space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-extrabold text-[#111111]">Add Case Record</h3>
+          <h3 className="text-sm font-extrabold text-[#111111]">Add Original Case Record</h3>
           <div className="flex items-center gap-2">
             {previewNewCaseNo && (
               <span className="text-xs font-mono font-bold text-[#111111] bg-[#fffef0] border border-[#111111] px-2.5 py-0.5">
@@ -1240,12 +1886,12 @@ export function DatabaseView({
             className="bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
           />
           <input
-            type="text"
-            value={newDate}
-            onChange={(e) => setNewDate(e.target.value)}
-            placeholder="DATE"
-            aria-label="Case Date"
-            className="bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+            type="date"
+            value={toHtmlDateInputValue(newDate)}
+            onChange={(e) => setNewDate(fromHtmlDateInputValue(e.target.value))}
+            aria-label="Case Date Picker"
+            title={`Date: ${newDate}`}
+            className="bg-[#f8f9fb] border border-[#cbd0da] px-2 py-2 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
           />
           <input
             type="text"
@@ -1290,36 +1936,76 @@ export function DatabaseView({
 
           <input
             type="text"
+            inputMode="numeric"
             value={newTm}
-            onChange={(e) => setNewTm(e.target.value)}
-            placeholder="TM/CPR NUMBER"
-            aria-label="TM or CPR Number"
+            onChange={(e) => setNewTm(sanitizeTmCprValue(e.target.value))}
+            placeholder="TM/CPR (0-9, -)"
+            aria-label="TM or CPR Number (numbers and hyphen only)"
             className="bg-[#fffef0] border border-[#111111] px-2.5 py-2 text-xs font-mono font-bold text-[#111111] focus:bg-white focus:outline-none"
           />
-          <input
-            type="text"
+
+          <select
             value={newClassNo}
             onChange={(e) => setNewClassNo(e.target.value)}
-            placeholder="CLASS"
-            aria-label="Trademark Class"
-            className="bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs font-mono text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
-          />
-          <input
-            type="text"
+            aria-label="Trademark Class (1-45)"
+            className="bg-[#f8f9fb] border border-[#cbd0da] px-2 py-2 text-xs font-mono font-bold text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+          >
+            <option value="">CLASS (1–45)</option>
+            <option value="-">-</option>
+            {NICE_CLASS_NUMBERS.map((num) => (
+              <option key={num} value={num}>
+                Class {num}
+              </option>
+            ))}
+          </select>
+
+          <select
             value={newStatus}
-            onChange={(e) => setNewStatus(e.target.value)}
-            placeholder="STATUS"
-            aria-label="Status"
-            className="bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
-          />
-          <input
-            type="text"
+            onChange={(e) => {
+              const nextSt = e.target.value;
+              setNewStatus(nextSt);
+              const nextSubs = stageCatalog.subStatusesByStage[nextSt] || [];
+              if (nextSubs.length > 0 && !nextSubs.includes(newSubStatus)) {
+                setNewSubStatus('');
+              }
+            }}
+            aria-label="Stage Status (STAGE 1 to STAGE 4)"
+            className="bg-[#f8f9fb] border border-[#cbd0da] px-2 py-2 text-xs font-bold text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+          >
+            {statusOptions.map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+          </select>
+
+          <select
             value={newSubStatus}
             onChange={(e) => setNewSubStatus(e.target.value)}
-            placeholder="SUB STATUS"
             aria-label="Sub Status"
-            className="bg-[#f8f9fb] border border-[#cbd0da] px-2.5 py-2 text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
-          />
+            className="bg-[#f8f9fb] border border-[#cbd0da] px-2 py-2 text-xs font-semibold text-[#111111] focus:bg-white focus:outline-none focus:border-[#111111]"
+          >
+            <option value="">SUB STATUS…</option>
+            {addSubCatalog.stageSpecific.length > 0 && (
+              <optgroup label={`${newStatus} Sub-Statuses`}>
+                {addSubCatalog.stageSpecific.map((sub) => (
+                  <option key={`stage_${sub}`} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="All Database Sub-Statuses">
+              {addSubCatalog.all
+                .filter((s) => !addSubCatalog.stageSpecific.includes(s))
+                .map((sub) => (
+                  <option key={`all_${sub}`} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+            </optgroup>
+          </select>
+
           <input
             type="text"
             value={newCaseType}
@@ -1420,8 +2106,50 @@ export function DatabaseView({
         )}
       </form>
 
-      {/* Search + Sort & Filter + Pagination + Delete All + Table */}
+      {/* Search + Journal Tabs + Sort & Filter + Pagination + Delete All + Table */}
       <div className="bg-white border border-[#e2e4ea] overflow-hidden space-y-0">
+        {/* Per-Journal Quick Separation Strip (when Journal Nos exist in Database) */}
+        {journalOptions.length > 0 && (
+          <div className="px-4 py-2.5 bg-[#f8f9fb] border-b border-[#e2e4ea] flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#555a66] mr-1">
+              Journal No:
+            </span>
+            <button
+              type="button"
+              data-sfx="filter"
+              onClick={() => {
+                setJournalFilter('ALL');
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1 border text-[11px] font-bold tabular-nums ${
+                journalFilter === 'ALL'
+                  ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                  : 'border-[#cbd0da] bg-white text-[#555a66] hover:text-[#111111]'
+              }`}
+            >
+              All ({config.caseEntries.length})
+            </button>
+            {journalOptions.map((opt) => (
+              <button
+                key={opt.journalNumber}
+                type="button"
+                data-sfx="filter"
+                onClick={() => {
+                  setJournalFilter(opt.journalNumber);
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 border text-[11px] font-bold font-mono tabular-nums ${
+                  journalFilter === opt.journalNumber
+                    ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
+                    : 'border-[#cbd0da] bg-white text-[#555a66] hover:text-[#111111]'
+                }`}
+              >
+                Jrn {opt.journalNumber} ({opt.count})
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="p-4 border-b border-[#e2e4ea] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
             <div className="relative flex-1 max-w-md">
@@ -1461,11 +2189,11 @@ export function DatabaseView({
             </div>
           </div>
 
-          {selectedKeys.size > 0 && (
-            <span className="text-xs font-bold text-[#111111] bg-[#ffee00] px-2 py-0.5 tabular-nums self-start lg:self-auto">
-              {selectedKeys.size} selected
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[11px] font-bold text-[#555a66]">
+              {editMode ? 'Edit Mode: ON' : 'Read-Only (Edit Mode OFF)'}
             </span>
-          )}
+          </div>
         </div>
 
         <TableControlsBar
@@ -1497,6 +2225,7 @@ export function DatabaseView({
                 setSearchQuery('');
                 setCodeCaseFilter('');
                 setStatusFilter('ALL');
+                setJournalFilter('ALL');
                 setSortBy('date');
                 setSortDir('desc');
                 setCurrentPage(1);
@@ -1511,7 +2240,7 @@ export function DatabaseView({
                 aria-label="Filter by status"
                 className="bg-white border border-[#cbd0da] px-2.5 py-1 text-xs font-bold text-[#111111]"
               >
-                <option value="ALL">All Statuses</option>
+                <option value="ALL">All Stages</option>
                 {statusOptions.map((st) => (
                   <option key={st} value={st}>
                     {st}
@@ -1577,7 +2306,7 @@ export function DatabaseView({
                 const rowKey = getCaseEntryKey(c, (safePage - 1) * safePageSize + idx);
                 const isSelected = selectedKeys.has(rowKey);
 
-                const renderEditableCell = (
+                const renderEditableText = (
                   value: string | undefined,
                   field: keyof CaseEntry,
                   className = ''
@@ -1594,28 +2323,28 @@ export function DatabaseView({
                       />
                     );
                   }
-                  return (
-                    <span
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) => {
-                        const next = e.currentTarget.innerText.trim();
-                        if (next !== (value || '').trim()) {
-                          handleUpdateEntryByKey(rowKey, {
-                            [field]: next === '—' ? '' : next,
-                          });
-                        }
-                      }}
-                      className={`outline-none focus:bg-[#fffef0] focus:px-1 ${className}`}
-                    >
-                      {value || '—'}
-                    </span>
-                  );
+                  return <span className={className}>{value || '—'}</span>;
                 };
 
-                const renderFlag = (val?: string) => {
+                const renderFlag = (val?: string, flagKey?: 'tm5' | 'tm6' | 'tm11' | 'tm16' | 'tm56') => {
                   const upper = String(val || '').trim().toUpperCase();
-                  if (upper === 'TRUE') {
+                  const isTrue = upper === 'TRUE';
+                  if (editMode && flagKey) {
+                    return (
+                      <input
+                        type="checkbox"
+                        checked={isTrue}
+                        onChange={(e) =>
+                          handleUpdateEntryByKey(rowKey, {
+                            [flagKey]: e.target.checked ? 'TRUE' : 'FALSE',
+                          })
+                        }
+                        aria-label={`${flagKey.toUpperCase()} flag for ${c.id || c.tmNumber}`}
+                        className="w-3.5 h-3.5 accent-[#111111] cursor-pointer"
+                      />
+                    );
+                  }
+                  if (isTrue) {
                     return (
                       <span className="px-1.5 py-0.5 bg-[#ffee00] text-[#111111] font-mono font-extrabold text-[10px]">
                         TRUE
@@ -1624,6 +2353,8 @@ export function DatabaseView({
                   }
                   return <span className="font-mono text-[#9ca3af] text-[10.5px]">{upper || '—'}</span>;
                 };
+
+                const rowSubCatalog = getSubStatusOptionsForStage(c.status || '', c.subStatus);
 
                 return (
                   <tr
@@ -1644,74 +2375,179 @@ export function DatabaseView({
                       />
                     </td>
                     <td className="py-2.5 px-3 font-mono font-semibold text-[#555a66] whitespace-nowrap">
-                      {renderEditableCell(c.id, 'id')}
+                      {renderEditableText(c.id, 'id')}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#111111] whitespace-nowrap">
-                      {renderEditableCell(c.date, 'date')}
+                      {editMode ? (
+                        <input
+                          type="date"
+                          value={toHtmlDateInputValue(c.date)}
+                          onChange={(e) =>
+                            handleUpdateEntryByKey(rowKey, {
+                              date: fromHtmlDateInputValue(e.target.value),
+                            })
+                          }
+                          aria-label={`Date for ${c.id || c.tmNumber}`}
+                          className="bg-[#fffef0] border border-[#cbd0da] focus:border-[#111111] px-1.5 py-0.5 text-xs font-mono"
+                        />
+                      ) : (
+                        <span>{c.date || '—'}</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-[#111111] whitespace-nowrap">
-                      {renderEditableCell(c.prefix, 'prefix')}
+                      {renderEditableText(c.prefix, 'prefix')}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#111111] whitespace-nowrap">
-                      {renderEditableCell(c.clientCode, 'clientCode')}
+                      {renderEditableText(c.clientCode, 'clientCode')}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#111111] whitespace-nowrap">
-                      {renderEditableCell(c.rawCaseNo, 'rawCaseNo')}
+                      {renderEditableText(c.rawCaseNo, 'rawCaseNo')}
                     </td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <span className="px-2 py-0.5 bg-[#fffef0] border border-[#111111] font-mono font-extrabold text-[#111111]">
-                        {renderEditableCell(c.caseNo, 'caseNo')}
+                        {renderEditableText(c.caseNo, 'caseNo')}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-[#4b505c] max-w-[180px] truncate" title={c.clientName}>
-                      {renderEditableCell(c.clientName, 'clientName')}
+                      {renderEditableText(c.clientName, 'clientName')}
                     </td>
                     <td
                       className="py-2.5 px-3 font-semibold text-[#111111] max-w-[210px] truncate"
                       title={c.applicationName}
                     >
-                      {renderEditableCell(c.applicationName, 'applicationName')}
+                      {renderEditableText(c.applicationName, 'applicationName')}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-[#111111] tabular-nums whitespace-nowrap">
-                      {renderEditableCell(c.tmNumber, 'tmNumber')}
+                      {editMode ? (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={c.tmNumber || ''}
+                          onChange={(e) =>
+                            handleUpdateEntryByKey(rowKey, {
+                              tmNumber: sanitizeTmCprValue(e.target.value),
+                            })
+                          }
+                          placeholder="0-9, -"
+                          className="w-[104px] bg-[#fffef0] border border-[#cbd0da] focus:border-[#111111] px-1.5 py-0.5 text-xs font-mono font-bold"
+                        />
+                      ) : (
+                        <span>{c.tmNumber || '—'}</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono tabular-nums whitespace-nowrap">
-                      {renderEditableCell(c.classNo, 'classNo', 'text-center')}
+                      {editMode ? (
+                        <select
+                          value={c.classNo || ''}
+                          onChange={(e) =>
+                            handleUpdateEntryByKey(rowKey, { classNo: e.target.value })
+                          }
+                          aria-label={`Class for ${c.id || c.tmNumber}`}
+                          className="bg-[#fffef0] border border-[#cbd0da] focus:border-[#111111] px-1.5 py-0.5 text-xs font-mono font-bold"
+                        >
+                          <option value="">—</option>
+                          <option value="-">-</option>
+                          {NICE_CLASS_NUMBERS.map((num) => (
+                            <option key={num} value={num}>
+                              {num}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span>{c.classNo || '—'}</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 font-semibold text-[#111111] whitespace-nowrap">
-                      {renderEditableCell(c.status, 'status')}
+                      {editMode ? (
+                        <select
+                          value={(c.status || '').trim().toUpperCase()}
+                          onChange={(e) =>
+                            handleUpdateEntryByKey(rowKey, { status: e.target.value })
+                          }
+                          aria-label={`Stage status for ${c.id || c.tmNumber}`}
+                          className="bg-[#fffef0] border border-[#cbd0da] focus:border-[#111111] px-1.5 py-0.5 text-xs font-bold text-[#111111]"
+                        >
+                          <option value="">—</option>
+                          {statusOptions.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      ) : c.status ? (
+                        <span
+                          className={`inline-block px-2 py-0.5 border text-[10.5px] font-extrabold ${getStageBadgeClass(
+                            c.status
+                          )}`}
+                        >
+                          {c.status}
+                        </span>
+                      ) : (
+                        <span>—</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-[#4b505c] whitespace-nowrap">
-                      {renderEditableCell(c.subStatus, 'subStatus')}
+                      {editMode ? (
+                        <select
+                          value={(c.subStatus || '').trim().toUpperCase()}
+                          onChange={(e) =>
+                            handleUpdateEntryByKey(rowKey, { subStatus: e.target.value })
+                          }
+                          aria-label={`Sub status for ${c.id || c.tmNumber}`}
+                          className="bg-[#fffef0] border border-[#cbd0da] focus:border-[#111111] px-1.5 py-0.5 text-xs font-semibold text-[#111111]"
+                        >
+                          <option value="">—</option>
+                          {rowSubCatalog.stageSpecific.length > 0 && (
+                            <optgroup label={`${c.status || 'Stage'} Sub-Statuses`}>
+                              {rowSubCatalog.stageSpecific.map((sub) => (
+                                <option key={`rs_${sub}`} value={sub}>
+                                  {sub}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          <optgroup label="All Database Sub-Statuses">
+                            {rowSubCatalog.all
+                              .filter((s) => !rowSubCatalog.stageSpecific.includes(s))
+                              .map((sub) => (
+                                <option key={`ra_${sub}`} value={sub}>
+                                  {sub}
+                                </option>
+                              ))}
+                          </optgroup>
+                        </select>
+                      ) : (
+                        <span>{c.subStatus || '—'}</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#555a66] whitespace-nowrap">
-                      {renderEditableCell(c.caseType, 'caseType')}
+                      {renderEditableText(c.caseType, 'caseType')}
                     </td>
                     <td className="py-2.5 px-3 text-[#111111] whitespace-nowrap">
-                      {renderEditableCell(c.agent, 'agent')}
+                      {renderEditableText(c.agent, 'agent')}
                     </td>
                     <td className="py-2.5 px-3 text-[#555a66] max-w-[160px] truncate" title={c.offNote}>
-                      {renderEditableCell(c.offNote, 'offNote')}
+                      {renderEditableText(c.offNote, 'offNote')}
                     </td>
                     <td className="py-2.5 px-3 text-[#555a66] max-w-[160px] truncate" title={c.notes}>
-                      {renderEditableCell(c.notes, 'notes')}
+                      {renderEditableText(c.notes, 'notes')}
                     </td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm5)}</td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm6)}</td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm11)}</td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm16)}</td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm56)}</td>
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm5, 'tm5')}</td>
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm6, 'tm6')}</td>
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm11, 'tm11')}</td>
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm16, 'tm16')}</td>
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderFlag(c.tm56, 'tm56')}</td>
                     <td className="py-2.5 px-3 font-mono text-[#111111] whitespace-nowrap">
-                      {renderEditableCell(c.journalNumber, 'journalNumber')}
+                      {renderEditableText(c.journalNumber, 'journalNumber')}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#555a66] whitespace-nowrap">
-                      {renderEditableCell(c.journalDate, 'journalDate')}
+                      {renderEditableText(c.journalDate, 'journalDate')}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#555a66] whitespace-nowrap">
-                      {renderEditableCell(c.lastModified, 'lastModified')}
+                      {renderEditableText(c.lastModified, 'lastModified')}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#555a66] max-w-[140px] truncate" title={c.imageUrl}>
-                      {renderEditableCell(c.imageUrl, 'imageUrl')}
+                      {renderEditableText(c.imageUrl, 'imageUrl')}
                     </td>
                     <td className="py-2.5 px-3 text-right whitespace-nowrap">
                       <button
@@ -1730,7 +2566,7 @@ export function DatabaseView({
               {visibleEntries.length === 0 && (
                 <tr>
                   <td colSpan={27} className="py-10 text-center text-xs text-[#555a66]">
-                    No database records found. Click &quot;Sync Google Sheet&quot; or &quot;Import CSV&quot;.
+                    No database records found. Click &quot;Pull Sheet&quot; or &quot;Sheet Setup / Import CSV&quot;.
                   </td>
                 </tr>
               )}
@@ -1738,6 +2574,124 @@ export function DatabaseView({
           </table>
         </div>
       </div>
+
+      {/* Google Drive Spreadsheet Picker Modal */}
+      {drivePickerOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose Google Spreadsheet"
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        >
+          <div className="bg-white border border-[#111111] w-full max-w-lg shadow-xl overflow-hidden">
+            <div className="px-5 py-3.5 bg-[#111111] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderSearch className="w-4 h-4 text-[#ffee00]" aria-hidden="true" />
+                <h3 className="text-sm font-extrabold">Select Google Spreadsheet from Drive</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDrivePickerOpen(false)}
+                aria-label="Close spreadsheet picker"
+                className="p-1 text-white/80 hover:text-[#ffee00]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 max-h-[380px] overflow-y-auto divide-y divide-[#eceef2]">
+              {driveLoading ? (
+                <p className="py-8 text-center text-xs text-[#555a66]">
+                  Loading your Google Drive spreadsheets…
+                </p>
+              ) : driveSpreadsheets.length === 0 ? (
+                <p className="py-8 text-center text-xs text-[#555a66]">
+                  No Google Spreadsheets found in Drive. Paste any Spreadsheet URL or ID manually.
+                </p>
+              ) : (
+                driveSpreadsheets.map((file) => (
+                  <button
+                    key={file.id}
+                    type="button"
+                    onClick={() => handleSelectDriveSpreadsheet(file)}
+                    className="w-full text-left py-2.5 px-3 hover:bg-[#fffef0] flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-extrabold text-[#111111] truncate">
+                        {file.name}
+                      </div>
+                      <div className="text-[10.5px] font-mono text-[#555a66] truncate">
+                        {file.id}
+                      </div>
+                    </div>
+                    {file.modifiedTime && (
+                      <span className="text-[10px] font-mono text-[#555a66] shrink-0">
+                        {new Date(file.modifiedTime).toLocaleDateString()}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mandatory Confirmation Modal Before Updating User Google Sheet */}
+      {confirmPushOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm Google Sheet Update"
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        >
+          <div className="bg-white border border-[#111111] w-full max-w-md shadow-xl p-5 space-y-4">
+            <div className="flex items-start gap-2.5">
+              <CloudUpload className="w-5 h-5 text-[#111111] shrink-0 mt-0.5" aria-hidden="true" />
+              <div>
+                <h3 className="text-sm font-extrabold text-[#111111]">
+                  Push Records to Google Sheet?
+                </h3>
+                <p className="text-xs text-[#555a66] mt-1">
+                  This will update rows <span className="font-mono font-bold">A1:X</span> on your
+                  connected Google Sheet tab with all{' '}
+                  <span className="font-mono font-bold text-[#111111]">
+                    {config.caseEntries.length}
+                  </span>{' '}
+                  database record(s):
+                </p>
+                <div className="mt-2 bg-[#f8f9fb] border border-[#e2e4ea] p-2.5 text-[11px] font-mono space-y-1">
+                  <div>
+                    <span className="font-bold">Sheet:</span>{' '}
+                    {connectedSheetTitle || sheetUrlOrId}
+                  </div>
+                  <div>
+                    <span className="font-bold">Tab:</span> {sheetName || 'DATABASE'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={pushingSheet}
+                onClick={() => setConfirmPushOpen(false)}
+                className="h-[34px] px-3.5 border border-[#cbd0da] bg-white text-xs font-bold text-[#111111] hover:border-[#111111]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pushingSheet}
+                onClick={handleConfirmPushToGoogleSheet}
+                className="h-[34px] px-4 bg-[#111111] text-[#ffee00] text-xs font-extrabold hover:bg-[#222222]"
+              >
+                {pushingSheet ? 'Updating Sheet…' : 'Confirm Push to Sheet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <DeleteAllConfirmModal
         open={confirmDialog !== null}

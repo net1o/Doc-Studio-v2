@@ -50,8 +50,16 @@ export function BuiltyHeader({
     { id: 'generator', label: 'Doc Gen', shortcut: 'Ctrl+4', count: docsCount, iconName: 'generator' },
     { id: 'database', label: 'Database', shortcut: 'Ctrl+5', count: databaseCount, iconName: 'database' },
     { id: 'records', label: 'Records', shortcut: 'Ctrl+6', count: recordsCount, iconName: 'records' },
-    { id: 'settings', label: 'Settings', shortcut: 'Ctrl+7', count: null, iconName: 'settings' },
-    { id: 'backup', label: 'Backup', shortcut: 'Ctrl+8', count: activeContextCount, iconName: 'backup' },
+  ];
+
+  const utilityTabs: {
+    id: AppTab;
+    label: string;
+    shortcut: string;
+    iconName: BrandexButtonIconName;
+  }[] = [
+    { id: 'settings', label: 'Settings', shortcut: 'Ctrl+7', iconName: 'settings' },
+    { id: 'backup', label: 'Backup', shortcut: 'Ctrl+8', iconName: 'backup' },
   ];
 
   return (
@@ -128,8 +136,34 @@ export function BuiltyHeader({
           })}
         </nav>
 
-        {/* Zone 3: Sound Toggle + Primary Slanted CTA + Mobile Trigger */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Zone 3: Utility Icons (Settings, Backup, Sound) + Primary Slanted CTA + Mobile Trigger */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {utilityTabs.map((u) => {
+            const active = activeTab === u.id;
+            return (
+              <button
+                key={u.id}
+                type="button"
+                data-sfx="filter"
+                data-active={active}
+                onClick={() => onSelectTab(u.id)}
+                aria-label={`${u.label} (${u.shortcut})`}
+                title={`${u.label} (${u.shortcut})`}
+                className={`h-[38px] w-[38px] border inline-flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[#111111] ${
+                  active
+                    ? 'border-[#111111] bg-[#ffee00] ring-2 ring-[#111111]/20'
+                    : 'border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-[#fffef0]'
+                }`}
+              >
+                <BrandexButtonIcon
+                  name={u.iconName}
+                  size={22}
+                  colorMode={themeSettings?.imageColorMode}
+                />
+              </button>
+            );
+          })}
+
           <button
             type="button"
             onClick={onToggleSfx}
@@ -179,7 +213,7 @@ export function BuiltyHeader({
 
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-[#e2e4ea] bg-white px-4 py-3 space-y-1">
-          {navItems.map((item) => {
+          {[...navItems, ...utilityTabs.map((u) => ({ ...u, count: null }))].map((item) => {
             const active = activeTab === item.id;
             const displayCount = active ? activeContextCount : item.count;
             return (

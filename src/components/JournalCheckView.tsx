@@ -173,21 +173,7 @@ export function JournalCheckView({
         />
       );
     }
-    return (
-      <div
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={(e) => {
-          const next = e.currentTarget.innerText.trim();
-          if (next !== val.trim()) {
-            handleCellChange(row.id, field, next === '—' ? '' : next);
-          }
-        }}
-        className={`w-full min-h-[24px] px-2 py-1 outline-none focus:bg-[#fffef0] focus:ring-1 focus:ring-[#111111] ${className}`}
-      >
-        {val || '—'}
-      </div>
-    );
+    return <div className={`w-full min-h-[24px] px-2 py-1 ${className}`}>{val || '—'}</div>;
   };
 
   const activeFilterCount = (searchText.trim() ? 1 : 0) + (classFilter !== 'ALL' ? 1 : 0);
