@@ -98,7 +98,6 @@ export function AnalyzerView({
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
   const logoPrimary = config.universalSettings?.docPrimaryColor || '#290076';
-  const logoAccent = config.universalSettings?.docAccentColor || '#f4580b';
 
   const openWizard = (tab: WatchlistWizardTab) => {
     setWizardTab(tab);
@@ -459,7 +458,8 @@ export function AnalyzerView({
               variant="logo17"
               size="md"
               primaryColor={logoPrimary}
-              accentColor={logoAccent}
+              discColor={config.universalSettings?.uiDarkColor || '#111111'}
+              accentColor={config.universalSettings?.uiAccentColor || '#f5c400'}
               className="shrink-0"
             />
             <div className="space-y-1">

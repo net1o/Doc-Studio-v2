@@ -188,7 +188,8 @@ export function Journal909GeneratorView({
           variant="logo17"
           size="lg"
           primaryColor={themePrimary}
-          accentColor={themeAccent}
+          discColor={universalSettings?.uiDarkColor || '#111111'}
+          accentColor={universalSettings?.uiAccentColor || '#f5c400'}
           className="mx-auto"
         />
         <h2 className="text-xl font-extrabold text-[#111111]">No Documents Yet</h2>
@@ -236,8 +237,8 @@ export function Journal909GeneratorView({
             <BrandexLogo
               variant="logo17Icon"
               size="sm"
-              primaryColor={themePrimary}
-              accentColor={themeAccent}
+              discColor={universalSettings?.uiDarkColor || '#111111'}
+              accentColor={universalSettings?.uiAccentColor || '#f5c400'}
               className="shrink-0"
             />
             <div>
@@ -1175,13 +1176,14 @@ export function Journal909GeneratorView({
                     </button>
                   )}
 
-                  {/* Brandex Icon 17 Official Stamp */}
+                  {/* Brandex Circular b(R) Official Stamp */}
                   <div className="absolute right-2 bottom-2 opacity-90 pointer-events-none">
                     <BrandexLogo
                       variant="logo17"
                       size="md"
                       primaryColor={themePrimary}
-                      accentColor={themeAccent}
+                      discColor={universalSettings?.uiDarkColor || '#111111'}
+                      accentColor={universalSettings?.uiAccentColor || '#f5c400'}
                     />
                   </div>
                 </div>

@@ -54,8 +54,8 @@ export function BuiltyHeroBanner({
             <BrandexLogo
               variant="logo17Icon"
               size="lg"
-              primaryColor={logoPrimary}
-              accentColor={logoAccent}
+              discColor={themeSettings?.uiDarkColor || '#111111'}
+              accentColor={themeSettings?.uiAccentColor || '#f5c400'}
               className="shrink-0"
             />
             <div>

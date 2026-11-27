@@ -173,8 +173,8 @@ export function ReviewQueueView({
           <BrandexLogo
             variant="logo17Icon"
             size="sm"
-            primaryColor={themeSettings?.docPrimaryColor}
-            accentColor={themeSettings?.docAccentColor}
+            discColor={themeSettings?.uiDarkColor || '#111111'}
+            accentColor={themeSettings?.uiAccentColor || '#f5c400'}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">Review Queue</h2>
           <span className="bg-[#ffee00] text-[#111111] px-2.5 py-0.5 text-xs font-extrabold tabular-nums">

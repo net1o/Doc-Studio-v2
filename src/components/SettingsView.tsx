@@ -169,8 +169,8 @@ export function SettingsView({
           <BrandexLogo
             variant="logo17Icon"
             size="sm"
-            primaryColor={universal.docPrimaryColor}
-            accentColor={universal.docAccentColor}
+            discColor={universal.uiDarkColor || '#111111'}
+            accentColor={universal.uiAccentColor || '#f5c400'}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Workspace &amp; Universal Settings
@@ -210,7 +210,8 @@ export function SettingsView({
                 variant="logo17"
                 size="sm"
                 primaryColor={universal.docPrimaryColor}
-                accentColor={universal.docAccentColor}
+                discColor={universal.uiDarkColor || '#111111'}
+                accentColor={universal.uiAccentColor || '#f5c400'}
               />
             </div>
             <div className="px-3 py-1.5 bg-[#111111] border border-[#111111]">

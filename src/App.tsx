@@ -150,9 +150,9 @@ export default function App() {
 
   useEffect(() => {
     const svg = buildLogo17IconSvgString(
-      universalSettings.docPrimaryColor || '#290076',
-      universalSettings.docAccentColor || '#f4580b',
-      '#ffffff'
+      universalSettings.uiDarkColor || '#111111',
+      universalSettings.uiAccentColor || '#f5c400',
+      false
     );
     const dataUrl = `data:image/svg+xml,${encodeURIComponent(svg)}`;
     let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
@@ -163,7 +163,7 @@ export default function App() {
     }
     link.type = 'image/svg+xml';
     link.href = dataUrl;
-  }, [universalSettings.docPrimaryColor, universalSettings.docAccentColor]);
+  }, [universalSettings.uiDarkColor, universalSettings.uiAccentColor]);
 
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent) => {

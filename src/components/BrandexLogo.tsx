@@ -15,6 +15,7 @@ interface BrandexLogoProps {
   variant?: BrandexLogoVariant;
   primaryColor?: string;
   accentColor?: string;
+  discColor?: string;
   onDark?: boolean;
   className?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -39,8 +40,7 @@ export function getContrastText(hexColor: string): string {
 }
 
 /**
- * Ensures dark theme primary colors (like #290076 or #111111) stay clearly legible
- * when rendered over a dark background (#111111) without altering light-surface colors.
+ * Ensures dark theme primary colors stay clearly legible over dark surfaces.
  */
 export function resolveOnDarkPrimary(hexColor: string): string {
   const hex = hexColor.replace('#', '').trim();
@@ -58,7 +58,6 @@ export function resolveOnDarkPrimary(hexColor: string): string {
   if ([r, g, b].some(Number.isNaN)) return '#8b5cf6';
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   if (luminance >= 0.28) return hexColor;
-  // Blend toward bright violet/white tint while preserving hue
   const mix = (c: number, target: number) =>
     Math.min(255, Math.round(c + (target - c) * 0.52))
       .toString(16)
@@ -67,19 +66,26 @@ export function resolveOnDarkPrimary(hexColor: string): string {
 }
 
 /**
- * Generates an inline SVG string for Icon #17 (from logo-icon.png) so it can also
- * be used as a dynamic theme-synced favicon or embedded inside exported HTML docs.
+ * Builds the exact circular b(R) favicon/badge SVG matching the user's uploaded circular emblem,
+ * with themeable disc & gold/accent colors.
  */
 export function buildLogo17IconSvgString(
-  primaryColor = '#290076',
-  accentColor = '#f4580b',
-  bgFill = '#ffffff'
+  discColor = '#111111',
+  markColor = '#f5c400',
+  roundedSquare = false
 ): string {
+  const outerShape = roundedSquare
+    ? `<rect x="4" y="4" width="92" height="92" rx="22" fill="${discColor}" stroke="#26262b" stroke-width="1.5" />`
+    : `<circle cx="50" cy="50" r="48" fill="${discColor}" stroke="#26262b" stroke-width="1.2" />
+       <circle cx="50" cy="50" r="42" stroke="${markColor}" stroke-width="2.7" fill="none" />`;
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
-    <circle cx="50" cy="50" r="45" fill="${bgFill}" stroke="${primaryColor}" stroke-width="4" />
-    <path d="M31 23 L43 17 L43 60 C43 69 49 74 58 74 C64 74 69 71 72 67 C68 75 59 80 48 80 C36 80 31 72 31 61 Z" fill="${primaryColor}" />
-    <path d="M41 44 C45 36 53 31 62 32 C68 33 72 36 74 40 C70 37 66 36 61 36 C52 36 45 41 42 49 Z" fill="${primaryColor}" />
-    <circle cx="59" cy="54" r="13.5" fill="${accentColor}" />
+    ${outerShape}
+    <path d="M30 30.5 C34.5 29.8 38.5 27.6 41.8 25 L41.8 70.2 C41.8 71.8 39.2 72.5 36.2 72.5 L36.2 33.2 L30 32 Z" fill="${markColor}" />
+    <circle cx="52.5" cy="55.5" r="17" fill="${markColor}" />
+    <circle cx="52.5" cy="55.5" r="12.8" fill="${discColor}" />
+    <circle cx="52.5" cy="55.5" r="10.4" fill="${markColor}" />
+    <text x="52.4" y="61.2" text-anchor="middle" fill="${discColor}" font-family="Georgia, 'Times New Roman', serif" font-size="16" font-weight="500">R</text>
   </svg>`;
 }
 
@@ -111,6 +117,7 @@ export function BrandexLogo({
   variant = 'logoFinal',
   primaryColor,
   accentColor = '#f4580b',
+  discColor = '#111111',
   onDark = false,
   className = '',
   size = 'md',
@@ -123,16 +130,18 @@ export function BrandexLogo({
   const rTextColor = getContrastText(accent);
 
   const heightMap = {
-    xs: 22,
-    sm: 30,
-    md: 40,
-    lg: 54,
-    xl: 68,
+    xs: 24,
+    sm: 32,
+    md: 42,
+    lg: 56,
+    xl: 70,
   };
   const h = heightMap[size];
 
-  // #17 ICON ONLY (circular b + accent dot emblem from logo-icon.png cell 17)
-  if (variant === 'logo17Icon' || variant === 'logo03' || variant === 'logo09') {
+  // Circular b(R) Badge Icon (exact uploaded circular emblem, theme-synced)
+  if (variant === 'logo17Icon' || variant === 'logo03') {
+    const badgeMark = accentColor || '#f5c400';
+    const badgeDisc = discColor || '#111111';
     return (
       <svg
         width={h}
@@ -141,33 +150,76 @@ export function BrandexLogo({
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className={className}
-        aria-label="Brandex Icon 17"
+        aria-label="Brandex Circular b(R) Icon"
       >
-        <circle
-          cx="50"
-          cy="50"
-          r="45"
-          fill={onDark ? '#18181f' : '#ffffff'}
-          stroke={primary}
-          strokeWidth="3.6"
-        />
-        {/* Stylized 'b' stem & cradling lower curve matching #17 in logo-icon.png */}
+        <circle cx="50" cy="50" r="48" fill={badgeDisc} stroke="#2a2a30" strokeWidth="1.2" />
+        <circle cx="50" cy="50" r="42" stroke={badgeMark} strokeWidth="2.7" fill="none" />
+        {/* Stylized 'b' stem with angled top-left serif */}
         <path
-          d="M31 23 L43 17 L43 60 C43 69 49 74 58 74 C64 74 69 71 72 67 C68 75 59 80 48 80 C36 80 31 72 31 61 Z"
-          fill={primary}
+          d="M30 30.5 C34.5 29.8 38.5 27.6 41.8 25 L41.8 70.2 C41.8 71.8 39.2 72.5 36.2 72.5 L36.2 33.2 L30 32 Z"
+          fill={badgeMark}
         />
-        <path
-          d="M41 44 C45 36 53 31 62 32 C68 33 72 36 74 40 C70 37 66 36 61 36 C52 36 45 41 42 49 Z"
-          fill={primary}
-        />
-        <circle cx="59" cy="54" r="13.5" fill={accent} />
+        {/* Bowl + cutout ring + inner circle + serif R */}
+        <circle cx="52.5" cy="55.5" r="17" fill={badgeMark} />
+        <circle cx="52.5" cy="55.5" r="12.8" fill={badgeDisc} />
+        <circle cx="52.5" cy="55.5" r="10.4" fill={badgeMark} />
+        <text
+          x="52.4"
+          y="61.2"
+          textAnchor="middle"
+          fill={badgeDisc}
+          fontFamily="Georgia, 'Times New Roman', serif"
+          fontSize="16"
+          fontWeight="500"
+        >
+          R
+        </text>
       </svg>
     );
   }
 
-  // #17 SYMBOL + WORDMARK (exact cell 17 from logo-icon.png: ring + b + accent dot + spaced serif "brandex")
+  // Rounded-Square App Icon variant (matching App_favicon_icon_in_yellow)
+  if (variant === 'logo09') {
+    const badgeMark = accentColor || '#f5c400';
+    const badgeDisc = discColor || '#111111';
+    return (
+      <svg
+        width={h}
+        height={h}
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={className}
+        aria-label="Brandex App Icon"
+      >
+        <rect x="4" y="4" width="92" height="92" rx="22" fill={badgeDisc} stroke="#2a2a30" strokeWidth="1.5" />
+        <path
+          d="M30 30.5 C34.5 29.8 38.5 27.6 41.8 25 L41.8 70.2 C41.8 71.8 39.2 72.5 36.2 72.5 L36.2 33.2 L30 32 Z"
+          fill={badgeMark}
+        />
+        <circle cx="52.5" cy="55.5" r="17" fill={badgeMark} />
+        <circle cx="52.5" cy="55.5" r="12.8" fill={badgeDisc} />
+        <circle cx="52.5" cy="55.5" r="10.4" fill={badgeMark} />
+        <text
+          x="52.4"
+          y="61.2"
+          textAnchor="middle"
+          fill={badgeDisc}
+          fontFamily="Georgia, 'Times New Roman', serif"
+          fontSize="16"
+          fontWeight="500"
+        >
+          R
+        </text>
+      </svg>
+    );
+  }
+
+  // Circular b(R) Emblem + "brandex" wordmark lockup
   if (variant === 'logo17' || variant === 'logo06') {
-    const lockupSize = h * 1.32;
+    const badgeMark = accentColor || '#f5c400';
+    const badgeDisc = discColor || '#111111';
+    const lockupSize = h * 1.25;
     return (
       <svg
         width={lockupSize}
@@ -176,33 +228,38 @@ export function BrandexLogo({
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className={className}
-        aria-label="Brandex Symbol + Wordmark 17"
+        aria-label="Brandex Circular Seal + Wordmark"
       >
-        <circle
-          cx="60"
-          cy="46"
-          r="39"
-          fill={onDark ? '#18181f' : '#ffffff'}
-          stroke={primary}
-          strokeWidth="3.2"
-        />
-        <path
-          d="M43 22 L54 17 L54 54 C54 62 59 67 67 67 C72 67 77 64 79 60 C76 68 68 72 58 72 C47 72 43 65 43 55 Z"
-          fill={primary}
-        />
-        <path
-          d="M52 40 C56 33 63 29 71 30 C76 31 79 33 81 37 C77 34 74 33 69 33 C62 33 56 38 53 45 Z"
-          fill={primary}
-        />
-        <circle cx="68" cy="49" r="11.5" fill={accent} />
+        <g transform="translate(10, 0) scale(0.92)">
+          <circle cx="54" cy="48" r="46" fill={badgeDisc} stroke="#2a2a30" strokeWidth="1.2" />
+          <circle cx="54" cy="48" r="40" stroke={badgeMark} strokeWidth="2.7" fill="none" />
+          <path
+            d="M34 28.5 C38.5 27.8 42.5 25.6 45.8 23 L45.8 68.2 C45.8 69.8 43.2 70.5 40.2 70.5 L40.2 31.2 L34 30 Z"
+            fill={badgeMark}
+          />
+          <circle cx="56.5" cy="53.5" r="17" fill={badgeMark} />
+          <circle cx="56.5" cy="53.5" r="12.8" fill={badgeDisc} />
+          <circle cx="56.5" cy="53.5" r="10.4" fill={badgeMark} />
+          <text
+            x="56.4"
+            y="59.2"
+            textAnchor="middle"
+            fill={badgeDisc}
+            fontFamily="Georgia, 'Times New Roman', serif"
+            fontSize="16"
+            fontWeight="500"
+          >
+            R
+          </text>
+        </g>
         <text
           x="60"
-          y="108"
+          y="112"
           textAnchor="middle"
           fill={onDark ? '#ffffff' : primary}
           fontFamily="Georgia, 'Times New Roman', serif"
-          fontSize="16"
-          fontWeight="500"
+          fontSize="15.5"
+          fontWeight="600"
           letterSpacing="3.4"
         >
           brandex

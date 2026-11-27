@@ -109,8 +109,8 @@ export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: Builty
               <BrandexLogo
                 variant="logo17Icon"
                 size="xs"
-                primaryColor={logoPrimary}
-                accentColor={logoAccent}
+                discColor={themeSettings?.uiDarkColor || '#111111'}
+                accentColor={uiAccent || '#f5c400'}
                 onDark
               />
               <span>Brandex Law Associate</span>

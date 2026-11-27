@@ -1,6 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
-  <circle cx="50" cy="50" r="45" fill="#ffffff" stroke="#290076" stroke-width="4" />
-  <path d="M31 23 L43 17 L43 60 C43 69 49 74 58 74 C64 74 69 71 72 67 C68 75 59 80 48 80 C36 80 31 72 31 61 Z" fill="#290076" />
-  <path d="M41 44 C45 36 53 31 62 32 C68 33 72 36 74 40 C70 37 66 36 61 36 C52 36 45 41 42 49 Z" fill="#290076" />
-  <circle cx="59" cy="54" r="13.5" fill="#f4580b" />
+  <circle cx="50" cy="50" r="48" fill="#111111" stroke="#26262b" stroke-width="1.2" />
+  <circle cx="50" cy="50" r="42" stroke="#f5c400" stroke-width="2.7" fill="none" />
+  <path d="M30 30.5 C34.5 29.8 38.5 27.6 41.8 25 L41.8 70.2 C41.8 71.8 39.2 72.5 36.2 72.5 L36.2 33.2 L30 32 Z" fill="#f5c400" />
+  <circle cx="52.5" cy="55.5" r="17" fill="#f5c400" />
+  <circle cx="52.5" cy="55.5" r="12.8" fill="#111111" />
+  <circle cx="52.5" cy="55.5" r="10.4" fill="#f5c400" />
+  <text x="52.4" y="61.2" text-anchor="middle" fill="#111111" font-family="Georgia, 'Times New Roman', serif" font-size="16" font-weight="500">R</text>
 </svg>

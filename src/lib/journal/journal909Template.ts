@@ -360,7 +360,7 @@ export function buildJournal909Html(
         </div>
         <div class="image-line"></div>
       </div>
-      <div class="image-area" contenteditable="true">${imageHtml}<div class="image-stamp">${buildLogo17IconSvgString(themePrimary, themeAccent, '#ffffff')}</div></div>
+      <div class="image-area" contenteditable="true">${imageHtml}<div class="image-stamp">${buildLogo17IconSvgString('#111111', universalSettings?.uiAccentColor || themeAccent, false)}</div></div>
       <div class="footer">
         <div class="note-bar">${safeNote}</div>
         <div class="brandex-row">

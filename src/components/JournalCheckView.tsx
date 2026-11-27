@@ -199,8 +199,8 @@ export function JournalCheckView({
           <BrandexLogo
             variant="logo17Icon"
             size="sm"
-            primaryColor={themeSettings?.docPrimaryColor}
-            accentColor={themeSettings?.docAccentColor}
+            discColor={themeSettings?.uiDarkColor || '#111111'}
+            accentColor={themeSettings?.uiAccentColor || '#f5c400'}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             JournalCheck Table
