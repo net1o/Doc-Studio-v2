@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Menu, Play, Volume2, VolumeX, X } from 'lucide-react';
 import { AppTab, UniversalSettings } from '../types/journal';
-import { BrandexLogo } from './BrandexLogo';
 
 interface BuiltyHeaderProps {
   activeTab: AppTab;
@@ -35,9 +34,7 @@ export function BuiltyHeader({
   themeSettings,
 }: BuiltyHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const logoPrimary = themeSettings?.docPrimaryColor || '#290076';
-  const logoAccent = themeSettings?.docAccentColor || '#f4580b';
+  const grayscaleFilter = themeSettings?.imageColorMode === 'grayscale' ? 'grayscale' : '';
 
   const navItems: { id: AppTab; label: string; shortcut: string; count: number | null }[] = [
     { id: 'analyzer', label: 'Dashboard', shortcut: 'Ctrl+1', count: watchlistCount },
@@ -53,17 +50,16 @@ export function BuiltyHeader({
   return (
     <header className="no-print sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e2e4ea]">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-3 xl:gap-5">
-        {/* Zone 1: Brandex Logo-Final Primary Branding */}
+        {/* Zone 1: Brandex Top Header Logo */}
         <button
           type="button"
           onClick={() => onSelectTab('analyzer')}
           className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
         >
-          <BrandexLogo
-            variant="logoFinal"
-            size="md"
-            primaryColor={logoPrimary}
-            accentColor={logoAccent}
+          <img
+            src="/assets/aistudio/image_49727114.png"
+            alt="Brandex Get Legal"
+            className={`h-[54px] w-auto object-contain select-none ${grayscaleFilter}`}
           />
           <span className="hidden sm:inline-block border-l border-[#e2e4ea] pl-2.5 text-[12px] font-extrabold tracking-tight text-[#111111]">
             Law Associate

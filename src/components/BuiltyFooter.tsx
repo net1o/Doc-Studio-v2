@@ -9,21 +9,19 @@ interface BuiltyFooterProps {
 }
 
 export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: BuiltyFooterProps) {
-  const logoPrimary = themeSettings?.docPrimaryColor || '#290076';
-  const logoAccent = themeSettings?.docAccentColor || '#f4580b';
   const uiAccent = themeSettings?.uiAccentColor || '#ffee00';
+  const grayscaleFilter = themeSettings?.imageColorMode === 'grayscale' ? 'grayscale' : '';
 
   return (
     <footer className="no-print mt-12">
-      {/* Consultation Strip with Logo-Final */}
+      {/* Consultation Strip */}
       <div className="bg-white border-t border-b border-[#e2e4ea]">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <BrandexLogo
-              variant="logoFinal"
-              size="sm"
-              primaryColor={logoPrimary}
-              accentColor={logoAccent}
+            <img
+              src="/assets/aistudio/image_49727114.png"
+              alt="Brandex Get Legal"
+              className={`h-[48px] w-auto object-contain select-none ${grayscaleFilter}`}
             />
             <div>
               <p className="text-sm font-extrabold text-[#111111]">Brandex Law Associate</p>
@@ -44,16 +42,14 @@ export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: Builty
         </div>
       </div>
 
-      {/* Main Corporate Footer with Logo-Final on Dark */}
+      {/* Main Corporate Footer */}
       <div className="bg-[#111111] text-white">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-9 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-3">
-            <BrandexLogo
-              variant="logoFinal"
-              size="md"
-              primaryColor={logoPrimary}
-              accentColor={logoAccent || uiAccent}
-              onDark
+            <img
+              src="/assets/aistudio/image_29830b0e.png"
+              alt="BRANDEX"
+              className={`h-[56px] w-auto object-contain select-none ${grayscaleFilter}`}
             />
             <p className="text-xs text-[#9c9ca6] leading-relaxed max-w-sm">
               Brandex Law Associate · Journal Monitor &amp; Case Records Workspace.
