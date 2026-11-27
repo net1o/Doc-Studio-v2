@@ -6,6 +6,7 @@ declare module 'virtual:firebase-config' {
     appId: string;
     apiKey: string;
     authDomain: string;
+    firestoreDatabaseId: string;
     storageBucket: string;
     messagingSenderId: string;
     oAuthClientId: string;

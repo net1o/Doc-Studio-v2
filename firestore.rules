@@ -1,0 +1,572 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all reads and writes by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Hardened Primitives
+    // -------------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function userRootExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) ||
+        existsAfter(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function isBoundedString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function isOptionalBoundedString(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptionalInt(data, key) {
+      return !(key in data) || data[key] is int;
+    }
+
+    function isStringListBounded(val, maxItems) {
+      return val is list &&
+        val.size() <= maxItems &&
+        (val.size() == 0 || val[0] is string);
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
+    // -------------------------------------------------------------------------
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'activeWorkspaceId', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'displayName', 'activeWorkspaceId', 'createdAt', 'updatedAt']) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        isValidId(data.uid) &&
+        isOptionalBoundedString(data, 'displayName', 160) &&
+        data.activeWorkspaceId is string &&
+        data.activeWorkspaceId.size() <= 64 &&
+        data.activeWorkspaceId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCaseSheetConfigMap(cfg) {
+      return cfg is map &&
+        cfg.keys().hasOnly([
+          'sheetUrlOrId', 'sheetName', 'keyCol', 'prefixCol', 'clientCodeCol',
+          'caseCol', 'clientCol', 'appNameCol', 'caseSeparator', 'lastSyncedAt'
+        ]) &&
+        isOptionalBoundedString(cfg, 'sheetUrlOrId', 400) &&
+        isOptionalBoundedString(cfg, 'sheetName', 128) &&
+        isOptionalInt(cfg, 'keyCol') &&
+        isOptionalInt(cfg, 'prefixCol') &&
+        isOptionalInt(cfg, 'clientCodeCol') &&
+        isOptionalInt(cfg, 'caseCol') &&
+        isOptionalInt(cfg, 'clientCol') &&
+        isOptionalInt(cfg, 'appNameCol') &&
+        isOptionalBoundedString(cfg, 'caseSeparator', 16) &&
+        isOptionalBoundedString(cfg, 'lastSyncedAt', 64);
+    }
+
+    function isValidPaperSizeMap(ps) {
+      return ps is map &&
+        ps.keys().hasOnly([
+          'preset', 'orientation', 'customWidth', 'customHeight', 'customUnit', 'autoAdjustPrint'
+        ]) &&
+        isOptionalBoundedString(ps, 'preset', 32) &&
+        isOptionalBoundedString(ps, 'orientation', 32) &&
+        (!('customWidth' in ps) || ps.customWidth is number) &&
+        (!('customHeight' in ps) || ps.customHeight is number) &&
+        isOptionalBoundedString(ps, 'customUnit', 16) &&
+        (!('autoAdjustPrint' in ps) || ps.autoAdjustPrint is bool);
+    }
+
+    function isValidUniversalSettingsMap(us) {
+      return us is map &&
+        us.keys().hasOnly([
+          'tablePageSize', 'enableInlineEdit', 'themePreset',
+          'docPrimaryColor', 'docSecondaryColor', 'docAccentColor',
+          'uiAccentColor', 'uiDarkColor', 'imageColorMode'
+        ]) &&
+        isOptionalInt(us, 'tablePageSize') &&
+        (!('enableInlineEdit' in us) || us.enableInlineEdit is bool) &&
+        isOptionalBoundedString(us, 'themePreset', 64) &&
+        isOptionalBoundedString(us, 'docPrimaryColor', 32) &&
+        isOptionalBoundedString(us, 'docSecondaryColor', 32) &&
+        isOptionalBoundedString(us, 'docAccentColor', 32) &&
+        isOptionalBoundedString(us, 'uiAccentColor', 32) &&
+        isOptionalBoundedString(us, 'uiDarkColor', 32) &&
+        isOptionalBoundedString(us, 'imageColorMode', 32);
+    }
+
+    function isValidWorkspaceConfig(data, userId, workspaceId) {
+      return data.keys().hasAll([
+          'ownerId', 'workspaceId', 'journalNo', 'journalDate', 'keywordMatchMode',
+          'serialPrefix', 'serialPad', 'keywords', 'tmNumbers', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'workspaceId', 'journalNo', 'journalDate', 'keywordMatchMode',
+          'serialPrefix', 'serialPad', 'keywords', 'tmNumbers',
+          'caseSheetConfig', 'paperSize', 'universalSettings', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId == userId &&
+        data.ownerId == request.auth.uid &&
+        data.workspaceId == workspaceId &&
+        isValidId(data.workspaceId) &&
+        isBoundedString(data.journalNo, 64) &&
+        isBoundedString(data.journalDate, 64) &&
+        (data.keywordMatchMode == 'word' || data.keywordMatchMode == 'contains') &&
+        isBoundedString(data.serialPrefix, 32) &&
+        data.serialPad is int && data.serialPad >= 1 && data.serialPad <= 6 &&
+        isStringListBounded(data.keywords, 10000) &&
+        isStringListBounded(data.tmNumbers, 20000) &&
+        (!('caseSheetConfig' in data) || isValidCaseSheetConfigMap(data.caseSheetConfig)) &&
+        (!('paperSize' in data) || isValidPaperSizeMap(data.paperSize)) &&
+        (!('universalSettings' in data) || isValidUniversalSettingsMap(data.universalSettings)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCaseRecord(data, userId, caseId) {
+      return data.keys().hasAll([
+          'ownerId', 'caseId', 'tmNumber', 'caseNo', 'clientName', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'caseId', 'recordId', 'tmNumber', 'caseNo', 'clientName',
+          'prefix', 'clientCode', 'rawCaseNo', 'applicationName', 'classNo',
+          'status', 'subStatus', 'caseType', 'agent', 'date', 'offNote', 'notes',
+          'tm5', 'tm6', 'tm11', 'tm16', 'tm56', 'journalNumber', 'journalDate',
+          'lastModified', 'imageUrl', 'sheetRowIndex', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId == userId &&
+        data.ownerId == request.auth.uid &&
+        data.caseId == caseId &&
+        isValidId(data.caseId) &&
+        isOptionalBoundedString(data, 'recordId', 64) &&
+        isBoundedString(data.tmNumber, 64) &&
+        isBoundedString(data.caseNo, 160) &&
+        isBoundedString(data.clientName, 240) &&
+        isOptionalBoundedString(data, 'prefix', 32) &&
+        isOptionalBoundedString(data, 'clientCode', 64) &&
+        isOptionalBoundedString(data, 'rawCaseNo', 128) &&
+        isOptionalBoundedString(data, 'applicationName', 300) &&
+        isOptionalBoundedString(data, 'classNo', 32) &&
+        isOptionalBoundedString(data, 'status', 64) &&
+        isOptionalBoundedString(data, 'subStatus', 128) &&
+        isOptionalBoundedString(data, 'caseType', 64) &&
+        isOptionalBoundedString(data, 'agent', 240) &&
+        isOptionalBoundedString(data, 'date', 64) &&
+        isOptionalBoundedString(data, 'offNote', 1000) &&
+        isOptionalBoundedString(data, 'notes', 2000) &&
+        isOptionalBoundedString(data, 'tm5', 16) &&
+        isOptionalBoundedString(data, 'tm6', 16) &&
+        isOptionalBoundedString(data, 'tm11', 16) &&
+        isOptionalBoundedString(data, 'tm16', 16) &&
+        isOptionalBoundedString(data, 'tm56', 16) &&
+        isOptionalBoundedString(data, 'journalNumber', 64) &&
+        isOptionalBoundedString(data, 'journalDate', 64) &&
+        isOptionalBoundedString(data, 'lastModified', 64) &&
+        isOptionalBoundedString(data, 'imageUrl', 1000) &&
+        isOptionalInt(data, 'sheetRowIndex') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidJournalCheckRecord(data, userId, rowId) {
+      return data.keys().hasAll([
+          'ownerId', 'rowId', 'applicationNo', 'title', 'classNo', 'applicant',
+          'agent', 'dateOfFiling', 'pageNo', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'rowId', 'applicationNo', 'title', 'classNo', 'applicant',
+          'agent', 'dateOfFiling', 'pageNo', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId == userId &&
+        data.ownerId == request.auth.uid &&
+        data.rowId == rowId &&
+        isValidId(data.rowId) &&
+        isBoundedString(data.applicationNo, 64) &&
+        isBoundedString(data.title, 500) &&
+        isBoundedString(data.classNo, 32) &&
+        isBoundedString(data.applicant, 1000) &&
+        isBoundedString(data.agent, 500) &&
+        isBoundedString(data.dateOfFiling, 64) &&
+        isBoundedString(data.pageNo, 32) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidReviewQueueRecord(data, userId, reviewId) {
+      return data.keys().hasAll([
+          'ownerId', 'reviewId', 'journalNo', 'journalDate', 'applicationNo', 'caseNo',
+          'title', 'classNo', 'applicant', 'agent', 'dateOfFiling', 'matchedTerm',
+          'matchType', 'decision', 'status', 'generatedDocId', 'generatedPdfReady',
+          'generatedAt', 'pageNo', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'reviewId', 'journalNo', 'journalDate', 'applicationNo', 'caseNo',
+          'title', 'classNo', 'applicant', 'agent', 'dateOfFiling', 'matchedTerm',
+          'matchType', 'decision', 'status', 'generatedDocId', 'generatedPdfReady',
+          'generatedAt', 'pageNo', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId == userId &&
+        data.ownerId == request.auth.uid &&
+        data.reviewId == reviewId &&
+        isValidId(data.reviewId) &&
+        isBoundedString(data.journalNo, 64) &&
+        isBoundedString(data.journalDate, 64) &&
+        isBoundedString(data.applicationNo, 64) &&
+        isBoundedString(data.caseNo, 240) &&
+        isBoundedString(data.title, 500) &&
+        isBoundedString(data.classNo, 32) &&
+        isBoundedString(data.applicant, 1000) &&
+        isBoundedString(data.agent, 500) &&
+        isBoundedString(data.dateOfFiling, 64) &&
+        isBoundedString(data.matchedTerm, 240) &&
+        (data.matchType == 'TM' || data.matchType == 'KEYWORD') &&
+        (
+          data.decision == 'PENDING REVIEW' ||
+          data.decision == 'ISSUE - OPPOSE' ||
+          data.decision == 'NO ISSUE - CLEAR'
+        ) &&
+        (
+          data.status == 'REVIEW' ||
+          data.status == 'MAILMERGE' ||
+          data.status == 'GENERATED'
+        ) &&
+        isBoundedString(data.generatedDocId, 128) &&
+        data.generatedPdfReady is bool &&
+        isBoundedString(data.generatedAt, 64) &&
+        isBoundedString(data.pageNo, 32) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRecordItem(data, userId, recordId) {
+      return data.keys().hasAll([
+          'ownerId', 'recordId', 'journalNo', 'journalDate', 'tmNo', 'caseNo',
+          'classNo', 'applicant', 'title', 'agent', 'applicationNo', 'dateOfFiling',
+          'matchedTerm', 'matchType', 'decision', 'remarks', 'docId', 'pdfReady',
+          'docCreatedAt', 'pageNo', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'recordId', 'journalNo', 'journalDate', 'tmNo', 'caseNo',
+          'classNo', 'applicant', 'title', 'agent', 'applicationNo', 'dateOfFiling',
+          'matchedTerm', 'matchType', 'decision', 'remarks', 'docId', 'pdfReady',
+          'docCreatedAt', 'pageNo', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId == userId &&
+        data.ownerId == request.auth.uid &&
+        data.recordId == recordId &&
+        isValidId(data.recordId) &&
+        isBoundedString(data.journalNo, 64) &&
+        isBoundedString(data.journalDate, 64) &&
+        isBoundedString(data.tmNo, 64) &&
+        isBoundedString(data.caseNo, 240) &&
+        isBoundedString(data.classNo, 32) &&
+        isBoundedString(data.applicant, 1000) &&
+        isBoundedString(data.title, 500) &&
+        isBoundedString(data.agent, 500) &&
+        isBoundedString(data.applicationNo, 64) &&
+        isBoundedString(data.dateOfFiling, 64) &&
+        isBoundedString(data.matchedTerm, 240) &&
+        (data.matchType == 'TM' || data.matchType == 'KEYWORD') &&
+        isBoundedString(data.decision, 120) &&
+        isBoundedString(data.remarks, 500) &&
+        isBoundedString(data.docId, 128) &&
+        data.pdfReady is bool &&
+        isBoundedString(data.docCreatedAt, 64) &&
+        isBoundedString(data.pageNo, 32) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGeneratedDocRecord(data, userId, docId) {
+      return data.keys().hasAll([
+          'ownerId', 'docId', 'serialNo', 'journalNo', 'journalDate', 'caseNo',
+          'applicationNo', 'title', 'classNo', 'pageNo', 'dateOfFiling', 'applicant',
+          'agent', 'publishingDetails', 'trademarkField', 'extraLabel', 'extraValue',
+          'imageDataUrl', 'pdfGenerated', 'docCreatedAt', 'docUpdatedAt',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'docId', 'reviewId', 'serialNo', 'journalNo', 'journalDate',
+          'caseNo', 'applicationNo', 'title', 'classNo', 'pageNo', 'dateOfFiling',
+          'applicant', 'agent', 'publishingDetails', 'trademarkField', 'extraLabel',
+          'extraValue', 'extraRows', 'noteText', 'imageColorMode', 'imageDataUrl',
+          'pdfGenerated', 'docCreatedAt', 'docUpdatedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId == userId &&
+        data.ownerId == request.auth.uid &&
+        data.docId == docId &&
+        isValidId(data.docId) &&
+        (!('reviewId' in data) || data.reviewId == null || isBoundedString(data.reviewId, 128)) &&
+        isBoundedString(data.serialNo, 64) &&
+        isBoundedString(data.journalNo, 64) &&
+        isBoundedString(data.journalDate, 64) &&
+        isBoundedString(data.caseNo, 240) &&
+        isBoundedString(data.applicationNo, 64) &&
+        isBoundedString(data.title, 500) &&
+        isBoundedString(data.classNo, 32) &&
+        isBoundedString(data.pageNo, 32) &&
+        isBoundedString(data.dateOfFiling, 64) &&
+        isBoundedString(data.applicant, 1000) &&
+        isBoundedString(data.agent, 500) &&
+        isBoundedString(data.publishingDetails, 2000) &&
+        isBoundedString(data.trademarkField, 300) &&
+        isBoundedString(data.extraLabel, 64) &&
+        isBoundedString(data.extraValue, 300) &&
+        (
+          !('extraRows' in data) ||
+          (
+            data.extraRows is list &&
+            data.extraRows.size() <= 25 &&
+            (data.extraRows.size() == 0 || data.extraRows[0] is map)
+          )
+        ) &&
+        isOptionalBoundedString(data, 'noteText', 1000) &&
+        (
+          !('imageColorMode' in data) ||
+          data.imageColorMode == 'original' ||
+          data.imageColorMode == 'theme' ||
+          data.imageColorMode == 'grayscale'
+        ) &&
+        isBoundedString(data.imageDataUrl, 400000) &&
+        data.pdfGenerated is bool &&
+        isBoundedString(data.docCreatedAt, 64) &&
+        isBoundedString(data.docUpdatedAt, 64) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Match Blocks (Owner-Scoped Zero-Trust)
+    // -------------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isVerifiedOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId) &&
+        isVerifiedOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) &&
+        isVerifiedOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'activeWorkspaceId', 'updatedAt'
+        ]);
+      allow delete: if false;
+
+      // Workspace Config
+      match /workspaces/{workspaceId} {
+        allow get: if isValidId(userId) && isValidId(workspaceId) && isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) &&
+          isValidId(workspaceId) &&
+          isVerifiedOwner(userId) &&
+          isValidWorkspaceConfig(incoming(), userId, workspaceId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userRootExists(userId);
+        allow update: if isValidId(userId) &&
+          isValidId(workspaceId) &&
+          isVerifiedOwner(userId) &&
+          isValidWorkspaceConfig(incoming(), userId, workspaceId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().workspaceId == existing().workspaceId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'journalNo', 'journalDate', 'keywordMatchMode', 'serialPrefix', 'serialPad',
+            'keywords', 'tmNumbers', 'caseSheetConfig', 'paperSize', 'universalSettings',
+            'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(workspaceId) && isVerifiedOwner(userId);
+      }
+
+      // Cases Database
+      match /cases/{caseId} {
+        allow get: if isValidId(userId) && isValidId(caseId) && isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) &&
+          isValidId(caseId) &&
+          isVerifiedOwner(userId) &&
+          isValidCaseRecord(incoming(), userId, caseId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userRootExists(userId);
+        allow update: if isValidId(userId) &&
+          isValidId(caseId) &&
+          isVerifiedOwner(userId) &&
+          isValidCaseRecord(incoming(), userId, caseId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().caseId == existing().caseId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'recordId', 'tmNumber', 'caseNo', 'clientName', 'prefix', 'clientCode',
+            'rawCaseNo', 'applicationName', 'classNo', 'status', 'subStatus', 'caseType',
+            'agent', 'date', 'offNote', 'notes', 'tm5', 'tm6', 'tm11', 'tm16', 'tm56',
+            'journalNumber', 'journalDate', 'lastModified', 'imageUrl', 'sheetRowIndex',
+            'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(caseId) && isVerifiedOwner(userId);
+      }
+
+      // JournalCheck Rows
+      match /journalRows/{rowId} {
+        allow get: if isValidId(userId) && isValidId(rowId) && isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) &&
+          isValidId(rowId) &&
+          isVerifiedOwner(userId) &&
+          isValidJournalCheckRecord(incoming(), userId, rowId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userRootExists(userId);
+        allow update: if isValidId(userId) &&
+          isValidId(rowId) &&
+          isVerifiedOwner(userId) &&
+          isValidJournalCheckRecord(incoming(), userId, rowId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().rowId == existing().rowId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'applicationNo', 'title', 'classNo', 'applicant', 'agent',
+            'dateOfFiling', 'pageNo', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(rowId) && isVerifiedOwner(userId);
+      }
+
+      // Review Queue Rows (with terminal generatedDocId lock once GENERATED)
+      match /reviewRows/{reviewId} {
+        allow get: if isValidId(userId) && isValidId(reviewId) && isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) &&
+          isValidId(reviewId) &&
+          isVerifiedOwner(userId) &&
+          isValidReviewQueueRecord(incoming(), userId, reviewId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userRootExists(userId);
+        allow update: if isValidId(userId) &&
+          isValidId(reviewId) &&
+          isVerifiedOwner(userId) &&
+          isValidReviewQueueRecord(incoming(), userId, reviewId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().reviewId == existing().reviewId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            // Action: Mark PDF Ready or update case/decision after doc link (locks status & generatedDocId)
+            (
+              existing().status == 'GENERATED' &&
+              existing().generatedDocId != '' &&
+              incoming().status == 'GENERATED' &&
+              incoming().generatedDocId == existing().generatedDocId &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'generatedPdfReady', 'caseNo', 'decision', 'updatedAt'
+              ])
+            ) ||
+            // Action: Review/Mailmerge/Generate edit prior to linking generatedDocId
+            (
+              (existing().status != 'GENERATED' || existing().generatedDocId == '') &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'journalNo', 'journalDate', 'applicationNo', 'caseNo', 'title', 'classNo',
+                'applicant', 'agent', 'dateOfFiling', 'matchedTerm', 'matchType',
+                'decision', 'status', 'generatedDocId', 'generatedPdfReady',
+                'generatedAt', 'pageNo', 'updatedAt'
+              ])
+            )
+          );
+        allow delete: if isValidId(userId) && isValidId(reviewId) && isVerifiedOwner(userId);
+      }
+
+      // Action Log Records
+      match /records/{recordId} {
+        allow get: if isValidId(userId) && isValidId(recordId) && isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) &&
+          isValidId(recordId) &&
+          isVerifiedOwner(userId) &&
+          isValidRecordItem(incoming(), userId, recordId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userRootExists(userId);
+        allow update: if isValidId(userId) &&
+          isValidId(recordId) &&
+          isVerifiedOwner(userId) &&
+          isValidRecordItem(incoming(), userId, recordId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().recordId == existing().recordId &&
+          incoming().docId == existing().docId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'journalNo', 'journalDate', 'tmNo', 'caseNo', 'classNo', 'applicant',
+            'title', 'agent', 'applicationNo', 'dateOfFiling', 'matchedTerm',
+            'matchType', 'decision', 'remarks', 'pdfReady', 'pageNo', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(recordId) && isVerifiedOwner(userId);
+      }
+
+      // Generated Publication Docs
+      match /generatedDocs/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) &&
+          isValidId(docId) &&
+          isVerifiedOwner(userId) &&
+          isValidGeneratedDocRecord(incoming(), userId, docId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          userRootExists(userId);
+        allow update: if isValidId(userId) &&
+          isValidId(docId) &&
+          isVerifiedOwner(userId) &&
+          isValidGeneratedDocRecord(incoming(), userId, docId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().docId == existing().docId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'reviewId', 'serialNo', 'journalNo', 'journalDate', 'caseNo',
+            'applicationNo', 'title', 'classNo', 'pageNo', 'dateOfFiling',
+            'applicant', 'agent', 'publishingDetails', 'trademarkField',
+            'extraLabel', 'extraValue', 'extraRows', 'noteText', 'imageColorMode',
+            'imageDataUrl', 'pdfGenerated', 'docUpdatedAt', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(docId) && isVerifiedOwner(userId);
+      }
+    }
+  }
+}

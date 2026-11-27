@@ -26,6 +26,8 @@ export default defineConfig(({mode}) => {
       appId: env.VITE_FIREBASE_APP_ID || fileCfg.appId || '',
       apiKey: env.VITE_FIREBASE_API_KEY || fileCfg.apiKey || '',
       authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || fileCfg.authDomain || '',
+      firestoreDatabaseId:
+        env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || fileCfg.firestoreDatabaseId || '(default)',
       storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || fileCfg.storageBucket || '',
       messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || fileCfg.messagingSenderId || '',
       oAuthClientId: env.VITE_FIREBASE_OAUTH_CLIENT_ID || fileCfg.oAuthClientId || '',

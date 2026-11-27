@@ -1,14 +1,11 @@
-import { getApps, initializeApp } from 'firebase/app';
 import {
-  type Auth,
-  getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
   signOut,
   type User,
 } from 'firebase/auth';
-import firebaseConfig from 'virtual:firebase-config';
+import { auth } from '../firebase/firebaseApp';
 import { CaseEntry } from '../../types/journal';
 import { CaseLookupImportOptions, exportRowsToCsv, parseCaseLookupInput } from '../journal/engine';
 
@@ -19,14 +16,6 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/spreadsheets.readonly',
 ];
-
-const hasFirebaseConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
-const app = hasFirebaseConfig
-  ? getApps().length > 0
-    ? getApps()[0]
-    : initializeApp(firebaseConfig)
-  : null;
-const auth: Auth | null = app ? getAuth(app) : null;
 
 // Strictly in-memory OAuth access token cache (never persisted to localStorage/sessionStorage)
 let cachedAccessToken: string | null = null;

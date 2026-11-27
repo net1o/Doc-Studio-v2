@@ -1,0 +1,721 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private authenticated workspace owner record (no raw PII stored).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128,
+          "description": "Firebase Auth UID matching the document path userId."
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Optional display label for the workspace owner."
+        },
+        "activeWorkspaceId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 64,
+          "description": "Identifier of the active workspace configuration."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp."
+        }
+      },
+      "required": ["uid", "activeWorkspaceId", "createdAt", "updatedAt"]
+    },
+    "WorkspaceConfig": {
+      "title": "WorkspaceConfig",
+      "description": "Journal monitoring configuration, watchlists, sheet mapping, paper size, and theme settings.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 64
+        },
+        "journalNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "journalDate": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "keywordMatchMode": {
+          "type": "string",
+          "enum": ["word", "contains"]
+        },
+        "serialPrefix": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "serialPad": {
+          "type": "integer"
+        },
+        "keywords": {
+          "type": "array",
+          "description": "Watchlist keyword terms (bounded to 10000 items)."
+        },
+        "tmNumbers": {
+          "type": "array",
+          "description": "Watchlist TM application numbers (bounded to 20000 items)."
+        },
+        "caseSheetConfig": {
+          "type": "object"
+        },
+        "paperSize": {
+          "type": "object"
+        },
+        "universalSettings": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "workspaceId",
+        "journalNo",
+        "journalDate",
+        "keywordMatchMode",
+        "serialPrefix",
+        "serialPad",
+        "keywords",
+        "tmNumbers",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CaseRecord": {
+      "title": "CaseRecord",
+      "description": "Trademark case database entry synced with workspace and optional Google Sheet.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "caseId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "recordId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "tmNumber": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "caseNo": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "clientName": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "prefix": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "clientCode": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "rawCaseNo": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "applicationName": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "classNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "subStatus": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "caseType": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "agent": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "offNote": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "tm5": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "tm6": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "tm11": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "tm16": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "tm56": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "journalNumber": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "journalDate": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "lastModified": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "sheetRowIndex": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "caseId",
+        "tmNumber",
+        "caseNo",
+        "clientName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "JournalCheckRecord": {
+      "title": "JournalCheckRecord",
+      "description": "Parsed Trade Marks Journal entry imported via CSV, Wizard, or FolioParse.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "rowId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "applicationNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "classNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "applicant": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "agent": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "dateOfFiling": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "pageNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "rowId",
+        "applicationNo",
+        "title",
+        "classNo",
+        "applicant",
+        "agent",
+        "dateOfFiling",
+        "pageNo",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ReviewQueueRecord": {
+      "title": "ReviewQueueRecord",
+      "description": "Matched trademark journal entry awaiting review, mailmerge, or document generation.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "reviewId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "journalNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "journalDate": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "applicationNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "caseNo": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "classNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "applicant": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "agent": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "dateOfFiling": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "matchedTerm": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "matchType": {
+          "type": "string",
+          "enum": ["TM", "KEYWORD"]
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["PENDING REVIEW", "ISSUE - OPPOSE", "NO ISSUE - CLEAR"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["REVIEW", "MAILMERGE", "GENERATED"]
+        },
+        "generatedDocId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "generatedPdfReady": {
+          "type": "boolean"
+        },
+        "generatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "pageNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "reviewId",
+        "journalNo",
+        "journalDate",
+        "applicationNo",
+        "caseNo",
+        "title",
+        "classNo",
+        "applicant",
+        "agent",
+        "dateOfFiling",
+        "matchedTerm",
+        "matchType",
+        "decision",
+        "status",
+        "generatedDocId",
+        "generatedPdfReady",
+        "generatedAt",
+        "pageNo",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RecordItem": {
+      "title": "RecordItem",
+      "description": "Logged action record generated from Journal 909 publication documents.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "recordId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "journalNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "journalDate": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "tmNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "caseNo": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "classNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "applicant": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "agent": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "applicationNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "dateOfFiling": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "matchedTerm": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "matchType": {
+          "type": "string",
+          "enum": ["TM", "KEYWORD"]
+        },
+        "decision": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "remarks": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "docId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "pdfReady": {
+          "type": "boolean"
+        },
+        "docCreatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "pageNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "recordId",
+        "journalNo",
+        "journalDate",
+        "tmNo",
+        "caseNo",
+        "classNo",
+        "applicant",
+        "title",
+        "agent",
+        "applicationNo",
+        "dateOfFiling",
+        "matchedTerm",
+        "matchType",
+        "decision",
+        "remarks",
+        "docId",
+        "pdfReady",
+        "docCreatedAt",
+        "pageNo",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GeneratedDocRecord": {
+      "title": "GeneratedDocRecord",
+      "description": "Editable Journal 909 publication document snapshot for print and PDF generation.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "docId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "reviewId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "serialNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "journalNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "journalDate": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "caseNo": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "applicationNo": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "classNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "pageNo": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "dateOfFiling": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "applicant": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "agent": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "publishingDetails": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "trademarkField": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "extraLabel": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "extraValue": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "extraRows": {
+          "type": "array"
+        },
+        "noteText": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "imageColorMode": {
+          "type": "string",
+          "enum": ["original", "theme", "grayscale"]
+        },
+        "imageDataUrl": {
+          "type": "string",
+          "maxLength": 400000
+        },
+        "pdfGenerated": {
+          "type": "boolean"
+        },
+        "docCreatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "docUpdatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "docId",
+        "serialNo",
+        "journalNo",
+        "journalDate",
+        "caseNo",
+        "applicationNo",
+        "title",
+        "classNo",
+        "pageNo",
+        "dateOfFiling",
+        "applicant",
+        "agent",
+        "publishingDetails",
+        "trademarkField",
+        "extraLabel",
+        "extraValue",
+        "imageDataUrl",
+        "pdfGenerated",
+        "docCreatedAt",
+        "docUpdatedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user's private workspace root document."
+    },
+    "/users/{userId}/workspaces/{workspaceId}": {
+      "schema": { "$ref": "#/entities/WorkspaceConfig" },
+      "description": "User's journal configuration, watchlists, and UI/paper settings."
+    },
+    "/users/{userId}/cases/{caseId}": {
+      "schema": { "$ref": "#/entities/CaseRecord" },
+      "description": "User's trademark case records."
+    },
+    "/users/{userId}/journalRows/{rowId}": {
+      "schema": { "$ref": "#/entities/JournalCheckRecord" },
+      "description": "User's imported Trade Marks Journal entries."
+    },
+    "/users/{userId}/reviewRows/{reviewId}": {
+      "schema": { "$ref": "#/entities/ReviewQueueRecord" },
+      "description": "User's matched trademark review queue items."
+    },
+    "/users/{userId}/records/{recordId}": {
+      "schema": { "$ref": "#/entities/RecordItem" },
+      "description": "User's generated document log records."
+    },
+    "/users/{userId}/generatedDocs/{docId}": {
+      "schema": { "$ref": "#/entities/GeneratedDocRecord" },
+      "description": "User's Journal 909 document snapshots."
+    }
+  }
+}

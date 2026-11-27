@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { CalendarClock, FileUp, Play, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, FileSearch, FileUp, Play, Plus, Trash2 } from 'lucide-react';
 import { JournalCheckRow, UniversalSettings } from '../types/journal';
 import { BrandexButtonIcon } from './BrandexButtonIcon';
 import { deduplicateJournalCheckRows } from '../lib/journal/engine';
 import { JournalImportWizard } from './JournalImportWizard';
+import { FolioParsePanel } from './FolioParsePanel';
 import {
   DeleteAllConfirmModal,
   TableControlsBar,
@@ -43,7 +44,7 @@ export function JournalCheckView({
   onNotify,
 }: JournalCheckViewProps) {
   const safePageSize = Math.max(1, pageSize || 50);
-  const [showWizard, setShowWizard] = useState(false);
+  const [activePanel, setActivePanel] = useState<'none' | 'wizard' | 'folioparse'>('none');
   const [searchText, setSearchText] = useState('');
   const [classFilter, setClassFilter] = useState('ALL');
   const [sortField, setSortField] = useState<JournalSortField>('applicationNo');
@@ -154,7 +155,7 @@ export function JournalCheckView({
       );
     }
     setCurrentPage(1);
-    setShowWizard(false);
+    setActivePanel('none');
   };
 
   const renderEditableCell = (
@@ -207,15 +208,32 @@ export function JournalCheckView({
 
           <button
             type="button"
-            onClick={() => setShowWizard((prev) => !prev)}
+            onClick={() =>
+              setActivePanel((prev) => (prev === 'folioparse' ? 'none' : 'folioparse'))
+            }
             className={`h-[38px] px-3.5 border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-              showWizard
+              activePanel === 'folioparse'
+                ? 'border-[#111111] bg-[#111111] text-[#ffee00]'
+                : 'border-[#111111] bg-[#fffef0] text-[#111111] hover:bg-[#ffee00]'
+            }`}
+          >
+            <FileSearch className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{activePanel === 'folioparse' ? 'Hide FolioParse' : 'FolioParse PDF / OCR'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setActivePanel((prev) => (prev === 'wizard' ? 'none' : 'wizard'))
+            }
+            className={`h-[38px] px-3.5 border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+              activePanel === 'wizard'
                 ? 'border-[#111111] bg-[#ffee00] text-[#111111]'
                 : 'border-[#111111] bg-white text-[#111111] hover:bg-[#fffef0]'
             }`}
           >
             <FileUp className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>{showWizard ? 'Hide Import Wizard' : 'Import Wizard'}</span>
+            <span>{activePanel === 'wizard' ? 'Hide Import Wizard' : 'Import Wizard'}</span>
           </button>
 
           <button
@@ -246,12 +264,21 @@ export function JournalCheckView({
         </div>
       </div>
 
-      {showWizard && (
+      {activePanel === 'folioparse' && (
+        <FolioParsePanel
+          existingRows={rows}
+          pageSize={safePageSize}
+          onImport={handleWizardImport}
+          onClose={() => setActivePanel('none')}
+        />
+      )}
+
+      {activePanel === 'wizard' && (
         <JournalImportWizard
           existingRows={rows}
           pageSize={safePageSize}
           onImport={handleWizardImport}
-          onClose={() => setShowWizard(false)}
+          onClose={() => setActivePanel('none')}
         />
       )}
 

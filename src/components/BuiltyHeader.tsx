@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Menu, Play, Volume2, VolumeX, X } from 'lucide-react';
+import { Cloud, CloudOff, Menu, Play, RefreshCw, Volume2, VolumeX, X } from 'lucide-react';
 import { AppTab, UniversalSettings } from '../types/journal';
 import { BrandexButtonIcon, BrandexButtonIconName } from './BrandexButtonIcon';
+import { useFirebase } from './FirebaseProvider';
 
 interface BuiltyHeaderProps {
   activeTab: AppTab;
@@ -35,6 +36,7 @@ export function BuiltyHeader({
   themeSettings,
 }: BuiltyHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, cloudStatus, signIn, hasConfig } = useFirebase();
   const grayscaleFilter = themeSettings?.imageColorMode === 'grayscale' ? 'grayscale' : '';
 
   const navItems: {
@@ -163,6 +165,49 @@ export function BuiltyHeader({
               </button>
             );
           })}
+
+          {hasConfig && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) {
+                  void signIn();
+                } else {
+                  onSelectTab('settings');
+                }
+              }}
+              title={
+                user
+                  ? `Firebase Cloud: ${cloudStatus} (${user.email || user.displayName || 'Signed in'})`
+                  : 'Sign in with Google to sync workspace to Firebase Firestore'
+              }
+              aria-label={user ? `Firebase Cloud: ${cloudStatus}` : 'Sign in with Google'}
+              className={`h-[38px] px-2.5 border inline-flex items-center gap-1.5 text-[11px] font-bold transition-colors whitespace-nowrap ${
+                cloudStatus === 'error' || cloudStatus === 'quota_exceeded'
+                  ? 'border-red-500 bg-red-50 text-red-800'
+                  : user
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+                  : 'border-[#cbd0da] bg-[#f8f9fb] text-[#111111] hover:border-[#111111] hover:bg-[#fffef0]'
+              }`}
+            >
+              {cloudStatus === 'syncing' || cloudStatus === 'connecting' ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden="true" />
+              ) : user ? (
+                <Cloud className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              ) : (
+                <CloudOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              )}
+              <span className="hidden xl:inline">
+                {user
+                  ? cloudStatus === 'syncing'
+                    ? 'Syncing'
+                    : cloudStatus === 'error' || cloudStatus === 'quota_exceeded'
+                    ? 'Sync Alert'
+                    : 'Cloud On'
+                  : 'Sign In'}
+              </span>
+            </button>
+          )}
 
           <button
             type="button"

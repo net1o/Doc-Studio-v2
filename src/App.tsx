@@ -45,6 +45,16 @@ import { SettingsView } from './components/SettingsView';
 import { BackupToolsView } from './components/BackupToolsView';
 import { BuiltyFooter } from './components/BuiltyFooter';
 import { buildLogo17IconSvgString } from './components/BrandexLogo';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { FirebaseProvider, useFirebase } from './components/FirebaseProvider';
+
+function AppSyncBridge({ state }: { state: JournalMonitorState }) {
+  const { notifyLocalStateChanged } = useFirebase();
+  useEffect(() => {
+    notifyLocalStateChanged(state);
+  }, [state, notifyLocalStateChanged]);
+  return null;
+}
 
 function formatSerial(prefix: string, pad: number, indexOneBased: number): string {
   const num = String(indexOneBased).padStart(Math.max(1, pad), '0');
@@ -126,6 +136,8 @@ export default function App() {
   const [toast, setToast] = useState<{ kind: 'info' | 'error'; message: string } | null>(null);
   const [sfxEnabled, setSfxEnabledState] = useState<boolean>(() => isSfxEnabled());
   const toastTimerRef = useRef<number | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const universalSettings: UniversalSettings = useMemo(
     () => ({
@@ -629,7 +641,21 @@ export default function App() {
   } as CSSProperties;
 
   return (
-    <div style={themeVars} className="min-h-screen bg-[#f6f7f9] text-[#111111] flex flex-col">
+    <ErrorBoundary>
+      <FirebaseProvider
+        getLatestState={() => stateRef.current}
+        onApplyRemoteState={(remote) => {
+          setState(remote);
+          setSelectedDocId((prev) =>
+            prev && remote.generatedDocs.some((d) => d.id === prev)
+              ? prev
+              : remote.generatedDocs[0]?.id || null
+          );
+        }}
+        onToast={(msg, kind) => showToast(msg, kind)}
+      >
+        <AppSyncBridge state={state} />
+        <div style={themeVars} className="min-h-screen bg-[#f6f7f9] text-[#111111] flex flex-col">
       <BuiltyHeader
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -785,6 +811,7 @@ export default function App() {
         {activeTab === 'settings' && (
           <SettingsView
             config={state.config}
+            fullState={state}
             onUpdateConfig={handleUpdateConfig}
             onResetSampleData={handleResetSampleData}
             onNotify={(msg: string) => showToast(msg)}
@@ -809,6 +836,8 @@ export default function App() {
         onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         themeSettings={universalSettings}
       />
-    </div>
+        </div>
+      </FirebaseProvider>
+    </ErrorBoundary>
   );
 }
