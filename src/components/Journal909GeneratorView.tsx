@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   CheckCircle2,
-  Database,
   Download,
   Edit3,
   Eye,
   FileCode2,
-  FileSpreadsheet,
-  FileText,
   ImagePlus,
-  LayoutDashboard,
-  ListChecks,
   Palette,
   Plus,
   Printer,
@@ -37,6 +32,7 @@ import {
 } from '../lib/journal/journal909Template';
 import { triggerFileDownload } from '../lib/journal/engine';
 import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon, type BrandexButtonIconName } from './BrandexButtonIcon';
 
 interface Journal909GeneratorViewProps {
   docs: GeneratedJournalDoc[];
@@ -106,11 +102,11 @@ export function Journal909GeneratorView({
     return buildJournal909Html(activeDoc, activePaper, universalSettings);
   }, [pdfPreviewOpen, activeDoc, activePaper, universalSettings]);
 
-  const sidebarNavItems: { id: AppTab; label: string; icon: typeof LayoutDashboard }[] = [
-    { id: 'analyzer', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'database', label: 'Database', icon: Database },
-    { id: 'review', label: 'Review', icon: ListChecks },
-    { id: 'generator', label: 'Generator', icon: FileText },
+  const sidebarNavItems: { id: AppTab; label: string; brandIcon: BrandexButtonIconName }[] = [
+    { id: 'analyzer', label: 'Dashboard', brandIcon: 'dashboard' },
+    { id: 'database', label: 'Database', brandIcon: 'database' },
+    { id: 'review', label: 'Review', brandIcon: 'review' },
+    { id: 'generator', label: 'Generator', brandIcon: 'generator' },
   ];
 
   const updatePaper = (patch: Partial<PaperSizeConfig>) => {
@@ -234,12 +230,10 @@ export function Journal909GeneratorView({
       <aside className="no-print xl:col-span-4 bg-white border border-[#e2e4ea] p-5 space-y-5">
         <div className="flex items-center justify-between gap-2 border-b border-[#eceef2] pb-3">
           <div className="flex items-center gap-2.5">
-            <BrandexLogo
-              variant="logo17Icon"
-              size="sm"
-              discColor={universalSettings?.uiDarkColor || '#111111'}
-              accentColor={universalSettings?.uiAccentColor || '#f5c400'}
-              className="shrink-0"
+            <BrandexButtonIcon
+              name="generator"
+              size={32}
+              colorMode={universalSettings?.imageColorMode}
             />
             <div>
               <h2 className="text-base font-extrabold text-[#111111]">
@@ -274,7 +268,6 @@ export function Journal909GeneratorView({
         <div className="bg-[#f8f9fb] border border-[#e2e4ea] p-3 space-y-3">
           <nav aria-label="Sidebar quick navigation" className="grid grid-cols-2 gap-1.5">
             {sidebarNavItems.map((nav) => {
-              const Icon = nav.icon;
               const isActive = activeTab === nav.id;
               return (
                 <button
@@ -290,7 +283,11 @@ export function Journal909GeneratorView({
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                    <BrandexButtonIcon
+                      name={nav.brandIcon}
+                      size={18}
+                      colorMode={universalSettings?.imageColorMode}
+                    />
                     <span>{nav.label}</span>
                   </span>
                 </button>
@@ -313,7 +310,11 @@ export function Journal909GeneratorView({
               onClick={onExportReport}
               className="h-[34px] px-2.5 border border-[#cbd0da] bg-white hover:border-[#111111] hover:bg-[#fffef0] text-[11.5px] font-bold text-[#111111] inline-flex items-center justify-center gap-1.5"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden="true" />
+              <BrandexButtonIcon
+                name="records"
+                size={18}
+                colorMode={universalSettings?.imageColorMode}
+              />
               <span>Export Report</span>
             </button>
           </div>
@@ -471,7 +472,11 @@ export function Journal909GeneratorView({
             >
               <span className="truncate">Print / PDF ({resolvedDims.label})</span>
               <span className="builty-btn-icon-tab w-7 h-7 shrink-0">
-                <Printer className="w-3.5 h-3.5" aria-hidden="true" />
+                <BrandexButtonIcon
+                  name="generator"
+                  size={20}
+                  colorMode={universalSettings?.imageColorMode}
+                />
               </span>
             </button>
 

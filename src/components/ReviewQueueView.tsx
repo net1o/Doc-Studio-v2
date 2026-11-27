@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CheckSquare, CopyCheck, FilePlus2, FileText } from 'lucide-react';
 import { ReviewDecision, ReviewRow, ReviewStatus, UniversalSettings } from '../types/journal';
-import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 import {
   DeleteAllConfirmModal,
   TableControlsBar,
@@ -170,11 +170,10 @@ export function ReviewQueueView({
     <div className="space-y-5">
       <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
-          <BrandexLogo
-            variant="logo17Icon"
-            size="sm"
-            discColor={themeSettings?.uiDarkColor || '#111111'}
-            accentColor={themeSettings?.uiAccentColor || '#f5c400'}
+          <BrandexButtonIcon
+            name="review"
+            size={34}
+            colorMode={themeSettings?.imageColorMode}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">Review Queue</h2>
           <span className="bg-[#ffee00] text-[#111111] px-2.5 py-0.5 text-xs font-extrabold tabular-nums">
@@ -196,8 +195,13 @@ export function ReviewQueueView({
             type="button"
             onClick={onGenerateDocsFromMailmerge}
             disabled={mailmergeReadyCount === 0}
-            className="builty-btn h-[38px] pl-4 pr-2 gap-2 text-xs whitespace-nowrap"
+            className="builty-btn h-[38px] pl-3 pr-2 gap-2 text-xs whitespace-nowrap"
           >
+            <BrandexButtonIcon
+              name="generator"
+              size={20}
+              colorMode={themeSettings?.imageColorMode}
+            />
             <span>Generate Docs ({mailmergeReadyCount})</span>
             <span className="builty-btn-icon-tab w-6 h-6">
               <FilePlus2 className="w-3.5 h-3.5" aria-hidden="true" />

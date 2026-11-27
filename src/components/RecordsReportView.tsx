@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FileText } from 'lucide-react';
 import { JournalStats, RecordRow, UniversalSettings } from '../types/journal';
-import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 import {
   DeleteAllConfirmModal,
   TableControlsBar,
@@ -186,11 +186,10 @@ export function RecordsReportView({
       {/* Summary Section */}
       <section className="space-y-4" aria-label="Monitoring report">
         <div className="flex flex-wrap items-center gap-2.5">
-          <BrandexLogo
-            variant="logo17Icon"
-            size="sm"
-            discColor={themeSettings?.uiDarkColor || '#111111'}
-            accentColor={themeSettings?.uiAccentColor || '#f5c400'}
+          <BrandexButtonIcon
+            name="records"
+            size={34}
+            colorMode={themeSettings?.imageColorMode}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Monitoring Report

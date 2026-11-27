@@ -1,6 +1,7 @@
 import { ArrowRight, Home } from 'lucide-react';
 import { AppTab, UniversalSettings } from '../types/journal';
 import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 
 interface BuiltyHeroBannerProps {
   journalNo: string;
@@ -28,9 +29,6 @@ export function BuiltyHeroBanner({
   onOpenGenerator,
   themeSettings,
 }: BuiltyHeroBannerProps) {
-  const logoPrimary = themeSettings?.docPrimaryColor || '#290076';
-  const logoAccent = themeSettings?.docAccentColor || '#f4580b';
-
   return (
     <section
       aria-label="Workspace overview"
@@ -71,8 +69,13 @@ export function BuiltyHeroBanner({
           <button
             type="button"
             onClick={onOpenGenerator}
-            className="builty-btn self-start md:self-auto h-[40px] pl-4 pr-2.5 gap-2.5 text-xs tracking-wide whitespace-nowrap shrink-0"
+            className="builty-btn self-start md:self-auto h-[40px] pl-3 pr-2.5 gap-2 text-xs tracking-wide whitespace-nowrap shrink-0"
           >
+            <BrandexButtonIcon
+              name="generator"
+              size={22}
+              colorMode={themeSettings?.imageColorMode}
+            />
             <span>Open Document</span>
             <span className="builty-btn-icon-tab w-7 h-6">
               <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />

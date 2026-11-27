@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Database, Palette, RotateCcw, Settings2, ShieldCheck, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Database, Download, Palette, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import {
   CaseSheetConfig,
   DocumentThemePreset,
@@ -16,7 +16,9 @@ import {
 } from '../lib/journal/watchlistSeed';
 import { DEFAULT_UNIVERSAL_SETTINGS } from '../lib/journal/store';
 import { formatCompositeCaseNo } from '../lib/journal/engine';
+import { BRANDING_ASSETS, BrandingCategory } from '../lib/branding/brandingAssets';
 import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 
 interface SettingsViewProps {
   config: JournalConfig;
@@ -87,6 +89,7 @@ export function SettingsView({
   onOpenDatabase,
 }: SettingsViewProps) {
   const journalNoInputRef = useRef<HTMLInputElement>(null);
+  const [assetCategory, setAssetCategory] = useState<'all' | BrandingCategory>('all');
 
   const universal: UniversalSettings = {
     ...DEFAULT_UNIVERSAL_SETTINGS,
@@ -161,16 +164,38 @@ export function SettingsView({
 
   const sepPreview = formatCompositeCaseNo('A', '32', '4', sheetCfg.caseSeparator || '-');
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<'all' | BrandingCategory, number> = {
+      all: BRANDING_ASSETS.length,
+      logos: 0,
+      favicons: 0,
+      icons: 0,
+      buttons: 0,
+      cards: 0,
+    };
+    for (const asset of BRANDING_ASSETS) {
+      counts[asset.category] += 1;
+    }
+    return counts;
+  }, []);
+
+  const visibleBrandingAssets = useMemo(
+    () =>
+      assetCategory === 'all'
+        ? BRANDING_ASSETS
+        : BRANDING_ASSETS.filter((item) => item.category === assetCategory),
+    [assetCategory]
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white border border-[#e2e4ea] p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <BrandexLogo
-            variant="logo17Icon"
-            size="sm"
-            discColor={universal.uiDarkColor || '#111111'}
-            accentColor={universal.uiAccentColor || '#f5c400'}
+          <BrandexButtonIcon
+            name="settings"
+            size={34}
+            colorMode={universal.imageColorMode}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Workspace &amp; Universal Settings
@@ -364,9 +389,12 @@ export function SettingsView({
         <section className="bg-white border border-[#e2e4ea] p-6 space-y-5">
           <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
             <div className="flex items-center gap-2.5">
-              <span className="w-7 h-7 bg-[#ffee00] text-[#111111] flex items-center justify-center">
-                <Settings2 className="w-4 h-4" aria-hidden="true" />
-              </span>
+              <BrandexButtonIcon
+                name="journalScan"
+                variant="square"
+                size={30}
+                colorMode={universal.imageColorMode}
+              />
               <h3 className="text-base font-extrabold text-[#111111]">
                 Journal &amp; Scan Settings
               </h3>
@@ -479,9 +507,12 @@ export function SettingsView({
         <section className="bg-white border border-[#e2e4ea] p-6 space-y-5">
           <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
             <div className="flex items-center gap-2.5">
-              <span className="w-7 h-7 bg-[#ffee00] text-[#111111] flex items-center justify-center">
-                <Database className="w-4 h-4" aria-hidden="true" />
-              </span>
+              <BrandexButtonIcon
+                name="databaseMapping"
+                variant="square"
+                size={30}
+                colorMode={universal.imageColorMode}
+              />
               <h3 className="text-base font-extrabold text-[#111111]">Database Mapping</h3>
             </div>
             <span className="text-xs font-mono font-bold text-[#111111] bg-[#fffef0] border border-[#111111] px-2 py-0.5">
@@ -624,6 +655,146 @@ export function SettingsView({
             <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Reset Sample Data</span>
           </button>
+        </div>
+      </section>
+
+      {/* Branding Asset Kit (/branding) */}
+      <section className="bg-white border border-[#e2e4ea] p-6 space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-[#eceef2] pb-4">
+          <div className="flex items-center gap-3">
+            <BrandexButtonIcon
+              name="appYellow"
+              variant="square"
+              size={34}
+              colorMode={universal.imageColorMode}
+            />
+            <div>
+              <h3 className="text-base font-extrabold text-[#111111]">
+                Branding Asset Kit (/branding)
+              </h3>
+              <p className="text-xs text-[#555a66] tabular-nums">
+                {BRANDING_ASSETS.length} organized assets saved in /branding/logos, favicons, icons,
+                buttons &amp; cards
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(
+              [
+                { id: 'all', label: 'All' },
+                { id: 'logos', label: 'Logos' },
+                { id: 'favicons', label: 'Favicons' },
+                { id: 'icons', label: 'Icons' },
+                { id: 'buttons', label: 'Buttons' },
+                { id: 'cards', label: 'Business Cards' },
+              ] as const
+            ).map((tab) => {
+              const active = assetCategory === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  data-sfx="filter"
+                  data-active={active}
+                  onClick={() => setAssetCategory(tab.id)}
+                  className={`builty-filter-btn h-[32px] px-3 border text-xs font-bold inline-flex items-center gap-1.5 ${
+                    active
+                      ? 'bg-[#ffee00] border-[#111111] text-[#111111]'
+                      : 'bg-[#f8f9fb] border-[#cbd0da] text-[#555a66] hover:text-[#111111]'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className="font-mono text-[10.5px] opacity-80">
+                    {categoryCounts[tab.id]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {visibleBrandingAssets.map((item) => {
+            const isCircle = item.cropMode === 'circle';
+            const isSquare = item.cropMode === 'square';
+            const isPlaque = item.cropMode === 'plaque';
+            const grayscaleClass =
+              universal.imageColorMode === 'grayscale' ? 'grayscale contrast-110' : '';
+
+            return (
+              <div
+                key={item.id}
+                className="border border-[#e2e4ea] bg-[#f8f9fb] flex flex-col justify-between"
+              >
+                <div className="h-[132px] bg-white border-b border-[#eceef2] p-3 flex items-center justify-center overflow-hidden">
+                  {isCircle ? (
+                    <span className="w-[88px] h-[88px] rounded-full overflow-hidden bg-[#111111] inline-flex items-center justify-center">
+                      <img
+                        src={item.src}
+                        alt={item.label}
+                        loading="lazy"
+                        className={`w-full h-full object-cover scale-[1.52] ${grayscaleClass}`}
+                      />
+                    </span>
+                  ) : isSquare ? (
+                    <span className="w-[88px] h-[88px] rounded-[8px] overflow-hidden bg-[#111111] inline-flex items-center justify-center">
+                      <img
+                        src={item.src}
+                        alt={item.label}
+                        loading="lazy"
+                        className={`w-full h-full object-cover scale-[1.50] ${grayscaleClass}`}
+                      />
+                    </span>
+                  ) : isPlaque ? (
+                    <span className="w-[210px] h-[52px] rounded-[6px] overflow-hidden border border-[#111111] bg-[#111111] inline-flex items-center justify-center">
+                      <img
+                        src={item.src}
+                        alt={item.label}
+                        loading="lazy"
+                        className={`w-full h-full object-cover scale-[1.16] ${grayscaleClass}`}
+                      />
+                    </span>
+                  ) : (
+                    <img
+                      src={item.src}
+                      alt={item.label}
+                      loading="lazy"
+                      className={`max-h-full max-w-full object-contain ${grayscaleClass}`}
+                    />
+                  )}
+                </div>
+
+                <div className="p-3 space-y-2">
+                  <div>
+                    <div className="text-xs font-extrabold text-[#111111] truncate" title={item.label}>
+                      {item.label}
+                    </div>
+                    <div
+                      className="text-[10.5px] font-mono text-[#555a66] truncate mt-0.5"
+                      title={item.brandingPath}
+                    >
+                      {item.brandingPath}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#e2e4ea]">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 bg-white border border-[#cbd0da] text-[#374151]">
+                      {item.category}
+                    </span>
+                    <a
+                      href={item.brandingPath}
+                      download={item.fileName}
+                      className="h-[26px] px-2.5 bg-[#111111] text-[#ffee00] hover:bg-[#2a2f3a] text-[11px] font-bold inline-flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" aria-hidden="true" />
+                      <span>Download</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

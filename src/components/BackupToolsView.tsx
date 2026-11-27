@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Download, RotateCcw, Search } from 'lucide-react';
 import { JournalCheckRow, JournalConfig, RecordRow, ReviewRow, UniversalSettings } from '../types/journal';
 import { buildCaseMap, exportRowsToCsv, triggerFileDownload } from '../lib/journal/engine';
-import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 
 interface BackupToolsViewProps {
   config: JournalConfig;
@@ -50,11 +50,10 @@ export function BackupToolsView({
     <div className="space-y-6">
       <div className="bg-white border border-[#e2e4ea] p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <BrandexLogo
-            variant="logo17Icon"
-            size="sm"
-            discColor={themeSettings?.uiDarkColor || '#111111'}
-            accentColor={themeSettings?.uiAccentColor || '#f5c400'}
+          <BrandexButtonIcon
+            name="backup"
+            size={34}
+            colorMode={themeSettings?.imageColorMode}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Backup &amp; Export
@@ -72,9 +71,16 @@ export function BackupToolsView({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white border border-[#e2e4ea] p-5 space-y-4">
-          <div>
-            <h3 className="text-base font-extrabold text-[#111111]">JournalCheck</h3>
-            <p className="text-xs text-[#555a66] mt-1 tabular-nums">{journalRows.length} rows</p>
+          <div className="flex items-center gap-3">
+            <BrandexButtonIcon
+              name="journalcheck"
+              size={30}
+              colorMode={themeSettings?.imageColorMode}
+            />
+            <div>
+              <h3 className="text-base font-extrabold text-[#111111]">JournalCheck</h3>
+              <p className="text-xs text-[#555a66] mt-0.5 tabular-nums">{journalRows.length} rows</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -112,9 +118,16 @@ export function BackupToolsView({
         </div>
 
         <div className="bg-white border border-[#e2e4ea] p-5 space-y-4">
-          <div>
-            <h3 className="text-base font-extrabold text-[#111111]">Review Queue</h3>
-            <p className="text-xs text-[#555a66] mt-1 tabular-nums">{reviewRows.length} rows</p>
+          <div className="flex items-center gap-3">
+            <BrandexButtonIcon
+              name="review"
+              size={30}
+              colorMode={themeSettings?.imageColorMode}
+            />
+            <div>
+              <h3 className="text-base font-extrabold text-[#111111]">Review Queue</h3>
+              <p className="text-xs text-[#555a66] mt-0.5 tabular-nums">{reviewRows.length} rows</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -156,9 +169,16 @@ export function BackupToolsView({
         </div>
 
         <div className="bg-white border border-[#e2e4ea] p-5 space-y-4">
-          <div>
-            <h3 className="text-base font-extrabold text-[#111111]">Records Ledger</h3>
-            <p className="text-xs text-[#555a66] mt-1 tabular-nums">{records.length} records</p>
+          <div className="flex items-center gap-3">
+            <BrandexButtonIcon
+              name="records"
+              size={30}
+              colorMode={themeSettings?.imageColorMode}
+            />
+            <div>
+              <h3 className="text-base font-extrabold text-[#111111]">Records Ledger</h3>
+              <p className="text-xs text-[#555a66] mt-0.5 tabular-nums">{records.length} records</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <button

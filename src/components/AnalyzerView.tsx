@@ -5,17 +5,13 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Database,
   Edit3,
-  FileSpreadsheet,
   FolderSearch,
   Layers,
-  Play,
   Plus,
   Printer,
   Search,
   SearchCheck,
-  Settings2,
   ShieldAlert,
   Trash2,
 } from 'lucide-react';
@@ -36,6 +32,7 @@ import {
 import { WatchlistImportWizard, WatchlistWizardTab } from './WatchlistImportWizard';
 import { WatchlistBulkModal } from './WatchlistBulkModal';
 import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 import { DeleteAllConfirmModal } from './TableControlsBar';
 
 interface AnalyzerViewProps {
@@ -506,7 +503,11 @@ export function AnalyzerView({
               onClick={() => onGoToTab('settings')}
               className="h-[38px] px-3.5 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
             >
-              <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
+              <BrandexButtonIcon
+                name="settings"
+                size={18}
+                colorMode={config.universalSettings?.imageColorMode}
+              />
               <span>Settings</span>
             </button>
           </div>
@@ -566,22 +567,37 @@ export function AnalyzerView({
             >
               <span>Run Scan</span>
               <span className="builty-btn-icon-tab w-7 h-7">
-                <Play className="w-3 h-3 fill-current" aria-hidden="true" />
+                <BrandexButtonIcon
+                  name="journalScan"
+                  variant="square"
+                  size={20}
+                  colorMode={config.universalSettings?.imageColorMode}
+                />
               </span>
             </button>
             <button
               type="button"
               onClick={() => onGoToTab('journalcheck')}
-              className="h-[40px] px-4 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white whitespace-nowrap"
+              className="h-[40px] px-4 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white inline-flex items-center gap-2 whitespace-nowrap"
             >
-              JournalCheck
+              <BrandexButtonIcon
+                name="journalcheck"
+                size={18}
+                colorMode={config.universalSettings?.imageColorMode}
+              />
+              <span>JournalCheck</span>
             </button>
             <button
               type="button"
               onClick={() => onGoToTab('review')}
-              className="h-[40px] px-4 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white whitespace-nowrap"
+              className="h-[40px] px-4 border border-[#cbd0da] bg-[#f8f9fb] text-xs font-bold text-[#111111] hover:border-[#111111] hover:bg-white inline-flex items-center gap-2 whitespace-nowrap"
             >
-              Review Queue
+              <BrandexButtonIcon
+                name="review"
+                size={18}
+                colorMode={config.universalSettings?.imageColorMode}
+              />
+              <span>Review Queue</span>
             </button>
           </div>
         </div>
@@ -676,7 +692,11 @@ export function AnalyzerView({
               onClick={() => onGoToTab('database')}
               className="h-[40px] px-4 border border-[#111111] bg-white hover:bg-[#fffef0] text-xs font-bold text-[#111111] inline-flex items-center gap-2 whitespace-nowrap"
             >
-              <Database className="w-3.5 h-3.5" aria-hidden="true" />
+              <BrandexButtonIcon
+                name="database"
+                size={18}
+                colorMode={config.universalSettings?.imageColorMode}
+              />
               <span>Database ({config.caseEntries.length})</span>
             </button>
             <button
@@ -684,7 +704,11 @@ export function AnalyzerView({
               onClick={() => onGoToTab('settings')}
               className="h-[40px] px-4 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-2 whitespace-nowrap"
             >
-              <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
+              <BrandexButtonIcon
+                name="settings"
+                size={18}
+                colorMode={config.universalSettings?.imageColorMode}
+              />
               <span>Settings</span>
             </button>
           </div>
@@ -715,7 +739,12 @@ export function AnalyzerView({
               onClick={() => openWizard('watchlist')}
               className="h-[38px] px-4 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-2 whitespace-nowrap"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden="true" />
+              <BrandexButtonIcon
+                name="journalScan"
+                variant="square"
+                size={18}
+                colorMode={config.universalSettings?.imageColorMode}
+              />
               <span>Import Watchlist</span>
             </button>
             <button
@@ -723,7 +752,12 @@ export function AnalyzerView({
               onClick={() => openWizard('casemap')}
               className="h-[38px] px-4 border border-[#111111] bg-white hover:bg-[#f6f7f9] text-xs font-bold text-[#111111] inline-flex items-center gap-2 whitespace-nowrap"
             >
-              <Database className="w-3.5 h-3.5" aria-hidden="true" />
+              <BrandexButtonIcon
+                name="databaseMapping"
+                variant="square"
+                size={18}
+                colorMode={config.universalSettings?.imageColorMode}
+              />
               <span>Sync Case Map</span>
             </button>
           </div>
@@ -753,7 +787,14 @@ export function AnalyzerView({
           {/* Card 1: Keywords */}
           <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
-              <h3 className="text-base font-extrabold text-[#111111]">Keywords</h3>
+              <div className="flex items-center gap-2">
+                <BrandexButtonIcon
+                  name="brandGold"
+                  size={22}
+                  colorMode={config.universalSettings?.imageColorMode}
+                />
+                <h3 className="text-base font-extrabold text-[#111111]">Keywords</h3>
+              </div>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
@@ -872,7 +913,14 @@ export function AnalyzerView({
           {/* Card 2: TM Numbers */}
           <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
-              <h3 className="text-base font-extrabold text-[#111111]">TM Numbers</h3>
+              <div className="flex items-center gap-2">
+                <BrandexButtonIcon
+                  name="brandDark"
+                  size={22}
+                  colorMode={config.universalSettings?.imageColorMode}
+                />
+                <h3 className="text-base font-extrabold text-[#111111]">TM Numbers</h3>
+              </div>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
@@ -993,7 +1041,14 @@ export function AnalyzerView({
           {/* Card 3: Case Lookup Map */}
           <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-[#eceef2] pb-3">
-              <h3 className="text-base font-extrabold text-[#111111]">Case Map</h3>
+              <div className="flex items-center gap-2">
+                <BrandexButtonIcon
+                  name="database"
+                  size={22}
+                  colorMode={config.universalSettings?.imageColorMode}
+                />
+                <h3 className="text-base font-extrabold text-[#111111]">Case Map</h3>
+              </div>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"

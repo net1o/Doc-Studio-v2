@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  BarChart3,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -11,13 +10,12 @@ import {
   FileSpreadsheet,
   Globe,
   Plus,
-  RefreshCw,
   Search,
   ShieldPlus,
   Trash2,
 } from 'lucide-react';
 import { CaseEntry, CaseSheetConfig, JournalConfig, UniversalSettings } from '../types/journal';
-import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 import {
   analyzeCaseEntries,
   checkDuplicate,
@@ -695,11 +693,10 @@ export function DatabaseView({
       {/* Header Toolbar */}
       <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
-          <BrandexLogo
-            variant="logo17Icon"
-            size="sm"
-            discColor={themeSettings?.uiDarkColor || '#111111'}
-            accentColor={themeSettings?.uiAccentColor || '#f5c400'}
+          <BrandexButtonIcon
+            name="database"
+            size={34}
+            colorMode={themeSettings?.imageColorMode}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             Cases Database
@@ -717,9 +714,14 @@ export function DatabaseView({
             type="button"
             disabled={fetchingSheet}
             onClick={() => handleFetchGoogleSheet(true)}
-            className="builty-btn h-[38px] pl-4 pr-3 gap-2 text-xs whitespace-nowrap"
+            className="builty-btn h-[38px] pl-3 pr-3 gap-2 text-xs whitespace-nowrap"
           >
-            <Globe className="w-3.5 h-3.5" aria-hidden="true" />
+            <BrandexButtonIcon
+              name="databaseMapping"
+              variant="square"
+              size={20}
+              colorMode={themeSettings?.imageColorMode}
+            />
             <span>{fetchingSheet ? 'Syncing…' : 'Sync Google Sheet'}</span>
           </button>
 
@@ -737,22 +739,32 @@ export function DatabaseView({
             data-sfx="filter"
             data-active={showAnalysis}
             onClick={() => setShowAnalysis((prev) => !prev)}
-            className={`builty-filter-btn h-[38px] px-3 border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
+            className={`builty-filter-btn h-[38px] px-2.5 border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap ${
               showAnalysis
                 ? 'border-[#111111] bg-[#fffef0] text-[#111111]'
                 : 'border-[#cbd0da] bg-[#f8f9fb] text-[#555a66] hover:text-[#111111]'
             }`}
           >
-            <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" />
+            <BrandexButtonIcon
+              name="analysis"
+              variant="square"
+              size={18}
+              colorMode={themeSettings?.imageColorMode}
+            />
             <span>Analysis</span>
           </button>
 
           <button
             type="button"
             onClick={() => onRefreshReviewCases(config.caseEntries)}
-            className="h-[38px] px-3 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
+            className="h-[38px] px-2.5 border border-[#cbd0da] bg-[#f8f9fb] hover:border-[#111111] hover:bg-white text-xs font-bold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap"
           >
-            <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+            <BrandexButtonIcon
+              name="refresh"
+              variant="square"
+              size={18}
+              colorMode={themeSettings?.imageColorMode}
+            />
             <span>Refresh Cases</span>
           </button>
 
@@ -874,7 +886,13 @@ export function DatabaseView({
           className="bg-white border border-[#d4d7e0] shadow-sm"
         >
           <div className="px-6 py-4 bg-[#111111] text-white flex flex-wrap items-center justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-2.5">
+              <BrandexButtonIcon
+                name="databaseMapping"
+                variant="square"
+                size={24}
+                colorMode={themeSettings?.imageColorMode}
+              />
               <h3 className="text-sm font-extrabold">Import Database Sheet / CSV</h3>
             </div>
             <button

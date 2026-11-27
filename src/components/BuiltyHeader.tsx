@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Menu, Play, Volume2, VolumeX, X } from 'lucide-react';
 import { AppTab, UniversalSettings } from '../types/journal';
+import { BrandexButtonIcon, BrandexButtonIconName } from './BrandexButtonIcon';
 
 interface BuiltyHeaderProps {
   activeTab: AppTab;
@@ -36,32 +37,38 @@ export function BuiltyHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const grayscaleFilter = themeSettings?.imageColorMode === 'grayscale' ? 'grayscale' : '';
 
-  const navItems: { id: AppTab; label: string; shortcut: string; count: number | null }[] = [
-    { id: 'analyzer', label: 'Dashboard', shortcut: 'Ctrl+1', count: watchlistCount },
-    { id: 'journalcheck', label: 'JournalCheck', shortcut: 'Ctrl+2', count: journalRowsCount },
-    { id: 'review', label: 'Review', shortcut: 'Ctrl+3', count: reviewCount },
-    { id: 'generator', label: 'Doc Gen', shortcut: 'Ctrl+4', count: docsCount },
-    { id: 'database', label: 'Database', shortcut: 'Ctrl+5', count: databaseCount },
-    { id: 'records', label: 'Records', shortcut: 'Ctrl+6', count: recordsCount },
-    { id: 'settings', label: 'Settings', shortcut: 'Ctrl+7', count: null },
-    { id: 'backup', label: 'Backup', shortcut: 'Ctrl+8', count: activeContextCount },
+  const navItems: {
+    id: AppTab;
+    label: string;
+    shortcut: string;
+    count: number | null;
+    iconName: BrandexButtonIconName;
+  }[] = [
+    { id: 'analyzer', label: 'Dashboard', shortcut: 'Ctrl+1', count: watchlistCount, iconName: 'dashboard' },
+    { id: 'journalcheck', label: 'JournalCheck', shortcut: 'Ctrl+2', count: journalRowsCount, iconName: 'journalcheck' },
+    { id: 'review', label: 'Review', shortcut: 'Ctrl+3', count: reviewCount, iconName: 'review' },
+    { id: 'generator', label: 'Doc Gen', shortcut: 'Ctrl+4', count: docsCount, iconName: 'generator' },
+    { id: 'database', label: 'Database', shortcut: 'Ctrl+5', count: databaseCount, iconName: 'database' },
+    { id: 'records', label: 'Records', shortcut: 'Ctrl+6', count: recordsCount, iconName: 'records' },
+    { id: 'settings', label: 'Settings', shortcut: 'Ctrl+7', count: null, iconName: 'settings' },
+    { id: 'backup', label: 'Backup', shortcut: 'Ctrl+8', count: activeContextCount, iconName: 'backup' },
   ];
 
   return (
     <header className="no-print sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e2e4ea]">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-3 xl:gap-5">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center justify-between gap-2 xl:gap-4">
         {/* Zone 1: Brandex Top Header Logo */}
         <button
           type="button"
           onClick={() => onSelectTab('analyzer')}
-          className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
+          className="flex items-center gap-2 text-left whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
         >
           <img
             src="/assets/aistudio/image_49727114.png"
             alt="Brandex Get Legal"
-            className={`h-[54px] w-auto object-contain select-none ${grayscaleFilter}`}
+            className={`h-[52px] w-auto object-contain select-none ${grayscaleFilter}`}
           />
-          <span className="hidden sm:inline-block border-l border-[#e2e4ea] pl-2.5 text-[12px] font-extrabold tracking-tight text-[#111111]">
+          <span className="hidden 2xl:inline-block border-l border-[#e2e4ea] pl-2.5 text-[12px] font-extrabold tracking-tight text-[#111111]">
             Law Associate
           </span>
         </button>
@@ -69,7 +76,7 @@ export function BuiltyHeader({
         {/* Zone 2: Single-Line Navigation Links */}
         <nav
           aria-label="Primary navigation"
-          className="hidden lg:flex items-center lg:gap-1.5 xl:gap-2.5 text-[11.5px] xl:text-[12.5px] font-bold"
+          className="hidden lg:flex items-center lg:gap-1 xl:gap-1.5 text-[11.5px] xl:text-[12px] font-bold"
         >
           {navItems.map((item) => {
             const active = activeTab === item.id;
@@ -82,13 +89,19 @@ export function BuiltyHeader({
                 data-active={active}
                 title={`${item.label} (${item.shortcut})`}
                 onClick={() => onSelectTab(item.id)}
-                className={`builty-nav-tab relative py-2 px-2 xl:px-2.5 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111] ${
+                className={`builty-nav-tab relative py-2 px-1.5 xl:px-2 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111] ${
                   active
                     ? 'text-[#111111] bg-[#fffef0]'
                     : 'text-[#555a66] hover:text-[#111111]'
                 }`}
               >
                 <span className="inline-flex items-center gap-1.5 tabular-nums">
+                  <BrandexButtonIcon
+                    name={item.iconName}
+                    size={18}
+                    colorMode={themeSettings?.imageColorMode}
+                    className="hidden xl:inline-flex"
+                  />
                   <span>{item.label}</span>
                   {displayCount !== null && (
                     <span
@@ -138,8 +151,15 @@ export function BuiltyHeader({
           <button
             type="button"
             onClick={onRunScan}
-            className="builty-btn h-[40px] pl-3.5 pr-2 gap-2.5 text-[12.5px] tracking-wide whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
+            className="builty-btn h-[40px] pl-3.5 pr-2 gap-2 text-[12.5px] tracking-wide whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#111111]"
           >
+            <BrandexButtonIcon
+              name="journalScan"
+              variant="square"
+              size={20}
+              colorMode={themeSettings?.imageColorMode}
+              className="hidden sm:inline-flex"
+            />
             <span>Run Scan</span>
             <span className="builty-btn-icon-tab w-7 h-6">
               <Play className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
@@ -178,7 +198,14 @@ export function BuiltyHeader({
                     : 'text-[#555a66] hover:text-[#111111]'
                 }`}
               >
-                <span>{item.label}</span>
+                <span className="inline-flex items-center gap-2.5">
+                  <BrandexButtonIcon
+                    name={item.iconName}
+                    size={22}
+                    colorMode={themeSettings?.imageColorMode}
+                  />
+                  <span>{item.label}</span>
+                </span>
                 <span className="inline-flex items-center gap-2 text-xs tabular-nums">
                   {displayCount !== null && (
                     <span className="px-1.5 py-0.5 bg-[#111111] text-[#ffee00] font-extrabold text-[11px]">

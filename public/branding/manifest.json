@@ -1,0 +1,432 @@
+{
+  "logos": [
+    {
+      "fileName": "Designing_yellow_corporate_logo_db473361_b6215596.jpg",
+      "brandingPath": "/branding/logos/Designing_yellow_corporate_logo_db473361_b6215596.jpg",
+      "aistudioPath": "/assets/aistudio/Designing_yellow_corporate_logo_db473361_b6215596.jpg"
+    },
+    {
+      "fileName": "Logo-Final_74de92b5.JPG",
+      "brandingPath": "/branding/logos/Logo-Final_74de92b5.JPG",
+      "aistudioPath": "/assets/aistudio/Logo-Final_74de92b5.JPG"
+    },
+    {
+      "fileName": "Yellow_logo_on_black_background_016f7221_da76a33f.jpg",
+      "brandingPath": "/branding/logos/Yellow_logo_on_black_background_016f7221_da76a33f.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_logo_on_black_background_016f7221_da76a33f.jpg"
+    },
+    {
+      "fileName": "image.png_1845b85c_ae576694.png",
+      "brandingPath": "/branding/logos/image.png_1845b85c_ae576694.png",
+      "aistudioPath": "/assets/aistudio/image.png_1845b85c_ae576694.png"
+    },
+    {
+      "fileName": "image.png_55093e54_8c7b65b3.png",
+      "brandingPath": "/branding/logos/image.png_55093e54_8c7b65b3.png",
+      "aistudioPath": "/assets/aistudio/image.png_55093e54_8c7b65b3.png"
+    },
+    {
+      "fileName": "image_29830b0e.png",
+      "brandingPath": "/branding/logos/image_29830b0e.png",
+      "aistudioPath": "/assets/aistudio/image_29830b0e.png"
+    },
+    {
+      "fileName": "image_49727114.png",
+      "brandingPath": "/branding/logos/image_49727114.png",
+      "aistudioPath": "/assets/aistudio/image_49727114.png"
+    },
+    {
+      "fileName": "logo-icon.PNG_3ec9b575_2K_4b64bdb9.jpg",
+      "brandingPath": "/branding/logos/logo-icon.PNG_3ec9b575_2K_4b64bdb9.jpg",
+      "aistudioPath": "/assets/aistudio/logo-icon.PNG_3ec9b575_2K_4b64bdb9.jpg"
+    },
+    {
+      "fileName": "logo-icon.PNG_3ec9b575_d2b6abe4.jpg",
+      "brandingPath": "/branding/logos/logo-icon.PNG_3ec9b575_d2b6abe4.jpg",
+      "aistudioPath": "/assets/aistudio/logo-icon.PNG_3ec9b575_d2b6abe4.jpg"
+    },
+    {
+      "fileName": "logo-icon.PNG_871df332_2K_fac44534.jpg",
+      "brandingPath": "/branding/logos/logo-icon.PNG_871df332_2K_fac44534.jpg",
+      "aistudioPath": "/assets/aistudio/logo-icon.PNG_871df332_2K_fac44534.jpg"
+    },
+    {
+      "fileName": "logo-icon.PNG_871df332_e858bdea.jpg",
+      "brandingPath": "/branding/logos/logo-icon.PNG_871df332_e858bdea.jpg",
+      "aistudioPath": "/assets/aistudio/logo-icon.PNG_871df332_e858bdea.jpg"
+    },
+    {
+      "fileName": "logo-icon.PNG_c3a474a6_ca1edc3d.jpg",
+      "brandingPath": "/branding/logos/logo-icon.PNG_c3a474a6_ca1edc3d.jpg",
+      "aistudioPath": "/assets/aistudio/logo-icon.PNG_c3a474a6_ca1edc3d.jpg"
+    },
+    {
+      "fileName": "logo-icon.PNG_ccbb6a41_b670a015.jpg",
+      "brandingPath": "/branding/logos/logo-icon.PNG_ccbb6a41_b670a015.jpg",
+      "aistudioPath": "/assets/aistudio/logo-icon.PNG_ccbb6a41_b670a015.jpg"
+    },
+    {
+      "fileName": "logo-icon_eed7ebcf.PNG",
+      "brandingPath": "/branding/logos/logo-icon_eed7ebcf.PNG",
+      "aistudioPath": "/assets/aistudio/logo-icon_eed7ebcf.PNG"
+    }
+  ],
+  "favicons": [
+    {
+      "fileName": "favicon-17.svg",
+      "brandingPath": "/branding/favicons/favicon-17.svg",
+      "aistudioPath": "/favicon-17.svg"
+    },
+    {
+      "fileName": "App_favicon_icon_in_yellow_b57bb286_de846855.jpg",
+      "brandingPath": "/branding/favicons/App_favicon_icon_in_yellow_b57bb286_de846855.jpg",
+      "aistudioPath": "/assets/aistudio/App_favicon_icon_in_yellow_b57bb286_de846855.jpg"
+    },
+    {
+      "fileName": "Circular_favicon_icon_design_868ce5b8_2e3950a9.jpg",
+      "brandingPath": "/branding/favicons/Circular_favicon_icon_design_868ce5b8_2e3950a9.jpg",
+      "aistudioPath": "/assets/aistudio/Circular_favicon_icon_design_868ce5b8_2e3950a9.jpg"
+    },
+    {
+      "fileName": "Circular_favicon_icon_design_c5403ced_2e3950a9.jpg",
+      "brandingPath": "/branding/favicons/Circular_favicon_icon_design_c5403ced_2e3950a9.jpg",
+      "aistudioPath": "/assets/aistudio/Circular_favicon_icon_design_c5403ced_2e3950a9.jpg"
+    },
+    {
+      "fileName": "Circular_favicon_logo_icon_isolated_f0895dd9_f052d2a2.jpg",
+      "brandingPath": "/branding/favicons/Circular_favicon_logo_icon_isolated_f0895dd9_f052d2a2.jpg",
+      "aistudioPath": "/assets/aistudio/Circular_favicon_logo_icon_isolated_f0895dd9_f052d2a2.jpg"
+    },
+    {
+      "fileName": "Circular_favicon_logo_isolated_5b3b20a8_12ad53dc.jpg",
+      "brandingPath": "/branding/favicons/Circular_favicon_logo_isolated_5b3b20a8_12ad53dc.jpg",
+      "aistudioPath": "/assets/aistudio/Circular_favicon_logo_isolated_5b3b20a8_12ad53dc.jpg"
+    },
+    {
+      "fileName": "Circular_yellow_icon_badge_90b8cb09_4017d208.jpg",
+      "brandingPath": "/branding/favicons/Circular_yellow_icon_badge_90b8cb09_4017d208.jpg",
+      "aistudioPath": "/assets/aistudio/Circular_yellow_icon_badge_90b8cb09_4017d208.jpg"
+    },
+    {
+      "fileName": "Rounded_square_app_favicon_3758e845_a05ab6cf.jpg",
+      "brandingPath": "/branding/favicons/Rounded_square_app_favicon_3758e845_a05ab6cf.jpg",
+      "aistudioPath": "/assets/aistudio/Rounded_square_app_favicon_3758e845_a05ab6cf.jpg"
+    },
+    {
+      "fileName": "Yellow_and_black_vector_icon_0bfb83a2_e00f67d9.jpg",
+      "brandingPath": "/branding/favicons/Yellow_and_black_vector_icon_0bfb83a2_e00f67d9.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_and_black_vector_icon_0bfb83a2_e00f67d9.jpg"
+    },
+    {
+      "fileName": "Yellow_circular_logo_icon_bb66f6bc_5b414170.jpg",
+      "brandingPath": "/branding/favicons/Yellow_circular_logo_icon_bb66f6bc_5b414170.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_circular_logo_icon_bb66f6bc_5b414170.jpg"
+    },
+    {
+      "fileName": "Yellow_gradient_circular_logo_icon_a2824270_a32a6f27.jpg",
+      "brandingPath": "/branding/favicons/Yellow_gradient_circular_logo_icon_a2824270_a32a6f27.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_gradient_circular_logo_icon_a2824270_a32a6f27.jpg"
+    },
+    {
+      "fileName": "Yellow_line_art_logo_emblem_f36de1d2_7f6d9c6c.jpg",
+      "brandingPath": "/branding/favicons/Yellow_line_art_logo_emblem_f36de1d2_7f6d9c6c.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_line_art_logo_emblem_f36de1d2_7f6d9c6c.jpg"
+    },
+    {
+      "fileName": "Yellow_logo_icon_on_dark_0818f50b_02ab08e1.jpg",
+      "brandingPath": "/branding/favicons/Yellow_logo_icon_on_dark_0818f50b_02ab08e1.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_logo_icon_on_dark_0818f50b_02ab08e1.jpg"
+    },
+    {
+      "fileName": "Yellow_logo_icon_with_3D_fa82bf20_2b33eb29.jpg",
+      "brandingPath": "/branding/favicons/Yellow_logo_icon_with_3D_fa82bf20_2b33eb29.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_logo_icon_with_3D_fa82bf20_2b33eb29.jpg"
+    },
+    {
+      "fileName": "Yellow_monogram_logo_badge_6ef4d884_205ad77e.jpg",
+      "brandingPath": "/branding/favicons/Yellow_monogram_logo_badge_6ef4d884_205ad77e.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_monogram_logo_badge_6ef4d884_205ad77e.jpg"
+    },
+    {
+      "fileName": "Yellow_vector_logo_icon_1d36a536_f528a2c1.jpg",
+      "brandingPath": "/branding/favicons/Yellow_vector_logo_icon_1d36a536_f528a2c1.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_vector_logo_icon_1d36a536_f528a2c1.jpg"
+    }
+  ],
+  "icons": [
+    {
+      "fileName": "Backup_UI_icon_button_8ff4812e_4d373394.jpg",
+      "brandingPath": "/branding/icons/Backup_UI_icon_button_8ff4812e_4d373394.jpg",
+      "aistudioPath": "/assets/aistudio/Backup_UI_icon_button_8ff4812e_4d373394.jpg"
+    },
+    {
+      "fileName": "Dashboard_UI_icon_button_0da6ea0a_b73f780c.jpg",
+      "brandingPath": "/branding/icons/Dashboard_UI_icon_button_0da6ea0a_b73f780c.jpg",
+      "aistudioPath": "/assets/aistudio/Dashboard_UI_icon_button_0da6ea0a_b73f780c.jpg"
+    },
+    {
+      "fileName": "Database_icon_button_7d9d09a8_93d4e849.jpg",
+      "brandingPath": "/branding/icons/Database_icon_button_7d9d09a8_93d4e849.jpg",
+      "aistudioPath": "/assets/aistudio/Database_icon_button_7d9d09a8_93d4e849.jpg"
+    },
+    {
+      "fileName": "JournalCheck_UI_icon_button_15c5905f_a487580d.jpg",
+      "brandingPath": "/branding/icons/JournalCheck_UI_icon_button_15c5905f_a487580d.jpg",
+      "aistudioPath": "/assets/aistudio/JournalCheck_UI_icon_button_15c5905f_a487580d.jpg"
+    },
+    {
+      "fileName": "Settings_icon_button_0d755116_8a838812.jpg",
+      "brandingPath": "/branding/icons/Settings_icon_button_0d755116_8a838812.jpg",
+      "aistudioPath": "/assets/aistudio/Settings_icon_button_0d755116_8a838812.jpg"
+    },
+    {
+      "fileName": "Square_UI_button_showing_analysis_6320fb43_898e7f45.jpg",
+      "brandingPath": "/branding/icons/Square_UI_button_showing_analysis_6320fb43_898e7f45.jpg",
+      "aistudioPath": "/assets/aistudio/Square_UI_button_showing_analysis_6320fb43_898e7f45.jpg"
+    },
+    {
+      "fileName": "Square_UI_button_with_text_78cec560_95c70542.jpg",
+      "brandingPath": "/branding/icons/Square_UI_button_with_text_78cec560_95c70542.jpg",
+      "aistudioPath": "/assets/aistudio/Square_UI_button_with_text_78cec560_95c70542.jpg"
+    },
+    {
+      "fileName": "Square_UI_refresh_button_dcbe622a_a8ca7c7a.jpg",
+      "brandingPath": "/branding/icons/Square_UI_refresh_button_dcbe622a_a8ca7c7a.jpg",
+      "aistudioPath": "/assets/aistudio/Square_UI_refresh_button_dcbe622a_a8ca7c7a.jpg"
+    },
+    {
+      "fileName": "UI_button_with_database_text_577db65f_d5409246.jpg",
+      "brandingPath": "/branding/icons/UI_button_with_database_text_577db65f_d5409246.jpg",
+      "aistudioPath": "/assets/aistudio/UI_button_with_database_text_577db65f_d5409246.jpg"
+    },
+    {
+      "fileName": "UI_icon_button_for_Doc_b8477fdc_abb92630.jpg",
+      "brandingPath": "/branding/icons/UI_icon_button_for_Doc_b8477fdc_abb92630.jpg",
+      "aistudioPath": "/assets/aistudio/UI_icon_button_for_Doc_b8477fdc_abb92630.jpg"
+    },
+    {
+      "fileName": "UI_icon_button_for_records_49fe3c08_62b3b26d.jpg",
+      "brandingPath": "/branding/icons/UI_icon_button_for_records_49fe3c08_62b3b26d.jpg",
+      "aistudioPath": "/assets/aistudio/UI_icon_button_for_records_49fe3c08_62b3b26d.jpg"
+    },
+    {
+      "fileName": "Vector_icon_set_grid_7e9ea111_47f5c677.jpg",
+      "brandingPath": "/branding/icons/Vector_icon_set_grid_7e9ea111_47f5c677.jpg",
+      "aistudioPath": "/assets/aistudio/Vector_icon_set_grid_7e9ea111_47f5c677.jpg"
+    },
+    {
+      "fileName": "Vector_icon_set_grid_d11d8299_d1d2425c.jpg",
+      "brandingPath": "/branding/icons/Vector_icon_set_grid_d11d8299_d1d2425c.jpg",
+      "aistudioPath": "/assets/aistudio/Vector_icon_set_grid_d11d8299_d1d2425c.jpg"
+    },
+    {
+      "fileName": "Vector_icon_set_grid_e5ef680d_65ec0c03.jpg",
+      "brandingPath": "/branding/icons/Vector_icon_set_grid_e5ef680d_65ec0c03.jpg",
+      "aistudioPath": "/assets/aistudio/Vector_icon_set_grid_e5ef680d_65ec0c03.jpg"
+    }
+  ],
+  "buttons": [
+    {
+      "fileName": "Dashboard_button_with_yellow_text_16234ca0_ea0e2c52.jpg",
+      "brandingPath": "/branding/buttons/Dashboard_button_with_yellow_text_16234ca0_ea0e2c52.jpg",
+      "aistudioPath": "/assets/aistudio/Dashboard_button_with_yellow_text_16234ca0_ea0e2c52.jpg"
+    },
+    {
+      "fileName": "Database_button_with_yellow_text_6c25251b_bc43f384.jpg",
+      "brandingPath": "/branding/buttons/Database_button_with_yellow_text_6c25251b_bc43f384.jpg",
+      "aistudioPath": "/assets/aistudio/Database_button_with_yellow_text_6c25251b_bc43f384.jpg"
+    },
+    {
+      "fileName": "Doc_Gen_UI_button_c77c3445_24a7f441.jpg",
+      "brandingPath": "/branding/buttons/Doc_Gen_UI_button_c77c3445_24a7f441.jpg",
+      "aistudioPath": "/assets/aistudio/Doc_Gen_UI_button_c77c3445_24a7f441.jpg"
+    },
+    {
+      "fileName": "Export_button_with_arrow_bd6e6fa3_3a6d132d.jpg",
+      "brandingPath": "/branding/buttons/Export_button_with_arrow_bd6e6fa3_3a6d132d.jpg",
+      "aistudioPath": "/assets/aistudio/Export_button_with_arrow_bd6e6fa3_3a6d132d.jpg"
+    },
+    {
+      "fileName": "Import_button_on_white_background_b4f64521_96cfa96c.jpg",
+      "brandingPath": "/branding/buttons/Import_button_on_white_background_b4f64521_96cfa96c.jpg",
+      "aistudioPath": "/assets/aistudio/Import_button_on_white_background_b4f64521_96cfa96c.jpg"
+    },
+    {
+      "fileName": "JournalCheck_UI_button_28fb39f4_662766b6.jpg",
+      "brandingPath": "/branding/buttons/JournalCheck_UI_button_28fb39f4_662766b6.jpg",
+      "aistudioPath": "/assets/aistudio/JournalCheck_UI_button_28fb39f4_662766b6.jpg"
+    },
+    {
+      "fileName": "Preview_button_on_white_background_5dc9a0bc_de24d380.jpg",
+      "brandingPath": "/branding/buttons/Preview_button_on_white_background_5dc9a0bc_de24d380.jpg",
+      "aistudioPath": "/assets/aistudio/Preview_button_on_white_background_5dc9a0bc_de24d380.jpg"
+    },
+    {
+      "fileName": "Review_UI_button_isolated_fc87c26a_06db3d8e.jpg",
+      "brandingPath": "/branding/buttons/Review_UI_button_isolated_fc87c26a_06db3d8e.jpg",
+      "aistudioPath": "/assets/aistudio/Review_UI_button_isolated_fc87c26a_06db3d8e.jpg"
+    },
+    {
+      "fileName": "Settings_UI_button_e7cb8c99_b851a75e.jpg",
+      "brandingPath": "/branding/buttons/Settings_UI_button_e7cb8c99_b851a75e.jpg",
+      "aistudioPath": "/assets/aistudio/Settings_UI_button_e7cb8c99_b851a75e.jpg"
+    },
+    {
+      "fileName": "UI_button_displaying_new_text_97ca683a_136e0de8.jpg",
+      "brandingPath": "/branding/buttons/UI_button_displaying_new_text_97ca683a_136e0de8.jpg",
+      "aistudioPath": "/assets/aistudio/UI_button_displaying_new_text_97ca683a_136e0de8.jpg"
+    },
+    {
+      "fileName": "UI_button_featuring_keyword_text_b0c7a48a_bc21bca0.jpg",
+      "brandingPath": "/branding/buttons/UI_button_featuring_keyword_text_b0c7a48a_bc21bca0.jpg",
+      "aistudioPath": "/assets/aistudio/UI_button_featuring_keyword_text_b0c7a48a_bc21bca0.jpg"
+    },
+    {
+      "fileName": "UI_button_labelled_Matches_245f9a13_7e24eca9.jpg",
+      "brandingPath": "/branding/buttons/UI_button_labelled_Matches_245f9a13_7e24eca9.jpg",
+      "aistudioPath": "/assets/aistudio/UI_button_labelled_Matches_245f9a13_7e24eca9.jpg"
+    },
+    {
+      "fileName": "Yellow_Ready_UI_Button_e7378bd8_d844ecfa.jpg",
+      "brandingPath": "/branding/buttons/Yellow_Ready_UI_Button_e7378bd8_d844ecfa.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_Ready_UI_Button_e7378bd8_d844ecfa.jpg"
+    },
+    {
+      "fileName": "Yellow_Ready_UI_button_d2050c35_36723cf9.jpg",
+      "brandingPath": "/branding/buttons/Yellow_Ready_UI_button_d2050c35_36723cf9.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_Ready_UI_button_d2050c35_36723cf9.jpg"
+    },
+    {
+      "fileName": "Yellow_backup_UI_button_164b4183_37849ac7.jpg",
+      "brandingPath": "/branding/buttons/Yellow_backup_UI_button_164b4183_37849ac7.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_backup_UI_button_164b4183_37849ac7.jpg"
+    },
+    {
+      "fileName": "Yellow_button_displaying_Run_Scan_551cab6f_cbf02eb1.jpg",
+      "brandingPath": "/branding/buttons/Yellow_button_displaying_Run_Scan_551cab6f_cbf02eb1.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_button_displaying_Run_Scan_551cab6f_cbf02eb1.jpg"
+    },
+    {
+      "fileName": "Yellow_document_button_opening_text_08f9e807_222d052c.jpg",
+      "brandingPath": "/branding/buttons/Yellow_document_button_opening_text_08f9e807_222d052c.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_document_button_opening_text_08f9e807_222d052c.jpg"
+    },
+    {
+      "fileName": "Yellow_keyword_UI_button_f676e721_f9bfb677.jpg",
+      "brandingPath": "/branding/buttons/Yellow_keyword_UI_button_f676e721_f9bfb677.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_keyword_UI_button_f676e721_f9bfb677.jpg"
+    },
+    {
+      "fileName": "Yellow_matches_UI_button_ea797536_7994943b.jpg",
+      "brandingPath": "/branding/buttons/Yellow_matches_UI_button_ea797536_7994943b.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_matches_UI_button_ea797536_7994943b.jpg"
+    },
+    {
+      "fileName": "Yellow_print_button_icon_84c3cbd3_e22cab8a.jpg",
+      "brandingPath": "/branding/buttons/Yellow_print_button_icon_84c3cbd3_e22cab8a.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_print_button_icon_84c3cbd3_e22cab8a.jpg"
+    },
+    {
+      "fileName": "Yellow_records_UI_button_168b6c49_3bb1caa7.jpg",
+      "brandingPath": "/branding/buttons/Yellow_records_UI_button_168b6c49_3bb1caa7.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_records_UI_button_168b6c49_3bb1caa7.jpg"
+    },
+    {
+      "fileName": "Yellow_review_button_on_black_f4b34406_94982779.jpg",
+      "brandingPath": "/branding/buttons/Yellow_review_button_on_black_f4b34406_94982779.jpg",
+      "aistudioPath": "/assets/aistudio/Yellow_review_button_on_black_f4b34406_94982779.jpg"
+    }
+  ],
+  "cards": [
+    {
+      "fileName": "Business_card_with_yellow_accents_3f6d86fb_c2207588.jpg",
+      "brandingPath": "/branding/cards/Business_card_with_yellow_accents_3f6d86fb_c2207588.jpg",
+      "aistudioPath": "/assets/aistudio/Business_card_with_yellow_accents_3f6d86fb_c2207588.jpg"
+    },
+    {
+      "fileName": "Business_cards_featuring_logo_03c95757_19434fae.jpg",
+      "brandingPath": "/branding/cards/Business_cards_featuring_logo_03c95757_19434fae.jpg",
+      "aistudioPath": "/assets/aistudio/Business_cards_featuring_logo_03c95757_19434fae.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_1b499a96_1cbf4c27.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_1b499a96_1cbf4c27.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_1b499a96_1cbf4c27.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_24a4ed42_f19d42e0.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_24a4ed42_f19d42e0.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_24a4ed42_f19d42e0.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_3a901e3e_bca7e54b.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_3a901e3e_bca7e54b.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_3a901e3e_bca7e54b.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_42f74c88_dc3965bf.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_42f74c88_dc3965bf.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_42f74c88_dc3965bf.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_71f78482_980c40f5.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_71f78482_980c40f5.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_71f78482_980c40f5.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_9d0a555e_d3103885.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_9d0a555e_d3103885.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_9d0a555e_d3103885.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_a872f204_f19d42e0.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_a872f204_f19d42e0.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_a872f204_f19d42e0.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_ae9fbe21_d8b70546.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_ae9fbe21_d8b70546.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_ae9fbe21_d8b70546.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_e7bf8917_8fe73e3e.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_e7bf8917_8fe73e3e.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_e7bf8917_8fe73e3e.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_f5816a84_6f8d7547.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_f5816a84_6f8d7547.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_f5816a84_6f8d7547.jpg"
+    },
+    {
+      "fileName": "Corporate_business_card_design_f911146c_d4553918.jpg",
+      "brandingPath": "/branding/cards/Corporate_business_card_design_f911146c_d4553918.jpg",
+      "aistudioPath": "/assets/aistudio/Corporate_business_card_design_f911146c_d4553918.jpg"
+    },
+    {
+      "fileName": "Generate_business_cards_with_names_39936c27_38ef317a.jpg",
+      "brandingPath": "/branding/cards/Generate_business_cards_with_names_39936c27_38ef317a.jpg",
+      "aistudioPath": "/assets/aistudio/Generate_business_cards_with_names_39936c27_38ef317a.jpg"
+    },
+    {
+      "fileName": "Generate_business_cards_with_names_b8947b70_a98fa443.jpg",
+      "brandingPath": "/branding/cards/Generate_business_cards_with_names_b8947b70_a98fa443.jpg",
+      "aistudioPath": "/assets/aistudio/Generate_business_cards_with_names_b8947b70_a98fa443.jpg"
+    },
+    {
+      "fileName": "Generate_business_cards_with_names_dfbb1f56_05ff67c7.jpg",
+      "brandingPath": "/branding/cards/Generate_business_cards_with_names_dfbb1f56_05ff67c7.jpg",
+      "aistudioPath": "/assets/aistudio/Generate_business_cards_with_names_dfbb1f56_05ff67c7.jpg"
+    },
+    {
+      "fileName": "Generate_business_cards_with_names_f7e9ecd1_faa76916.jpg",
+      "brandingPath": "/branding/cards/Generate_business_cards_with_names_f7e9ecd1_faa76916.jpg",
+      "aistudioPath": "/assets/aistudio/Generate_business_cards_with_names_f7e9ecd1_faa76916.jpg"
+    },
+    {
+      "fileName": "Modern_business_card_with_name_1efb9df0_fe306882.jpg",
+      "brandingPath": "/branding/cards/Modern_business_card_with_name_1efb9df0_fe306882.jpg",
+      "aistudioPath": "/assets/aistudio/Modern_business_card_with_name_1efb9df0_fe306882.jpg"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { ArrowUp, ArrowRight, Mail, MapPin, Phone } from 'lucide-react';
 import { AppTab, UniversalSettings } from '../types/journal';
 import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 
 interface BuiltyFooterProps {
   onSelectTab: (tab: AppTab) => void;
@@ -32,8 +33,13 @@ export function BuiltyFooter({ onSelectTab, onScrollTop, themeSettings }: Builty
           <button
             type="button"
             onClick={() => onSelectTab('generator')}
-            className="builty-btn h-[40px] pl-5 pr-2.5 gap-3 text-xs whitespace-nowrap"
+            className="builty-btn h-[40px] pl-3 pr-2.5 gap-2.5 text-xs whitespace-nowrap"
           >
+            <BrandexButtonIcon
+              name="generator"
+              size={22}
+              colorMode={themeSettings?.imageColorMode}
+            />
             <span>Open Document Generator</span>
             <span className="builty-btn-icon-tab w-7 h-6">
               <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />

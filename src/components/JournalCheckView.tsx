@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CalendarClock, FileUp, Play, Plus, Trash2 } from 'lucide-react';
 import { JournalCheckRow, UniversalSettings } from '../types/journal';
-import { BrandexLogo } from './BrandexLogo';
+import { BrandexButtonIcon } from './BrandexButtonIcon';
 import { deduplicateJournalCheckRows } from '../lib/journal/engine';
 import { JournalImportWizard } from './JournalImportWizard';
 import {
@@ -196,11 +196,10 @@ export function JournalCheckView({
     <div className="space-y-5">
       <div className="bg-white border border-[#e2e4ea] p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2.5">
-          <BrandexLogo
-            variant="logo17Icon"
-            size="sm"
-            discColor={themeSettings?.uiDarkColor || '#111111'}
-            accentColor={themeSettings?.uiAccentColor || '#f5c400'}
+          <BrandexButtonIcon
+            name="journalcheck"
+            size={34}
+            colorMode={themeSettings?.imageColorMode}
           />
           <h2 className="text-xl font-extrabold tracking-tight text-[#111111]">
             JournalCheck Table
@@ -245,8 +244,14 @@ export function JournalCheckView({
           <button
             type="button"
             onClick={onRunScan}
-            className="builty-btn h-[38px] pl-4 pr-2 gap-2 text-xs whitespace-nowrap"
+            className="builty-btn h-[38px] pl-3 pr-2 gap-2 text-xs whitespace-nowrap"
           >
+            <BrandexButtonIcon
+              name="journalScan"
+              variant="square"
+              size={20}
+              colorMode={themeSettings?.imageColorMode}
+            />
             <span>Run Scan</span>
             <span className="builty-btn-icon-tab w-6 h-6">
               <Play className="w-3 h-3 fill-current" aria-hidden="true" />
