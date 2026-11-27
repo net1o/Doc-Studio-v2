@@ -333,21 +333,6 @@ export async function generateJournalDocPdf(
     }
   }
 
-  // Brandex circular mini stamp bottom-right of image zone
-  const stampX = px(7.48);
-  const stampY = footerNoteY - s(0.42);
-  const [ur, ug, ub] = hexToRgb(universalSettings?.uiDarkColor || '#111111');
-  const [yr, yg, yb] = hexToRgb(universalSettings?.uiAccentColor || '#ffee00');
-  pdf.setFillColor(ur, ug, ub);
-  pdf.circle(stampX, stampY, s(0.24), 'F');
-  pdf.setDrawColor(yr, yg, yb);
-  pdf.setLineWidth(s(0.018));
-  pdf.circle(stampX, stampY, s(0.20), 'S');
-  pdf.setTextColor(yr, yg, yb);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(11 * scale);
-  pdf.text('bR', stampX, stampY + s(0.04), { align: 'center' });
-
   // --- Note Bar ---
   pdf.setFillColor(pr, pg, pb);
   pdf.rect(px(0.58), footerNoteY, totalTblW, s(0.32), 'F');
@@ -385,20 +370,20 @@ export async function generateJournalDocPdf(
   pdf.setFontSize(12 * scale);
   pdf.text('R', px(3.96), logoY + s(0.045), { align: 'center' });
 
-  // --- Contact Row (4 columns) ---
+  // --- Contact Row (4 columns inside safe corner margins) ---
   const contactY = logoY + s(0.32);
   const contacts = [
     {
       label: 'Address:',
       text: 'DROP AT ABDULLAH CENTRE, JINNAH COLONY BEHIND PTCL EXCHANGE, TARLAI, ISLAMABAD',
-      w: s(2.45),
+      w: s(2.35),
     },
-    { label: 'Whatsapp:', text: '+92 336 0015004', w: s(1.5) },
-    { label: 'Email:', text: 'info@brandex.pk', w: s(1.4) },
-    { label: 'Facebook:', text: 'https://www.facebook.com/Brandex.pk/', w: s(2.0) },
+    { label: 'Whatsapp:', text: '+92 336 0015004', w: s(1.38) },
+    { label: 'Email:', text: 'info@brandex.pk', w: s(1.32) },
+    { label: 'Facebook:', text: 'https://www.facebook.com/Brandex.pk/', w: s(1.76) },
   ];
 
-  let cx = px(0.58);
+  let cx = px(0.66);
   contacts.forEach((item, idx) => {
     pdf.setTextColor(pr, pg, pb);
     pdf.setFont('helvetica', 'bold');

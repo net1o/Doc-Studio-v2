@@ -2,13 +2,55 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 
-export default defineConfig(() => {
+const VIRTUAL_FIREBASE_MODULE_ID = 'virtual:firebase-config';
+const RESOLVED_VIRTUAL_FIREBASE_MODULE_ID = `\0${VIRTUAL_FIREBASE_MODULE_ID}`;
+
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  const loadRuntimeFirebaseConfig = () => {
+    const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+    let fileCfg: Record<string, string> = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        fileCfg = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, string>;
+      } catch {
+        fileCfg = {};
+      }
+    }
+
+    return {
+      projectId: env.VITE_FIREBASE_PROJECT_ID || fileCfg.projectId || '',
+      appId: env.VITE_FIREBASE_APP_ID || fileCfg.appId || '',
+      apiKey: env.VITE_FIREBASE_API_KEY || fileCfg.apiKey || '',
+      authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || fileCfg.authDomain || '',
+      storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || fileCfg.storageBucket || '',
+      messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || fileCfg.messagingSenderId || '',
+      oAuthClientId: env.VITE_FIREBASE_OAUTH_CLIENT_ID || fileCfg.oAuthClientId || '',
+    };
+  };
+
   return {
     plugins: [
       react(),
       tailwindcss(),
+      {
+        name: 'firebase-runtime-config',
+        resolveId(id) {
+          if (id === VIRTUAL_FIREBASE_MODULE_ID) {
+            return RESOLVED_VIRTUAL_FIREBASE_MODULE_ID;
+          }
+          return null;
+        },
+        load(id) {
+          if (id === RESOLVED_VIRTUAL_FIREBASE_MODULE_ID) {
+            return `export default ${JSON.stringify(loadRuntimeFirebaseConfig())};`;
+          }
+          return null;
+        },
+      },
       // Copies src/assets into dist/ so root-relative URLs like
       // "/src/assets/images/..." (e.g. generate_image output) still resolve
       // in production builds. Do not remove.

@@ -545,22 +545,22 @@ button:active:not(:disabled) {
   align-items: center;
   justify-content: space-between;
   font-family: var(--j909-font-body);
-  font-size: 7.5pt;
+  font-size: 7.1pt;
   color: #111111;
-  padding: 0 0.05in;
+  padding: 0 0.48in 0 0.14in;
 }
 
 .j909-contact-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 10px;
+  gap: 5px;
+  padding: 0 7px;
   border-right: 1.5px solid var(--j909-theme);
 }
 
 .j909-contact-item:first-child {
   padding-left: 0;
-  max-width: 2.35in;
+  max-width: 2.15in;
 }
 
 .j909-contact-item:last-child {

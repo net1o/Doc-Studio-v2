@@ -1,5 +1,6 @@
 import { getApps, initializeApp } from 'firebase/app';
 import {
+  type Auth,
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -7,7 +8,7 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
-import firebaseConfig from '../../../firebase-applet-config.json';
+import firebaseConfig from 'virtual:firebase-config';
 import { CaseEntry } from '../../types/journal';
 import { CaseLookupImportOptions, exportRowsToCsv, parseCaseLookupInput } from '../journal/engine';
 
@@ -19,8 +20,13 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets.readonly',
 ];
 
-const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
-const auth = getAuth(app);
+const hasFirebaseConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+const app = hasFirebaseConfig
+  ? getApps().length > 0
+    ? getApps()[0]
+    : initializeApp(firebaseConfig)
+  : null;
+const auth: Auth | null = app ? getAuth(app) : null;
 
 // Strictly in-memory OAuth access token cache (never persisted to localStorage/sessionStorage)
 let cachedAccessToken: string | null = null;
@@ -91,6 +97,10 @@ export function clearGoogleAccessToken(): void {
 export function initGoogleAuthListener(
   onUserChange: (user: User | null, accessToken: string | null) => void
 ): () => void {
+  if (!auth) {
+    onUserChange(null, null);
+    return () => {};
+  }
   return onAuthStateChanged(auth, (user) => {
     if (!user) {
       cachedAccessToken = null;
@@ -105,6 +115,11 @@ export async function signInWithGoogleWorkspace(): Promise<{
   user: User;
   accessToken: string | null;
 }> {
+  if (!auth) {
+    throw new Error(
+      'Firebase configuration is missing. Set VITE_FIREBASE_* in .env or provide an untracked local firebase-applet-config.json.'
+    );
+  }
   const provider = new GoogleAuthProvider();
   for (const scope of GOOGLE_SCOPES) {
     provider.addScope(scope);
@@ -126,7 +141,9 @@ export async function signInWithGoogleWorkspace(): Promise<{
 
 export async function signOutGoogleWorkspace(): Promise<void> {
   cachedAccessToken = null;
-  await signOut(auth);
+  if (auth) {
+    await signOut(auth);
+  }
 }
 
 async function googleApiFetch(url: string, init: RequestInit = {}): Promise<Response> {

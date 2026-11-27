@@ -4,10 +4,7 @@ import {
   PaperSizePreset,
   UniversalSettings,
 } from '../../types/journal';
-import {
-  buildLogo17IconSvgString,
-  buildLogoFinalSvgString,
-} from '../../components/BrandexLogo';
+import { buildLogoFinalSvgString } from '../../components/BrandexLogo';
 
 function esc(value: string): string {
   return String(value || '')
@@ -263,14 +260,13 @@ export function buildJournal909Html(
     .image-line { flex: 1; max-width: 1.8in; height: 2px; background: var(--theme); }
     .image-title { margin: 0; padding: 0 12px; font-family: var(--font-display); font-size: 15.5pt; font-weight: 800; letter-spacing: 2px; color: var(--heading); text-transform: uppercase; }
     .image-area { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 0.16in 0; min-height: 1.4in; }
-    .image-stamp { position: absolute; right: 8px; bottom: 8px; width: 64px; height: 64px; opacity: 0.9; pointer-events: none; }
     .footer { margin-top: auto; }
     .note-bar { background: var(--theme); color: #ffffff; text-align: center; font-family: var(--font-tech); font-size: 9pt; font-weight: 600; letter-spacing: 0.8px; padding: 6px 10px; text-transform: uppercase; }
     .brandex-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 0.12in 0 0.1in 0; }
     .brandex-line { width: 0.9in; height: 1.5px; background: var(--theme); }
-    .contact-row { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-body); font-size: 7.2pt; color: #111111; padding: 0 0.05in; }
-    .contact-item { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-right: 1.5px solid var(--theme); }
-    .contact-item:first-child { padding-left: 0; max-width: 2.25in; }
+    .contact-row { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-body); font-size: 7pt; color: #111111; padding: 0 0.48in 0 0.14in; }
+    .contact-item { display: flex; align-items: center; gap: 5px; padding: 0 7px; border-right: 1.5px solid var(--theme); }
+    .contact-item:first-child { padding-left: 0; max-width: 2.15in; }
     .contact-item:last-child { border-right: none; padding-right: 0; }
     .contact-icon { width: 20px; height: 20px; flex-shrink: 0; }
     .contact-label { font-family: var(--font-tech); font-weight: 700; color: var(--theme); font-size: 8pt; letter-spacing: 0.4px; display: block; margin-bottom: 1px; }
@@ -377,7 +373,7 @@ export function buildJournal909Html(
         </div>
         <div class="image-line"></div>
       </div>
-      <div class="image-area" contenteditable="true">${imageHtml}<div class="image-stamp">${buildLogo17IconSvgString('#111111', universalSettings?.uiAccentColor || themeAccent, false)}</div></div>
+      <div class="image-area" contenteditable="true">${imageHtml}</div>
       <div class="footer">
         <div class="note-bar">${safeNote}</div>
         <div class="brandex-row">

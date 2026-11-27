@@ -1316,17 +1316,6 @@ export function Journal909GeneratorView({
                       Click to attach artwork image
                     </button>
                   )}
-
-                  {/* Brandex Circular b(R) Official Stamp */}
-                  <div className="absolute right-2 bottom-2 opacity-90 pointer-events-none">
-                    <BrandexLogo
-                      variant="logo17"
-                      size="md"
-                      primaryColor={themePrimary}
-                      discColor={universalSettings?.uiDarkColor || '#111111'}
-                      accentColor={universalSettings?.uiAccentColor || '#f5c400'}
-                    />
-                  </div>
                 </div>
 
                 {/* FOOTER */}
